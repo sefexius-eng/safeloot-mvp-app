@@ -1,0 +1,17 @@
+"use strict";
+Object.defineProperty(exports, "__esModule", { value: true });
+exports.apiRouter = void 0;
+const express_1 = require("express");
+const chat_routes_1 = require("./chat.routes");
+const health_routes_1 = require("./health.routes");
+const orders_routes_1 = require("./orders.routes");
+const products_routes_1 = require("./products.routes");
+const users_routes_1 = require("./users.routes");
+const webhooks_routes_1 = require("./webhooks.routes");
+exports.apiRouter = (0, express_1.Router)();
+exports.apiRouter.use("/health", health_routes_1.healthRouter);
+exports.apiRouter.use("/chat", chat_routes_1.chatRouter);
+exports.apiRouter.use("/orders", orders_routes_1.ordersRouter);
+exports.apiRouter.use("/products", products_routes_1.productsRouter);
+exports.apiRouter.use("/users", users_routes_1.usersRouter);
+exports.apiRouter.use("/webhooks", webhooks_routes_1.webhooksRouter);

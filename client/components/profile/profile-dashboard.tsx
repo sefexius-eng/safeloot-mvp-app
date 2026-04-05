@@ -1,0 +1,257 @@
+"use client";
+
+import Link from "next/link";
+import { useEffect, useState } from "react";
+import { useSession } from "next-auth/react";
+
+type ProductType = "ITEM" | "ACCOUNT" | "SERVICE";
+
+interface CurrentUser {
+  id: string;
+  email: string;
+  role: string;
+  rank: string;
+  availableBalance: string;
+  holdBalance: string;
+  createdAt: string;
+}
+
+interface ProductItem {
+  id: string;
+  title: string;
+  description: string;
+  price: string;
+  gameId: string;
+  sellerId: string;
+  type: ProductType;
+  createdAt: string;
+  updatedAt: string;
+}
+
+function formatBalance(value: string) {
+  const numericValue = Number(value);
+
+  if (!Number.isFinite(numericValue)) {
+    return value;
+  }
+
+  return new Intl.NumberFormat("ru-RU", {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  }).format(numericValue);
+}
+
+function getProductTypeLabel(type: ProductType) {
+  switch (type) {
+    case "ITEM":
+      return "Предмет";
+    case "ACCOUNT":
+      return "Аккаунт";
+    case "SERVICE":
+      return "Услуга";
+    default:
+      return type;
+  }
+}
+
+export function ProfileDashboard() {
+  const { status } = useSession();
+  const [user, setUser] = useState<CurrentUser | null>(null);
+  const [products, setProducts] = useState<ProductItem[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [errorMessage, setErrorMessage] = useState("");
+
+  useEffect(() => {
+    let isMounted = true;
+
+    if (status === "loading") {
+      return () => {
+        isMounted = false;
+      };
+    }
+
+    if (status !== "authenticated") {
+      setUser(null);
+      setProducts([]);
+      setIsLoading(false);
+
+      return () => {
+        isMounted = false;
+      };
+    }
+
+    async function loadDashboard() {
+      setErrorMessage("");
+
+      try {
+        const [userResponse, productsResponse] = await Promise.all([
+          fetch("/api/users/me", { cache: "no-store" }),
+          fetch("/api/users/me/products", { cache: "no-store" }),
+        ]);
+
+        const [userPayload, productsPayload] = await Promise.all([
+          userResponse.json().catch(() => null),
+          productsResponse.json().catch(() => null),
+        ]);
+
+        if (!userResponse.ok) {
+          throw new Error(
+            (userPayload && userPayload.message) ||
+              (userPayload && userPayload.error) ||
+              "Не удалось загрузить профиль.",
+          );
+        }
+
+        if (!productsResponse.ok) {
+          throw new Error(
+            (productsPayload && productsPayload.message) ||
+              (productsPayload && productsPayload.error) ||
+              "Не удалось загрузить товары.",
+          );
+        }
+
+        if (isMounted) {
+          setUser(userPayload as CurrentUser);
+          setProducts(productsPayload as ProductItem[]);
+        }
+      } catch (error) {
+        if (isMounted) {
+          setErrorMessage(
+            error instanceof Error
+              ? error.message
+              : "Не удалось загрузить личный кабинет.",
+          );
+        }
+      } finally {
+        if (isMounted) {
+          setIsLoading(false);
+        }
+      }
+    }
+
+    void loadDashboard();
+
+    return () => {
+      isMounted = false;
+    };
+  }, [status]);
+
+  if (status === "loading" || isLoading) {
+    return (
+      <div className="rounded-[2rem] border border-white/10 bg-zinc-900/80 p-8 text-sm text-zinc-400 shadow-[0_24px_80px_rgba(0,0,0,0.28)] backdrop-blur">
+        Загружаем личный кабинет...
+      </div>
+    );
+  }
+
+  if (status !== "authenticated") {
+    return (
+      <div className="rounded-[2rem] border border-white/10 bg-zinc-900/80 p-8 text-sm leading-7 text-zinc-300 shadow-[0_24px_80px_rgba(0,0,0,0.28)] backdrop-blur">
+        <p className="text-base font-semibold text-white">Авторизация требуется</p>
+        <p className="mt-3">
+          Чтобы открыть личный кабинет, войдите в аккаунт или зарегистрируйтесь.
+        </p>
+        <div className="mt-5 flex flex-wrap gap-3">
+          <Link href="/login" className="inline-flex rounded-2xl bg-orange-600 px-5 py-3 text-sm font-semibold text-white transition hover:bg-orange-500">
+            Войти
+          </Link>
+          <Link href="/register" className="inline-flex rounded-2xl border border-white/10 bg-white/5 px-5 py-3 text-sm font-semibold text-zinc-200 transition hover:bg-white/10">
+            Регистрация
+          </Link>
+        </div>
+      </div>
+    );
+  }
+
+  if (!user || errorMessage) {
+    return (
+      <div className="rounded-[2rem] border border-red-500/15 bg-red-500/10 p-8 text-sm leading-7 text-red-200 shadow-[0_24px_80px_rgba(0,0,0,0.28)] backdrop-blur">
+        {errorMessage || "Не удалось загрузить личный кабинет."}
+      </div>
+    );
+  }
+
+  return (
+    <section className="space-y-8">
+      <div className="grid gap-5 md:grid-cols-2">
+        <article className="rounded-[2rem] border border-emerald-500/15 bg-[linear-gradient(180deg,rgba(5,150,105,0.12),rgba(9,9,11,0.92))] p-6 shadow-[0_20px_60px_rgba(0,0,0,0.22)]">
+          <p className="text-xs font-semibold tracking-[0.24em] uppercase text-emerald-300/80">
+            Доступно к выводу
+          </p>
+          <p className="mt-4 text-4xl font-semibold tracking-tight text-white md:text-5xl">
+            {formatBalance(user.availableBalance)}
+          </p>
+          <p className="mt-3 text-sm leading-7 text-zinc-300">
+            Баланс, который продавец может использовать после вывода из внутренней системы.
+          </p>
+        </article>
+
+        <article className="rounded-[2rem] border border-sky-500/15 bg-[linear-gradient(180deg,rgba(14,165,233,0.12),rgba(9,9,11,0.92))] p-6 shadow-[0_20px_60px_rgba(0,0,0,0.22)]">
+          <p className="text-xs font-semibold tracking-[0.24em] uppercase text-sky-300/80">
+            В холде (Escrow)
+          </p>
+          <p className="mt-4 text-4xl font-semibold tracking-tight text-white md:text-5xl">
+            {formatBalance(user.holdBalance)}
+          </p>
+          <p className="mt-3 text-sm leading-7 text-zinc-300">
+            Средства по завершенным сделкам, зафиксированные во внутреннем escrow-балансе.
+          </p>
+        </article>
+      </div>
+
+      <section className="rounded-[2rem] border border-white/10 bg-zinc-900/80 p-6 shadow-[0_24px_80px_rgba(0,0,0,0.28)] backdrop-blur md:p-8">
+        <div className="flex flex-col gap-3 border-b border-white/10 pb-5 md:flex-row md:items-end md:justify-between">
+          <div>
+            <p className="text-sm font-semibold tracking-[0.24em] uppercase text-zinc-500">
+              Личный кабинет
+            </p>
+            <h2 className="mt-2 text-2xl font-semibold tracking-tight text-white md:text-3xl">
+              Мои товары
+            </h2>
+          </div>
+
+          <div className="text-sm text-zinc-400">
+            Продавец: <span className="font-medium text-zinc-200">{user.email}</span>
+          </div>
+        </div>
+
+        {products.length === 0 ? (
+          <div className="mt-6 rounded-[1.5rem] border border-white/10 bg-white/5 p-6 text-sm leading-7 text-zinc-400">
+            У вас пока нет опубликованных товаров. <Link href="/sell" className="font-semibold text-orange-300 transition hover:text-orange-200">Перейти к размещению</Link>
+          </div>
+        ) : (
+          <div className="mt-6 overflow-hidden rounded-[1.5rem] border border-white/10">
+            <div className="grid grid-cols-[minmax(0,1.5fr)_120px_130px_120px] gap-4 border-b border-white/10 bg-white/5 px-5 py-4 text-xs font-semibold tracking-[0.2em] uppercase text-zinc-500">
+              <span>Товар</span>
+              <span>Игра</span>
+              <span>Тип</span>
+              <span>Цена</span>
+            </div>
+
+            <div className="divide-y divide-white/10">
+              {products.map((product) => (
+                <Link
+                  key={product.id}
+                  href={`/product/${product.id}`}
+                  className="grid grid-cols-[minmax(0,1.5fr)_120px_130px_120px] gap-4 px-5 py-4 transition hover:bg-white/5"
+                >
+                  <div className="min-w-0">
+                    <p className="truncate text-sm font-semibold text-white">
+                      {product.title}
+                    </p>
+                    <p className="mt-1 truncate text-sm text-zinc-500">
+                      #{product.id}
+                    </p>
+                  </div>
+                  <span className="text-sm text-zinc-300">{product.gameId}</span>
+                  <span className="text-sm text-zinc-300">{getProductTypeLabel(product.type)}</span>
+                  <span className="text-sm font-semibold text-white">{formatBalance(product.price)}</span>
+                </Link>
+              ))}
+            </div>
+          </div>
+        )}
+      </section>
+    </section>
+  );
+}

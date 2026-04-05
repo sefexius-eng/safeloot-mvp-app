@@ -1,0 +1,164 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum UserRole {
+  ADMIN
+  USER
+}
+
+enum SellerRank {
+  BRONZE
+  SILVER
+  GOLD
+}
+
+enum ProductType {
+  ITEM
+  ACCOUNT
+  SERVICE
+}
+
+enum OrderStatus {
+  PENDING
+  PAID
+  DELIVERED
+  COMPLETED
+  DISPUTED
+  CANCELLED
+}
+
+enum TransactionType {
+  DEPOSIT
+  ESCROW_HOLD
+  ESCROW_RELEASE
+  WITHDRAWAL
+}
+
+enum TransactionStatus {
+  PENDING
+  COMPLETED
+  FAILED
+  CANCELLED
+}
+
+model User {
+  id               String        @id @default(cuid())
+  email            String        @unique
+  password         String
+  role             UserRole      @default(USER)
+  rank             SellerRank    @default(BRONZE)
+  holdBalance      Decimal       @default(0) @db.Decimal(36, 8)
+  availableBalance Decimal       @default(0) @db.Decimal(36, 8)
+  products         Product[]     @relation("SellerProducts")
+  buyerOrders      Order[]       @relation("BuyerOrders")
+  sellerOrders     Order[]       @relation("SellerOrders")
+  transactions     Transaction[]
+  buyerChatRooms   ChatRoom[]    @relation("BuyerChatRooms")
+  sellerChatRooms  ChatRoom[]    @relation("SellerChatRooms")
+  sentMessages     Message[]     @relation("MessageSender")
+  createdAt        DateTime      @default(now())
+  updatedAt        DateTime      @updatedAt
+
+  @@map("users")
+}
+
+model Product {
+  id          String      @id @default(cuid())
+  title       String
+  description String
+  price       Decimal     @db.Decimal(36, 8)
+  gameId      String
+  sellerId    String
+  type        ProductType
+  seller      User        @relation("SellerProducts", fields: [sellerId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+  orders      Order[]
+  createdAt   DateTime    @default(now())
+  updatedAt   DateTime    @updatedAt
+
+  @@index([sellerId])
+  @@index([gameId])
+  @@index([type])
+  @@map("products")
+}
+
+model Order {
+  id           String        @id @default(cuid())
+  buyerId      String
+  sellerId     String
+  productId    String
+  price        Decimal       @db.Decimal(36, 8)
+  platformFee  Decimal       @default(0) @db.Decimal(36, 8)
+  status       OrderStatus   @default(PENDING)
+  buyer        User          @relation("BuyerOrders", fields: [buyerId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+  seller       User          @relation("SellerOrders", fields: [sellerId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+  product      Product       @relation(fields: [productId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+  chatRoom     ChatRoom?
+  transactions Transaction[]
+  createdAt    DateTime      @default(now())
+  updatedAt    DateTime      @updatedAt
+
+  @@index([buyerId])
+  @@index([sellerId])
+  @@index([productId])
+  @@index([status])
+  @@map("orders")
+}
+
+model Transaction {
+  id         String            @id @default(cuid())
+  userId     String
+  orderId    String?
+  amount     Decimal           @db.Decimal(36, 8)
+  currency   String            @default("USDT")
+  externalId String?           @unique
+  type       TransactionType
+  status     TransactionStatus @default(PENDING)
+  user       User              @relation(fields: [userId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+  order      Order?            @relation(fields: [orderId], references: [id], onDelete: SetNull, onUpdate: Cascade)
+  createdAt  DateTime          @default(now())
+  updatedAt  DateTime          @updatedAt
+
+  @@index([userId])
+  @@index([orderId])
+  @@index([type])
+  @@index([status])
+  @@map("transactions")
+}
+
+model ChatRoom {
+  id        String    @id @default(cuid())
+  orderId   String    @unique
+  buyerId   String
+  sellerId  String
+  order     Order     @relation(fields: [orderId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+  buyer     User      @relation("BuyerChatRooms", fields: [buyerId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+  seller    User      @relation("SellerChatRooms", fields: [sellerId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+  messages  Message[]
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+
+  @@index([buyerId])
+  @@index([sellerId])
+  @@map("chat_rooms")
+}
+
+model Message {
+  id         String   @id @default(cuid())
+  chatRoomId String
+  senderId   String
+  content    String
+  chatRoom   ChatRoom @relation(fields: [chatRoomId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+  sender     User     @relation("MessageSender", fields: [senderId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  @@index([chatRoomId])
+  @@index([senderId])
+  @@map("messages")
+}
