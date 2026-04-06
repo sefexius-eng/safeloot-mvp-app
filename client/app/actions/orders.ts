@@ -10,9 +10,11 @@ import {
 } from "@/lib/access-control";
 import { getAuthSession } from "@/lib/auth";
 import {
-  confirmOrder,
+  completeOrder,
+  confirmOrder as confirmPendingPayment,
   createOrder,
   openOrderDispute,
+  refundOrder as refundOrderBySeller,
   resolveOrderDisputeToBuyer,
   resolveOrderDisputeToSeller,
 } from "@/lib/marketplace";
@@ -106,7 +108,7 @@ export async function processPayment(
   try {
     const currentUser = await requireActiveOrderUser();
 
-    result = await confirmOrder({
+    result = await confirmPendingPayment({
       orderId,
       buyerId: currentUser.id,
     });
@@ -141,6 +143,57 @@ export async function openDispute(orderId: string): Promise<OrderActionResult> {
     return {
       ok: false,
       message: error instanceof Error ? error.message : "Не удалось открыть спор.",
+    };
+  }
+}
+
+export async function confirmOrder(orderId: string): Promise<OrderActionResult> {
+  try {
+    const currentUser = await requireActiveOrderUser();
+    const result = await completeOrder({
+      orderId,
+      buyerId: currentUser.id,
+    });
+
+    revalidateOrderPaths(result.orderId);
+
+    return {
+      ok: true,
+      status: result.status,
+      platformFee: result.platformFee,
+      sellerNetAmount: result.sellerNetAmount,
+    };
+  } catch (error) {
+    return {
+      ok: false,
+      message:
+        error instanceof Error
+          ? error.message
+          : "Не удалось подтвердить получение товара.",
+    };
+  }
+}
+
+export async function refundOrder(orderId: string): Promise<OrderActionResult> {
+  try {
+    const currentUser = await requireActiveOrderUser();
+    const result = await refundOrderBySeller({
+      orderId,
+      sellerId: currentUser.id,
+    });
+
+    revalidateOrderPaths(result.orderId);
+
+    return {
+      ok: true,
+      status: result.status,
+      refundAmount: result.refundAmount,
+    };
+  } catch (error) {
+    return {
+      ok: false,
+      message:
+        error instanceof Error ? error.message : "Не удалось оформить возврат.",
     };
   }
 }

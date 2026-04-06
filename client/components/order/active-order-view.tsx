@@ -8,10 +8,16 @@ import { useSession } from "next-auth/react";
 
 import { markMessagesAsRead, sendMessage } from "@/app/actions/chat";
 import {
+  confirmOrder,
   openDispute,
+  refundOrder,
   resolveDisputeToBuyer,
   resolveDisputeToSeller,
 } from "@/app/actions/orders";
+import {
+  useCurrency,
+  type CurrencyCode,
+} from "@/components/providers/currency-provider";
 import { createReview } from "@/app/actions/reviews";
 import CensoredText from "@/components/censored-text";
 import { RatingStars } from "@/components/reviews/rating-stars";
@@ -108,14 +114,6 @@ interface ChatTypingResponse {
   typingUsers: TypingUser[];
 }
 
-interface CompleteOrderResponse {
-  orderId: string;
-  transactionId: string;
-  status: OrderStatus;
-  platformFee: string;
-  sellerNetAmount?: string;
-}
-
 interface ActiveOrderViewProps {
   orderId: string;
 }
@@ -167,17 +165,46 @@ function formatMessageTime(value: string) {
   }).format(new Date(value));
 }
 
-function formatAmount(value: string) {
+function attachCurrencySymbol(
+  currency: CurrencyCode,
+  currencySymbol: string,
+  formattedValue: string,
+) {
+  if (currency === "USD" || currency === "EUR") {
+    return `${currencySymbol}${formattedValue}`;
+  }
+
+  return `${formattedValue} ${currencySymbol}`;
+}
+
+function formatAmountWithoutFractions(
+  value: string | number,
+  options: {
+    currency: CurrencyCode;
+    currentRate: number;
+    currencySymbol: string;
+  },
+) {
   const parsedValue = Number(value);
 
   if (!Number.isFinite(parsedValue)) {
-    return value;
+    return attachCurrencySymbol(options.currency, options.currencySymbol, "0");
   }
 
-  return new Intl.NumberFormat("ru-RU", {
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2,
-  }).format(parsedValue);
+  const convertedValue = parsedValue * options.currentRate;
+  const wholeValue = Math.floor(convertedValue + Number.EPSILON);
+  const localizedValue = new Intl.NumberFormat("en-US", {
+    minimumFractionDigits: 0,
+    maximumFractionDigits: 0,
+  })
+    .format(wholeValue)
+    .replace(/,/g, " ");
+
+  return attachCurrencySymbol(
+    options.currency,
+    options.currencySymbol,
+    localizedValue,
+  );
 }
 
 function formatReviewTime(value: string) {
@@ -290,6 +317,7 @@ async function compressChatImage(file: File) {
 
 export function ActiveOrderView({ orderId }: ActiveOrderViewProps) {
   const { data: session, status: sessionStatus } = useSession();
+  const { currency, currentRate, currencySymbol } = useCurrency();
   const router = useRouter();
   const [isReviewPending, startReviewTransition] = useTransition();
   const [order, setOrder] = useState<OrderDetail | null>(null);
@@ -305,6 +333,7 @@ export function ActiveOrderView({ orderId }: ActiveOrderViewProps) {
   const [isSending, setIsSending] = useState(false);
   const [isProcessingAttachment, setIsProcessingAttachment] = useState(false);
   const [isCompleting, setIsCompleting] = useState(false);
+  const [isRefunding, setIsRefunding] = useState(false);
   const [isOpeningDispute, setIsOpeningDispute] = useState(false);
   const [isResolvingToBuyer, setIsResolvingToBuyer] = useState(false);
   const [isResolvingToSeller, setIsResolvingToSeller] = useState(false);
@@ -789,45 +818,80 @@ export function ActiveOrderView({ orderId }: ActiveOrderViewProps) {
     setCompleteMessage("");
 
     try {
-      const response = await fetch(`/api/orders/${orderId}/complete`, {
-        method: "POST",
-      });
+      const result = await confirmOrder(orderId);
 
-      const payload = (await response.json().catch(() => null)) as
-        | { message?: string; error?: string }
-        | CompleteOrderResponse
-        | null;
-
-      if (!response.ok) {
+      if (!result.ok || !result.status) {
         throw new Error(
-          (payload && "message" in payload && payload.message) ||
-            (payload && "error" in payload && payload.error) ||
-            "Не удалось завершить сделку.",
+          result.message ?? "Не удалось подтвердить получение товара.",
         );
       }
-
-      const completedOrder = payload as CompleteOrderResponse;
 
       setOrder((currentOrder) =>
         currentOrder
           ? {
               ...currentOrder,
-              status: completedOrder.status,
-              platformFee: completedOrder.platformFee,
+              status: result.status as OrderStatus,
+              platformFee: result.platformFee ?? currentOrder.platformFee,
             }
           : currentOrder,
       );
-      setCompleteMessage("Сделка завершена. Средства зачислены продавцу на доступный баланс.");
+      setCompleteMessage(
+        result.sellerNetAmount
+          ? `Сделка завершена. Продавцу зачислено ${formatAmountWithoutFractions(result.sellerNetAmount, { currency, currentRate, currencySymbol })}.`
+          : "Сделка завершена. Средства зачислены продавцу на доступный баланс.",
+      );
       window.dispatchEvent(new Event(BALANCE_REFRESH_EVENT));
       router.refresh();
     } catch (error) {
       setActionError(
         error instanceof Error
           ? error.message
-          : "Не удалось завершить сделку.",
+          : "Не удалось подтвердить получение товара.",
       );
     } finally {
       setIsCompleting(false);
+    }
+  }
+
+  async function handleRefundOrder() {
+    if (!currentUserId) {
+      setActionError("Чтобы оформить возврат, выполните вход.");
+      return;
+    }
+
+    setIsRefunding(true);
+    setActionError("");
+    setCompleteMessage("");
+
+    try {
+      const result = await refundOrder(orderId);
+
+      if (!result.ok || !result.status) {
+        throw new Error(result.message ?? "Не удалось оформить возврат.");
+      }
+
+      setOrder((currentOrder) =>
+        currentOrder
+          ? {
+              ...currentOrder,
+              status: result.status as OrderStatus,
+              platformFee: "0.00000000",
+            }
+          : currentOrder,
+      );
+      setCompleteMessage(
+        result.refundAmount
+          ? `Возврат выполнен. Покупателю возвращено ${formatAmountWithoutFractions(result.refundAmount, { currency, currentRate, currencySymbol })}.`
+          : "Возврат выполнен. Средства возвращены покупателю.",
+      );
+      window.dispatchEvent(new Event(BALANCE_REFRESH_EVENT));
+      router.refresh();
+    } catch (error) {
+      setActionError(
+        error instanceof Error ? error.message : "Не удалось оформить возврат.",
+      );
+    } finally {
+      setIsRefunding(false);
     }
   }
 
@@ -887,7 +951,7 @@ export function ActiveOrderView({ orderId }: ActiveOrderViewProps) {
       );
       setCompleteMessage(
         result.refundAmount
-          ? `Арбитраж завершен: покупателю возвращено ${formatAmount(result.refundAmount)} USDT.`
+          ? `Арбитраж завершен: покупателю возвращено ${formatAmountWithoutFractions(result.refundAmount, { currency, currentRate, currencySymbol })}.`
           : "Арбитраж завершен в пользу покупателя.",
       );
       window.dispatchEvent(new Event(BALANCE_REFRESH_EVENT));
@@ -926,7 +990,7 @@ export function ActiveOrderView({ orderId }: ActiveOrderViewProps) {
       );
       setCompleteMessage(
         result.sellerNetAmount
-          ? `Арбитраж завершен: продавцу начислено ${formatAmount(result.sellerNetAmount)} USDT.`
+          ? `Арбитраж завершен: продавцу начислено ${formatAmountWithoutFractions(result.sellerNetAmount, { currency, currentRate, currencySymbol })}.`
           : "Арбитраж завершен в пользу продавца.",
       );
       window.dispatchEvent(new Event(BALANCE_REFRESH_EVENT));
@@ -1062,7 +1126,10 @@ export function ActiveOrderView({ orderId }: ActiveOrderViewProps) {
     isParticipant && (order.status === "PAID" || order.status === "DELIVERED");
   const canCompleteOrder =
     currentUserId === order.buyerId &&
-    (order.status === "PAID" || order.status === "DELIVERED");
+    (order.status === "PAID" || order.status === "DISPUTED");
+  const canRefundOrder =
+    currentUserId === order.sellerId &&
+    (order.status === "PAID" || order.status === "DISPUTED");
   const showArbiterPanel = isSpectator && order.status === "DISPUTED";
   const isChatReadOnly = isSpectator;
   const canLeaveReview =
@@ -1070,6 +1137,19 @@ export function ActiveOrderView({ orderId }: ActiveOrderViewProps) {
     currentUserId === order.buyerId &&
     !order.review;
   const reviewTitle = currentUserId === order.buyerId ? "Ваш отзыв" : "Отзыв покупателя";
+  const formattedOrderPrice = formatAmountWithoutFractions(order.price, {
+    currency,
+    currentRate,
+    currencySymbol,
+  });
+  const formattedSellerPayout = formatAmountWithoutFractions(
+    Number(order.price) * 0.95,
+    {
+      currency,
+      currentRate,
+      currencySymbol,
+    },
+  );
 
   return (
     <section className="grid gap-6 lg:grid-cols-[minmax(0,1.4fr)_360px] lg:items-start">
@@ -1173,7 +1253,7 @@ export function ActiveOrderView({ orderId }: ActiveOrderViewProps) {
 
         {order.status === "DISPUTED" ? (
           <div className="mt-5 rounded-[1.5rem] border border-amber-500/25 bg-amber-500/10 p-4 text-sm leading-7 text-amber-100">
-            Сделка находится в споре. Выдача средств и финальное закрытие заморожены до решения арбитра.
+            Сделка находится в споре. Покупатель может подтвердить получение, продавец может оформить возврат, а арбитр при необходимости вмешается и зафиксирует итог.
           </div>
         ) : null}
 
@@ -1442,11 +1522,11 @@ export function ActiveOrderView({ orderId }: ActiveOrderViewProps) {
               Сумма
             </p>
             <p className="mt-3 text-lg font-semibold text-white">
-              {formatAmount(order.price)}
+              {formattedOrderPrice}
             </p>
             {isCurrentUserSeller ? (
               <p className="mt-3 text-sm text-emerald-300">
-                К зачислению: {(Number(order.price) * 0.95).toFixed(2)} (Комиссия 5%)
+                К зачислению: {formattedSellerPayout} (Комиссия 5%)
               </p>
             ) : null}
           </div>
@@ -1541,7 +1621,18 @@ export function ActiveOrderView({ orderId }: ActiveOrderViewProps) {
             disabled={isCompleting || !currentUserId}
             className="mt-6 h-14 w-full rounded-[1.35rem] bg-emerald-600 text-base font-semibold shadow-[0_18px_42px_rgba(5,150,105,0.35)] hover:bg-emerald-500"
           >
-            {isCompleting ? "Подтверждаем получение..." : "Подтвердить получение товара"}
+            {isCompleting ? "Подтверждаем получение..." : "Подтвердить получение"}
+          </Button>
+        ) : null}
+
+        {canRefundOrder ? (
+          <Button
+            type="button"
+            onClick={handleRefundOrder}
+            disabled={isRefunding || !currentUserId}
+            className="mt-6 h-14 w-full rounded-[1.35rem] bg-orange-600 text-base font-semibold shadow-[0_18px_42px_rgba(234,88,12,0.35)] hover:bg-orange-500"
+          >
+            {isRefunding ? "Оформляем возврат..." : "Сделать возврат"}
           </Button>
         ) : null}
 

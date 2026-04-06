@@ -497,6 +497,7 @@ export function mapMarketplaceErrorToStatusCode(message: string) {
   if (
     message.includes("cannot be confirmed") ||
     message.includes("cannot be completed") ||
+    message.includes("cannot be refunded") ||
     message.includes("cannot be disputed") ||
     message.includes("cannot be resolved") ||
     message.includes("Checkout is not available") ||
@@ -1499,7 +1500,10 @@ export async function completeOrder(input: { orderId: string; buyerId: string })
         throw new Error("Only the buyer can complete this order.");
       }
 
-      if (order.status !== OrderStatus.PAID) {
+      if (
+        order.status !== OrderStatus.PAID &&
+        order.status !== OrderStatus.DISPUTED
+      ) {
         throw new Error(
           `Order ${orderId} cannot be completed from status ${order.status}.`,
         );
@@ -1520,7 +1524,9 @@ export async function completeOrder(input: { orderId: string; buyerId: string })
       const updatedOrder = await transactionClient.order.updateMany({
         where: {
           id: order.id,
-          status: OrderStatus.PAID,
+          status: {
+            in: [OrderStatus.PAID, OrderStatus.DISPUTED],
+          },
         },
         data: {
           status: OrderStatus.COMPLETED,
@@ -1590,6 +1596,122 @@ export async function completeOrder(input: { orderId: string; buyerId: string })
         status: OrderStatus.COMPLETED,
         platformFee: formatMoney(fee),
         sellerNetAmount: formatMoney(sellerPayout),
+      };
+    },
+    {
+      isolationLevel: Prisma.TransactionIsolationLevel.Serializable,
+    },
+  );
+}
+
+export async function refundOrder(input: { orderId: string; sellerId: string }) {
+  const orderId = normalizeText(input.orderId);
+  const sellerId = normalizeText(input.sellerId);
+
+  if (!orderId) {
+    throw new Error("orderId is required.");
+  }
+
+  if (!sellerId) {
+    throw new Error("sellerId is required.");
+  }
+
+  return prisma.$transaction(
+    async (transactionClient) => {
+      const order = await transactionClient.order.findUnique({
+        where: { id: orderId },
+        select: {
+          id: true,
+          buyerId: true,
+          sellerId: true,
+          price: true,
+          status: true,
+        },
+      });
+
+      if (!order) {
+        throw new Error(`Order with id ${orderId} was not found.`);
+      }
+
+      if (order.sellerId !== sellerId) {
+        throw new Error("Only the seller can refund this order.");
+      }
+
+      if (
+        order.status !== OrderStatus.PAID &&
+        order.status !== OrderStatus.DISPUTED
+      ) {
+        throw new Error(
+          `Order ${orderId} cannot be refunded from status ${order.status}.`,
+        );
+      }
+
+      const refundAmount = order.price.toDecimalPlaces(
+        MONEY_SCALE,
+        Prisma.Decimal.ROUND_HALF_UP,
+      );
+      const platformAdmin = await getPlatformAdminAccount(transactionClient);
+      const escrowHoldTransaction = await findCompletedEscrowHoldTransaction(
+        transactionClient,
+        {
+          orderId: order.id,
+          adminUserId: platformAdmin.id,
+        },
+      );
+
+      const updatedOrder = await transactionClient.order.updateMany({
+        where: {
+          id: order.id,
+          status: {
+            in: [OrderStatus.PAID, OrderStatus.DISPUTED],
+          },
+        },
+        data: {
+          status: OrderStatus.REFUNDED,
+          platformFee: new Prisma.Decimal(0),
+          commission: 0,
+        },
+      });
+
+      if (updatedOrder.count !== 1) {
+        throw new Error(`Order ${orderId} could not be refunded.`);
+      }
+
+      if (escrowHoldTransaction) {
+        await transactionClient.user.update({
+          where: {
+            id: platformAdmin.id,
+          },
+          data: {
+            holdBalance: {
+              decrement: refundAmount,
+            },
+          },
+        });
+      }
+
+      await transactionClient.user.update({
+        where: {
+          id: order.buyerId,
+        },
+        data: {
+          availableBalance: {
+            increment: refundAmount,
+          },
+        },
+      });
+
+      await createUserNotification(transactionClient, {
+        userId: order.buyerId,
+        title: "Возврат по сделке",
+        message: "Продавец оформил возврат средств по заказу.",
+        link: `/orders/${order.id}`,
+      });
+
+      return {
+        orderId: order.id,
+        status: OrderStatus.REFUNDED,
+        refundAmount: formatMoney(refundAmount),
       };
     },
     {
