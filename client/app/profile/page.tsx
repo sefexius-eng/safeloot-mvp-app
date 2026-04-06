@@ -1,8 +1,10 @@
 import Link from "next/link";
 
 import { ProfileDashboard } from "@/components/profile/profile-dashboard";
+import { WithdrawalPanel } from "@/components/profile/withdrawal-panel";
 import { getAuthSession } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
+import { mapWithdrawalListItem } from "@/lib/withdrawals";
 
 export const dynamic = "force-dynamic";
 
@@ -60,19 +62,37 @@ export default async function ProfilePage() {
     session?.user?.name?.trim() ||
     session?.user?.email?.split("@")[0] ||
     "Продавец";
-  const sales = sellerId
-    ? await prisma.order.findMany({
-        where: {
-          sellerId,
-        },
-        include: {
-          product: true,
-        },
-        orderBy: {
-          createdAt: "desc",
-        },
-      })
-    : [];
+  const [sales, sellerAccount, withdrawals] = sellerId
+    ? await Promise.all([
+        prisma.order.findMany({
+          where: {
+            sellerId,
+          },
+          include: {
+            product: true,
+          },
+          orderBy: {
+            createdAt: "desc",
+          },
+        }),
+        prisma.user.findUnique({
+          where: {
+            id: sellerId,
+          },
+          select: {
+            availableBalance: true,
+          },
+        }),
+        prisma.withdrawal.findMany({
+          where: {
+            userId: sellerId,
+          },
+          orderBy: {
+            createdAt: "desc",
+          },
+        }),
+      ])
+    : [[], null, []];
 
   return (
     <main className="mx-auto flex w-full max-w-7xl flex-col gap-8 px-4 py-10 sm:px-6 lg:px-8 lg:py-14">
@@ -100,6 +120,12 @@ export default async function ProfilePage() {
       </section>
 
       <ProfileDashboard />
+
+      <WithdrawalPanel
+        isAuthenticated={Boolean(sellerId)}
+        availableBalance={sellerAccount?.availableBalance.toFixed(8) ?? "0"}
+        withdrawals={withdrawals.map(mapWithdrawalListItem)}
+      />
 
       <section className="rounded-[2rem] border border-white/10 bg-zinc-900/80 p-6 shadow-[0_24px_80px_rgba(0,0,0,0.28)] backdrop-blur md:p-8">
         <div className="flex flex-col gap-3 border-b border-white/10 pb-5 md:flex-row md:items-end md:justify-between">

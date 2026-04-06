@@ -61,6 +61,7 @@ model User {
   sentMessages     Message[]     @relation("MessageSender")
   reviewsWritten   Review[]      @relation("ReviewAuthor")
   reviewsReceived  Review[]      @relation("ReviewSeller")
+  withdrawals      Withdrawal[]
   createdAt        DateTime      @default(now())
   updatedAt        DateTime      @updatedAt
 
@@ -172,6 +173,22 @@ model Transaction {
   @@index([type])
   @@index([status])
   @@map("transactions")
+}
+
+model Withdrawal {
+  id             String   @id @default(cuid())
+  amount         Decimal  @db.Decimal(36, 8)
+  paymentMethod  String
+  paymentDetails String
+  status         String   @default("PENDING")
+  userId         String
+  user           User     @relation(fields: [userId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  @@index([userId])
+  @@index([status])
+  @@map("withdrawals")
 }
 
 model ChatRoom {

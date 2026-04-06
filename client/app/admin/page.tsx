@@ -4,6 +4,7 @@ import { redirect } from "next/navigation";
 import {
   AdminDeleteProductButton,
   AdminToggleBanButton,
+  AdminWithdrawalActionButtons,
 } from "@/components/admin/admin-action-buttons";
 import { Badge } from "@/components/ui/badge";
 import {
@@ -27,6 +28,7 @@ import {
 } from "@/lib/access-control";
 import { getAuthSession } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
+import { getWithdrawalStatusMeta } from "@/lib/withdrawals";
 
 export const dynamic = "force-dynamic";
 
@@ -35,7 +37,13 @@ export const metadata: Metadata = {
   description: "Панель управления администратора маркетплейса SafeLoot.",
 };
 
-function formatUserName(email: string) {
+function formatUserName(email: string, name?: string | null) {
+  const normalizedName = name?.trim();
+
+  if (normalizedName) {
+    return normalizedName;
+  }
+
   const localPart = email.split("@")[0]?.trim() ?? "";
 
   if (!localPart) {
@@ -122,11 +130,12 @@ export default async function AdminDashboardPage() {
     redirect("/");
   }
 
-  const [users, products, orders] = await Promise.all([
+  const [users, products, orders, pendingWithdrawals] = await Promise.all([
     prisma.user.findMany({
       select: {
         id: true,
         email: true,
+        name: true,
         availableBalance: true,
         holdBalance: true,
         role: true,
@@ -199,6 +208,29 @@ export default async function AdminDashboardPage() {
         createdAt: "desc",
       },
     }),
+    prisma.withdrawal.findMany({
+      where: {
+        status: "PENDING",
+      },
+      select: {
+        id: true,
+        amount: true,
+        paymentMethod: true,
+        paymentDetails: true,
+        status: true,
+        createdAt: true,
+        user: {
+          select: {
+            id: true,
+            email: true,
+            name: true,
+          },
+        },
+      },
+      orderBy: {
+        createdAt: "desc",
+      },
+    }),
   ]);
 
   const adminCount = users.filter((user) => user.role === "ADMIN").length;
@@ -209,6 +241,7 @@ export default async function AdminDashboardPage() {
   const activeOrdersCount = orders.filter(
     (order) => order.status !== "COMPLETED" && order.status !== "CANCELLED",
   ).length;
+  const pendingWithdrawalsCount = pendingWithdrawals.length;
 
   return (
     <main className="mx-auto flex w-full max-w-[92rem] flex-col gap-8 px-4 py-10 sm:px-6 lg:px-8 lg:py-14">
@@ -307,6 +340,15 @@ export default async function AdminDashboardPage() {
                 <span>Сделки</span>
                 <Badge variant="secondary">{orders.length}</Badge>
               </a>
+              <a
+                href="#withdrawals"
+                className="flex items-center justify-between rounded-[1.25rem] border border-white/10 bg-white/5 px-4 py-3 text-sm font-semibold text-zinc-100 transition hover:bg-white/10"
+              >
+                <span>Заявки на вывод</span>
+                <Badge variant={pendingWithdrawalsCount > 0 ? "warning" : "secondary"}>
+                  {pendingWithdrawalsCount}
+                </Badge>
+              </a>
               <div className="rounded-[1.5rem] border border-sky-500/15 bg-sky-500/5 p-4 text-sm leading-7 text-zinc-300">
                 Блокировка пользователей и удаление товаров уже подключены через server actions с автоматическим обновлением панели.
               </div>
@@ -350,7 +392,7 @@ export default async function AdminDashboardPage() {
                           <TableRow key={user.id}>
                             <TableCell>
                               <div className="space-y-1">
-                                <p className="font-semibold text-white">{formatUserName(user.email)}</p>
+                                <p className="font-semibold text-white">{formatUserName(user.email, user.name)}</p>
                                 <p className="text-xs uppercase tracking-[0.18em] text-zinc-500">
                                   ID: {user.id.slice(0, 10)}...
                                 </p>
@@ -547,6 +589,92 @@ export default async function AdminDashboardPage() {
                     </Table>
                   </div>
                 </div>
+              </CardContent>
+            </Card>
+          </section>
+
+          <section id="withdrawals" className="scroll-mt-24">
+            <Card>
+              <CardHeader className="border-b border-white/10">
+                <div className="flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
+                  <div>
+                    <CardDescription>Payout Moderation</CardDescription>
+                    <CardTitle>Заявки на вывод</CardTitle>
+                  </div>
+                  <Badge variant={pendingWithdrawalsCount > 0 ? "warning" : "success"}>
+                    Pending: {pendingWithdrawalsCount}
+                  </Badge>
+                </div>
+              </CardHeader>
+              <CardContent className="pt-6">
+                {pendingWithdrawals.length === 0 ? (
+                  <div className="rounded-[1.5rem] border border-white/10 bg-white/5 p-6 text-sm leading-7 text-zinc-400">
+                    Сейчас нет заявок на вывод со статусом PENDING.
+                  </div>
+                ) : (
+                  <div className="overflow-hidden rounded-[1.5rem] border border-white/10 bg-black/10">
+                    <div className="overflow-x-auto">
+                      <Table>
+                        <TableHeader>
+                          <TableRow>
+                            <TableHead>Никнейм</TableHead>
+                            <TableHead>Сумма</TableHead>
+                            <TableHead>Метод</TableHead>
+                            <TableHead>Реквизиты</TableHead>
+                            <TableHead>Статус</TableHead>
+                            <TableHead>Создана</TableHead>
+                            <TableHead className="text-right">Действие</TableHead>
+                          </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                          {pendingWithdrawals.map((withdrawal) => {
+                            const statusMeta = getWithdrawalStatusMeta(withdrawal.status);
+
+                            return (
+                              <TableRow key={withdrawal.id}>
+                                <TableCell>
+                                  <div className="space-y-1">
+                                    <p className="font-semibold text-white">
+                                      {formatUserName(withdrawal.user.email, withdrawal.user.name)}
+                                    </p>
+                                    <p className="text-xs uppercase tracking-[0.18em] text-zinc-500">
+                                      {withdrawal.user.email}
+                                    </p>
+                                  </div>
+                                </TableCell>
+                                <TableCell className="font-semibold text-white">
+                                  {formatAmount(withdrawal.amount)} USDT
+                                </TableCell>
+                                <TableCell className="text-zinc-300">
+                                  {withdrawal.paymentMethod}
+                                </TableCell>
+                                <TableCell>
+                                  <p className="max-w-[320px] break-all text-sm leading-6 text-zinc-300">
+                                    {withdrawal.paymentDetails}
+                                  </p>
+                                </TableCell>
+                                <TableCell>
+                                  <Badge variant={statusMeta.variant}>{statusMeta.label}</Badge>
+                                </TableCell>
+                                <TableCell>
+                                  <p className="text-sm text-zinc-300">
+                                    {new Intl.DateTimeFormat("ru-RU", {
+                                      dateStyle: "medium",
+                                      timeStyle: "short",
+                                    }).format(withdrawal.createdAt)}
+                                  </p>
+                                </TableCell>
+                                <TableCell className="text-right">
+                                  <AdminWithdrawalActionButtons withdrawalId={withdrawal.id} />
+                                </TableCell>
+                              </TableRow>
+                            );
+                          })}
+                        </TableBody>
+                      </Table>
+                    </div>
+                  </div>
+                )}
               </CardContent>
             </Card>
           </section>

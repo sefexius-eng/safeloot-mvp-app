@@ -10,6 +10,8 @@ import { SellerRatingBadge } from "@/components/reviews/seller-rating-badge";
 import { UserAvatar } from "@/components/ui/user-avatar";
 import type { SellerReviewSummary } from "@/lib/review-summary";
 
+const BALANCE_REFRESH_EVENT = "safeloot:balances-refresh";
+
 interface CurrentUser {
   id: string;
   email: string;
@@ -73,6 +75,19 @@ export function ProfileDashboard() {
   const [products, setProducts] = useState<ProductItem[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [errorMessage, setErrorMessage] = useState("");
+  const [refreshToken, setRefreshToken] = useState(0);
+
+  useEffect(() => {
+    function handleBalanceRefresh() {
+      setRefreshToken((currentValue) => currentValue + 1);
+    }
+
+    window.addEventListener(BALANCE_REFRESH_EVENT, handleBalanceRefresh);
+
+    return () => {
+      window.removeEventListener(BALANCE_REFRESH_EVENT, handleBalanceRefresh);
+    };
+  }, []);
 
   useEffect(() => {
     let isMounted = true;
@@ -147,7 +162,7 @@ export function ProfileDashboard() {
     return () => {
       isMounted = false;
     };
-  }, [status]);
+  }, [refreshToken, status]);
 
   if (status === "loading" || isLoading) {
     return (

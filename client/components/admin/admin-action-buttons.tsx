@@ -6,6 +6,10 @@ import {
   deleteProductAdmin,
   toggleBanUser,
 } from "@/app/admin/actions";
+import {
+  adminApproveWithdrawal,
+  adminRejectWithdrawal,
+} from "@/app/actions/withdraw";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 
@@ -17,6 +21,10 @@ interface AdminToggleBanButtonProps {
 interface AdminDeleteProductButtonProps {
   productId: string;
   canDelete: boolean;
+}
+
+interface AdminWithdrawalActionButtonsProps {
+  withdrawalId: string;
 }
 
 export function AdminToggleBanButton({
@@ -103,6 +111,67 @@ export function AdminDeleteProductButton({
         {isPending ? "Загрузка..." : "Удалить"}
       </Button>
       {error ? <p className="max-w-[220px] text-right text-xs text-rose-300">{error}</p> : null}
+    </div>
+  );
+}
+
+export function AdminWithdrawalActionButtons({
+  withdrawalId,
+}: AdminWithdrawalActionButtonsProps) {
+  const [isPending, startTransition] = useTransition();
+  const [error, setError] = useState<string | null>(null);
+
+  function handleAction(action: "approve" | "reject") {
+    const confirmationMessage =
+      action === "approve"
+        ? "Подтвердить, что заявка действительно выплачена?"
+        : "Отклонить заявку и вернуть средства пользователю?";
+
+    if (!window.confirm(confirmationMessage)) {
+      return;
+    }
+
+    setError(null);
+
+    startTransition(() => {
+      const actionRequest =
+        action === "approve"
+          ? adminApproveWithdrawal(withdrawalId)
+          : adminRejectWithdrawal(withdrawalId);
+
+      void actionRequest
+        .then((result) => {
+          if (!result.ok) {
+            setError(result.message ?? "Не удалось обработать заявку на вывод.");
+          }
+        })
+        .catch(() => {
+          setError("Не удалось обработать заявку на вывод.");
+        });
+    });
+  }
+
+  return (
+    <div className="flex flex-col items-end gap-2">
+      <div className="flex flex-wrap justify-end gap-2">
+        <Button
+          type="button"
+          onClick={() => handleAction("approve")}
+          disabled={isPending}
+          className="h-10 rounded-xl bg-emerald-600 px-4 text-white shadow-none hover:bg-emerald-500"
+        >
+          {isPending ? "Загрузка..." : "Выплачено"}
+        </Button>
+        <Button
+          type="button"
+          onClick={() => handleAction("reject")}
+          disabled={isPending}
+          className="h-10 rounded-xl bg-rose-600 px-4 text-white shadow-none hover:bg-rose-500"
+        >
+          {isPending ? "Загрузка..." : "Отклонить"}
+        </Button>
+      </div>
+      {error ? <p className="max-w-[260px] text-right text-xs text-rose-300">{error}</p> : null}
     </div>
   );
 }
