@@ -97,11 +97,11 @@ export function MarketplaceProductCard({ product }: MarketplaceProductCardProps)
           </div>
         </div>
 
-        <div className="rounded-[1.2rem] bg-black/40 px-4 py-3 text-right text-white shadow-[0_12px_26px_rgba(0,0,0,0.24)]">
+        <div className="min-w-fit shrink-0 rounded-[1.2rem] bg-black/40 px-4 py-3 text-right text-white shadow-[0_12px_26px_rgba(0,0,0,0.24)]">
           <p className="text-xs uppercase tracking-[0.2em] text-zinc-500">
             Цена
           </p>
-          <p className="mt-1 text-lg font-semibold tracking-tight">
+          <p className="mt-1 flex flex-row items-center justify-end whitespace-nowrap text-lg font-bold tracking-tight">
             {formatPrice(product.price)}
           </p>
         </div>
