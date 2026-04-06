@@ -7,6 +7,11 @@ import {
   AdminToggleBanButton,
   AdminWithdrawalActionButtons,
 } from "@/components/admin/admin-action-buttons";
+import {
+  AdminCensoredText,
+  AdminSafeModeProvider,
+  AdminSafeModeToggle,
+} from "@/components/admin/admin-safe-mode";
 import { PlatformRevenueCard } from "@/components/admin/platform-revenue-card";
 import { Badge } from "@/components/ui/badge";
 import {
@@ -27,6 +32,7 @@ import {
 import {
   getCurrentSessionUser,
   hasActiveAdminAccess,
+  isAdminRole,
 } from "@/lib/access-control";
 import { getAuthSession } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
@@ -133,7 +139,7 @@ export default async function AdminDashboardPage() {
   const session = await getAuthSession();
   const currentUser = await getCurrentSessionUser(session);
 
-  if (!hasActiveAdminAccess(currentUser)) {
+  if (!currentUser || !hasActiveAdminAccess(currentUser)) {
     redirect("/");
   }
 
@@ -170,6 +176,7 @@ export default async function AdminDashboardPage() {
         seller: {
           select: {
             email: true,
+            name: true,
             rank: true,
           },
         },
@@ -268,10 +275,12 @@ export default async function AdminDashboardPage() {
   ).length;
   const pendingWithdrawalsCount = pendingWithdrawals.length;
   const disputedOrdersCount = disputedOrders.length;
+  const canUseSafeMode = isAdminRole(currentUser.role);
 
   return (
-    <main className="mx-auto flex w-full max-w-[92rem] flex-col gap-8 px-4 py-10 sm:px-6 lg:px-8 lg:py-14">
-      <section className="overflow-hidden rounded-[2.5rem] border border-white/10 bg-[linear-gradient(145deg,rgba(249,115,22,0.14),rgba(15,23,42,0.88)_38%,rgba(14,165,233,0.12))] p-6 shadow-[0_32px_100px_rgba(0,0,0,0.34)] md:p-8 lg:p-10">
+    <AdminSafeModeProvider>
+      <main className="mx-auto flex w-full max-w-[92rem] flex-col gap-8 px-4 py-10 sm:px-6 lg:px-8 lg:py-14">
+        <section className="overflow-hidden rounded-[2.5rem] border border-white/10 bg-[linear-gradient(145deg,rgba(249,115,22,0.14),rgba(15,23,42,0.88)_38%,rgba(14,165,233,0.12))] p-6 shadow-[0_32px_100px_rgba(0,0,0,0.34)] md:p-8 lg:p-10">
         <div className="grid gap-8 lg:grid-cols-[minmax(0,1.5fr)_360px] lg:items-end">
           <div>
             <Badge variant="default">Admin Control Center</Badge>
@@ -293,6 +302,7 @@ export default async function AdminDashboardPage() {
           </div>
 
           <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-1">
+            {canUseSafeMode ? <AdminSafeModeToggle /> : null}
             <PlatformRevenueCard revenue={session?.user?.platformRevenue ?? 0} />
             <Card className="bg-black/20 shadow-none">
               <CardHeader className="gap-1 p-5">
@@ -431,7 +441,9 @@ export default async function AdminDashboardPage() {
                           <TableRow key={user.id}>
                             <TableCell>
                               <div className="space-y-1">
-                                <p className="font-semibold text-white">{formatUserName(user.email, user.name)}</p>
+                                <p className="font-semibold text-white">
+                                  <AdminCensoredText text={formatUserName(user.email, user.name)} />
+                                </p>
                                 <p className="text-xs uppercase tracking-[0.18em] text-zinc-500">
                                   ID: {user.id.slice(0, 10)}...
                                 </p>
@@ -519,13 +531,20 @@ export default async function AdminDashboardPage() {
                             <TableRow key={product.id}>
                               <TableCell>
                                 <div className="space-y-1">
-                                  <p className="font-semibold text-white">{product.title}</p>
+                                  <p className="font-semibold text-white">
+                                    <AdminCensoredText text={product.title} />
+                                  </p>
                                   <p className="text-sm text-zinc-400">{product.game.name}</p>
                                 </div>
                               </TableCell>
                               <TableCell>
                                 <div className="space-y-1">
-                                  <p className="text-zinc-200">{product.seller.email}</p>
+                                  <p className="text-zinc-200">
+                                    <AdminCensoredText
+                                      text={formatUserName(product.seller.email, product.seller.name)}
+                                    />
+                                  </p>
+                                  <p className="text-xs text-zinc-500">{product.seller.email}</p>
                                   <p className="text-xs uppercase tracking-[0.18em] text-zinc-500">
                                     Rank: {product.seller.rank}
                                   </p>
@@ -613,14 +632,34 @@ export default async function AdminDashboardPage() {
                               </TableCell>
                               <TableCell>
                                 <div className="space-y-1">
-                                  <p className="font-semibold text-white">{order.product.title}</p>
+                                  <p className="font-semibold text-white">
+                                    <AdminCensoredText text={order.product.title} />
+                                  </p>
                                   <p className="text-sm text-zinc-400">
                                     {order.product.game.name} / {order.product.category.name}
                                   </p>
                                 </div>
                               </TableCell>
-                              <TableCell className="text-zinc-300">{order.buyer.email}</TableCell>
-                              <TableCell className="text-zinc-300">{order.seller.email}</TableCell>
+                              <TableCell>
+                                <div className="space-y-1 text-zinc-300">
+                                  <p>
+                                    <AdminCensoredText
+                                      text={formatUserName(order.buyer.email, order.buyer.name)}
+                                    />
+                                  </p>
+                                  <p className="text-xs text-zinc-500">{order.buyer.email}</p>
+                                </div>
+                              </TableCell>
+                              <TableCell>
+                                <div className="space-y-1 text-zinc-300">
+                                  <p>
+                                    <AdminCensoredText
+                                      text={formatUserName(order.seller.email, order.seller.name)}
+                                    />
+                                  </p>
+                                  <p className="text-xs text-zinc-500">{order.seller.email}</p>
+                                </div>
+                              </TableCell>
                               <TableCell>
                                 <Badge variant={statusMeta.variant}>{statusMeta.label}</Badge>
                               </TableCell>
@@ -685,13 +724,19 @@ export default async function AdminDashboardPage() {
                                 </div>
                               </TableCell>
                               <TableCell>
-                                <p className="font-semibold text-white">{order.product.title}</p>
+                                <p className="font-semibold text-white">
+                                  <AdminCensoredText text={order.product.title} />
+                                </p>
                               </TableCell>
                               <TableCell className="text-zinc-300">
-                                {order.buyer.name?.trim() || order.buyer.email}
+                                <AdminCensoredText
+                                  text={formatUserName(order.buyer.email, order.buyer.name)}
+                                />
                               </TableCell>
                               <TableCell className="text-zinc-300">
-                                {order.seller.name?.trim() || order.seller.email}
+                                <AdminCensoredText
+                                  text={formatUserName(order.seller.email, order.seller.name)}
+                                />
                               </TableCell>
                               <TableCell className="text-right font-semibold text-white">
                                 {formatAmount(order.price)} USDT
@@ -757,7 +802,9 @@ export default async function AdminDashboardPage() {
                                 <TableCell>
                                   <div className="space-y-1">
                                     <p className="font-semibold text-white">
-                                      {formatUserName(withdrawal.user.email, withdrawal.user.name)}
+                                      <AdminCensoredText
+                                        text={formatUserName(withdrawal.user.email, withdrawal.user.name)}
+                                      />
                                     </p>
                                     <p className="text-xs uppercase tracking-[0.18em] text-zinc-500">
                                       {withdrawal.user.email}
@@ -803,5 +850,6 @@ export default async function AdminDashboardPage() {
         </div>
       </div>
     </main>
+    </AdminSafeModeProvider>
   );
 }
