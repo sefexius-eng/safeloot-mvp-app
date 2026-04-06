@@ -157,6 +157,34 @@ function formatMoney(value: Prisma.Decimal) {
   return value.toFixed(MONEY_SCALE);
 }
 
+async function createUserNotification(
+  transactionClient: Prisma.TransactionClient,
+  input: {
+    userId: string;
+    title: string;
+    message: string;
+    link?: string;
+  },
+) {
+  const userId = normalizeText(input.userId);
+  const title = normalizeText(input.title);
+  const message = normalizeText(input.message);
+  const link = normalizeOptionalText(input.link);
+
+  if (!userId || !title || !message) {
+    return;
+  }
+
+  await transactionClient.notification.create({
+    data: {
+      userId,
+      title,
+      message,
+      link,
+    },
+  });
+}
+
 async function mapProductsWithSellerReviewSummary<
   T extends {
     price: Prisma.Decimal;
@@ -1063,6 +1091,13 @@ export async function confirmOrder(input: { orderId?: string; buyerId: string })
         },
       });
 
+      await createUserNotification(transactionClient, {
+        userId: checkoutOrder.sellerId,
+        title: "Новый заказ!",
+        message: "У вас купили товар. Перейдите в чат.",
+        link: `/orders/${checkoutOrder.id}`,
+      });
+
       return {
         orderId: checkoutOrder.id,
         status: OrderStatus.PAID,
@@ -1573,29 +1608,47 @@ export async function createChatMessage(input: {
   ensureChatParticipant(senderId, chatRoom);
   setTypingState(orderId, senderId, false);
 
-  const message = await prisma.message.create({
-    data: {
-      chatRoomId: chatRoom.id,
-      senderId,
-      content,
-      imageUrl: imageBase64,
-    },
-    select: {
-      id: true,
-      content: true,
-      imageUrl: true,
-      isRead: true,
-      senderId: true,
-      createdAt: true,
-      updatedAt: true,
-      sender: {
+  const recipientId = senderId === chatRoom.buyerId ? chatRoom.sellerId : chatRoom.buyerId;
+
+  const message = await prisma.$transaction(
+    async (transactionClient) => {
+      const createdMessage = await transactionClient.message.create({
+        data: {
+          chatRoomId: chatRoom.id,
+          senderId,
+          content,
+          imageUrl: imageBase64,
+        },
         select: {
           id: true,
-          email: true,
+          content: true,
+          imageUrl: true,
+          isRead: true,
+          senderId: true,
+          createdAt: true,
+          updatedAt: true,
+          sender: {
+            select: {
+              id: true,
+              email: true,
+            },
+          },
         },
-      },
+      });
+
+      await createUserNotification(transactionClient, {
+        userId: recipientId,
+        title: "Новое сообщение",
+        message: "Вам написали в чате сделки",
+        link: `/orders/${chatRoom.orderId}`,
+      });
+
+      return createdMessage;
     },
-  });
+    {
+      isolationLevel: Prisma.TransactionIsolationLevel.Serializable,
+    },
+  );
 
   return {
     orderId: chatRoom.orderId,

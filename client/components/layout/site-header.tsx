@@ -6,6 +6,7 @@ import { useEffect, useRef, useState } from "react";
 import { signOut, useSession } from "next-auth/react";
 
 import { searchGames } from "@/app/actions/search";
+import { NotificationsBell } from "@/components/notifications-bell";
 import { useCurrency } from "@/components/providers/currency-provider";
 import {
   DropdownMenu,
@@ -375,6 +376,8 @@ export function SiteHeader() {
                     ))}
                   </Select>
                 </div>
+
+                <NotificationsBell />
 
                 {isBanned ? (
                   <div className="inline-flex h-10 items-center justify-center rounded-xl border border-red-500/20 bg-red-500/10 px-4 text-sm font-semibold text-red-100 shadow-[0_12px_28px_rgba(0,0,0,0.22)]">

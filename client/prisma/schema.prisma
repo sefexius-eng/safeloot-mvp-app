@@ -63,6 +63,7 @@ model User {
   reviewsWritten   Review[]      @relation("ReviewAuthor")
   reviewsReceived  Review[]      @relation("ReviewSeller")
   withdrawals      Withdrawal[]
+  notifications    Notification[]
   createdAt        DateTime      @default(now())
   updatedAt        DateTime      @updatedAt
 
@@ -225,4 +226,20 @@ model Message {
   @@index([chatRoomId])
   @@index([senderId])
   @@map("messages")
+}
+
+model Notification {
+  id        String   @id @default(cuid())
+  userId    String
+  title     String
+  message   String
+  link      String?
+  isRead    Boolean  @default(false)
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+  createdAt DateTime @default(now())
+
+  @@index([userId])
+  @@index([userId, isRead])
+  @@index([createdAt])
+  @@map("notifications")
 }

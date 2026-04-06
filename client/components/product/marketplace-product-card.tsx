@@ -112,12 +112,12 @@ export function MarketplaceProductCard({ product }: MarketplaceProductCardProps)
       </div>
 
       <div className="mt-6 flex items-end justify-between gap-4 border-t border-white/10 pt-4">
-        <div className="flex min-w-0 items-center gap-3">
+        <div className="flex min-w-0 flex-row items-center gap-3">
           <UserAvatar
             src={product.seller.image}
             name={getSellerDisplayName(product.seller)}
             email={product.seller.email}
-            className="h-10 w-10 shrink-0 border-transparent bg-zinc-900/80"
+            className="h-12 w-12 shrink-0 border-transparent bg-zinc-900/80"
             imageClassName="rounded-full border border-gray-700/50 object-cover"
           />
           <div className="min-w-0 self-center">
