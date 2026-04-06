@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useEffect, useState } from "react";
 import { useSession } from "next-auth/react";
 
+import { ProfileProductActions } from "@/components/profile/profile-product-actions";
 import { useCurrency } from "@/components/providers/currency-provider";
 import { SellerRatingBadge } from "@/components/reviews/seller-rating-badge";
 import { UserAvatar } from "@/components/ui/user-avatar";
@@ -189,6 +190,12 @@ export function ProfileDashboard() {
   const displayName = user.name.trim() || user.email.split("@")[0];
   const avatarLetter = displayName.slice(0, 1).toUpperCase() || "S";
 
+  function handleProductDeleted(productId: string) {
+    setProducts((currentProducts) =>
+      currentProducts.filter((product) => product.id !== productId),
+    );
+  }
+
   return (
     <section className="space-y-8">
       <div className="grid gap-5 xl:grid-cols-[minmax(0,1.15fr)_minmax(320px,0.85fr)]">
@@ -306,30 +313,33 @@ export function ProfileDashboard() {
             У вас пока нет опубликованных товаров. <Link href="/sell" className="font-semibold text-orange-300 transition hover:text-orange-200">Перейти к размещению</Link>
           </div>
         ) : (
-          <div className="mt-6 overflow-hidden rounded-[1.5rem] border border-white/10">
-            <div className="grid grid-cols-[minmax(0,1.35fr)_140px_140px_minmax(160px,1fr)_120px] gap-4 border-b border-white/10 bg-white/5 px-5 py-4 text-xs font-semibold tracking-[0.2em] uppercase text-zinc-500">
+          <div className="mt-6 overflow-x-auto rounded-[1.5rem] border border-white/10">
+            <div className="min-w-[1160px] grid grid-cols-[minmax(0,1.2fr)_120px_140px_minmax(180px,1fr)_120px_220px] gap-4 border-b border-white/10 bg-white/5 px-5 py-4 text-xs font-semibold tracking-[0.2em] uppercase text-zinc-500">
               <span>Товар</span>
               <span>Игра</span>
               <span>Категория</span>
               <span>Продавец</span>
               <span>Цена</span>
+              <span className="text-right">Управление</span>
             </div>
 
-            <div className="divide-y divide-white/10">
+            <div className="min-w-[1160px] divide-y divide-white/10">
               {products.map((product) => {
                 const sellerDisplayName =
                   product.seller.name?.trim() || product.seller.email;
 
                 return (
-                  <Link
+                  <div
                     key={product.id}
-                    href={`/product/${product.id}`}
-                    className="grid grid-cols-[minmax(0,1.35fr)_140px_140px_minmax(160px,1fr)_120px] gap-4 px-5 py-4 transition hover:bg-white/5"
+                    className="grid grid-cols-[minmax(0,1.2fr)_120px_140px_minmax(180px,1fr)_120px_220px] gap-4 px-5 py-4 transition hover:bg-white/5"
                   >
                     <div className="min-w-0">
-                      <p className="truncate text-sm font-semibold text-white">
+                      <Link
+                        href={`/product/${product.id}`}
+                        className="truncate text-sm font-semibold text-white transition hover:text-orange-200"
+                      >
                         {product.title}
-                      </p>
+                      </Link>
                       <p className="mt-1 truncate text-sm text-zinc-500">
                         #{product.id}
                       </p>
@@ -355,7 +365,13 @@ export function ProfileDashboard() {
                       </div>
                     </div>
                     <span className="text-sm font-semibold text-white">{formatPrice(product.price)}</span>
-                  </Link>
+                    <div className="flex items-start justify-end">
+                      <ProfileProductActions
+                        productId={product.id}
+                        onDeleted={handleProductDeleted}
+                      />
+                    </div>
+                  </div>
                 );
               })}
             </div>

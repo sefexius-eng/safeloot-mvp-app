@@ -17,6 +17,7 @@ interface CurrencyContextValue {
   currencies: CurrencyDefinition[];
   currentRate: number;
   currencySymbol: string;
+  isHydrated: boolean;
 }
 
 const CURRENCY_STORAGE_KEY = "safeloot:currency";
@@ -71,17 +72,21 @@ function formatCurrencyValue(currency: CurrencyCode, basePriceInUsd: string | nu
 
 export function CurrencyProvider({ children }: { children: React.ReactNode }) {
   const [currency, setCurrency] = useState<CurrencyCode>("USD");
+  const [isHydrated, setIsHydrated] = useState(false);
 
   useEffect(() => {
     const savedCurrency = window.localStorage.getItem(CURRENCY_STORAGE_KEY);
 
     if (!savedCurrency) {
+      setIsHydrated(true);
       return;
     }
 
     if (CURRENCIES.some((item) => item.code === savedCurrency)) {
       setCurrency(savedCurrency as CurrencyCode);
     }
+
+    setIsHydrated(true);
   }, []);
 
   function handleSetCurrency(nextCurrency: CurrencyCode) {
@@ -104,6 +109,7 @@ export function CurrencyProvider({ children }: { children: React.ReactNode }) {
         currencies: CURRENCIES,
         currentRate: currentCurrencyDefinition.rate,
         currencySymbol: currentCurrencyDefinition.symbol,
+        isHydrated,
       }}
     >
       {children}

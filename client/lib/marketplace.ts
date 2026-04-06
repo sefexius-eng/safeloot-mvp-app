@@ -1,6 +1,7 @@
 import {
   OrderStatus,
   Prisma,
+  Role,
   TransactionStatus,
   TransactionType,
 } from "@prisma/client";
@@ -27,6 +28,95 @@ function normalizeText(value?: string) {
 
 function stripHtmlTags(value: string) {
   return value.replace(/<[^>]*>?/gm, "");
+}
+
+function sanitizeProductText(value?: string) {
+  return normalizeText(stripHtmlTags(normalizeText(value)));
+}
+
+function validateProductTextFields(input: {
+  title?: string;
+  description?: string;
+}) {
+  const title = sanitizeProductText(input.title);
+  const description = sanitizeProductText(input.description);
+
+  if (!title) {
+    throw new Error("title is required.");
+  }
+
+  if (!description) {
+    throw new Error("description is required.");
+  }
+
+  if (title.length > MAX_PRODUCT_TITLE_LENGTH) {
+    throw new Error(
+      `title must be at most ${MAX_PRODUCT_TITLE_LENGTH} characters.`,
+    );
+  }
+
+  if (description.length > MAX_PRODUCT_DESCRIPTION_LENGTH) {
+    throw new Error(
+      `description must be at most ${MAX_PRODUCT_DESCRIPTION_LENGTH} characters.`,
+    );
+  }
+
+  return {
+    title,
+    description,
+  };
+}
+
+async function validateCatalogSelection(gameId: string, categoryId: string) {
+  const [game, category] = await Promise.all([
+    prisma.game.findUnique({
+      where: {
+        id: gameId,
+      },
+      select: {
+        id: true,
+        slug: true,
+      },
+    }),
+    prisma.category.findUnique({
+      where: {
+        id: categoryId,
+      },
+      select: {
+        id: true,
+        gameId: true,
+      },
+    }),
+  ]);
+
+  if (!game) {
+    throw new Error(`Game with id ${gameId} was not found.`);
+  }
+
+  if (!category) {
+    throw new Error(`Category with id ${categoryId} was not found.`);
+  }
+
+  if (category.gameId !== gameId) {
+    throw new Error("categoryId does not belong to selected gameId.");
+  }
+
+  return {
+    game,
+    category,
+  };
+}
+
+function ensureProductManagementAccess(
+  userId: string,
+  role: Role | string | undefined,
+  product: { sellerId: string },
+) {
+  if (userId === product.sellerId || role === Role.ADMIN) {
+    return;
+  }
+
+  throw new Error("Only the seller or admin can manage this product.");
 }
 
 function normalizeOptionalText(value?: string | null) {
@@ -343,34 +433,11 @@ export async function createProduct(input: {
   categoryId?: string;
   sellerId?: string;
 }) {
-  const title = normalizeText(stripHtmlTags(normalizeText(input.title)));
-  const description = normalizeText(
-    stripHtmlTags(normalizeText(input.description)),
-  );
+  const { title, description } = validateProductTextFields(input);
   const gameId = normalizeText(input.gameId);
   const categoryId = normalizeText(input.categoryId);
   const sellerId = normalizeText(input.sellerId);
   const price = Number(input.price);
-
-  if (!title) {
-    throw new Error("title is required.");
-  }
-
-  if (!description) {
-    throw new Error("description is required.");
-  }
-
-  if (title.length > MAX_PRODUCT_TITLE_LENGTH) {
-    throw new Error(
-      `title must be at most ${MAX_PRODUCT_TITLE_LENGTH} characters.`,
-    );
-  }
-
-  if (description.length > MAX_PRODUCT_DESCRIPTION_LENGTH) {
-    throw new Error(
-      `description must be at most ${MAX_PRODUCT_DESCRIPTION_LENGTH} characters.`,
-    );
-  }
 
   if (!gameId) {
     throw new Error("gameId is required.");
@@ -388,7 +455,7 @@ export async function createProduct(input: {
     throw new Error("price must be a positive number.");
   }
 
-  const [seller, game, category] = await Promise.all([
+  const [seller, { game, category }] = await Promise.all([
     prisma.user.findUnique({
       where: {
         id: sellerId,
@@ -397,39 +464,11 @@ export async function createProduct(input: {
         id: true,
       },
     }),
-    prisma.game.findUnique({
-      where: {
-        id: gameId,
-      },
-      select: {
-        id: true,
-      },
-    }),
-    prisma.category.findUnique({
-      where: {
-        id: categoryId,
-      },
-      select: {
-        id: true,
-        gameId: true,
-      },
-    }),
+    validateCatalogSelection(gameId, categoryId),
   ]);
 
   if (!seller) {
     throw new Error(`Seller with id ${sellerId} was not found.`);
-  }
-
-  if (!game) {
-    throw new Error(`Game with id ${gameId} was not found.`);
-  }
-
-  if (!category) {
-    throw new Error(`Category with id ${categoryId} was not found.`);
-  }
-
-  if (category.gameId !== gameId) {
-    throw new Error("categoryId does not belong to selected gameId.");
   }
 
   const product = await prisma.product.create({
@@ -474,6 +513,174 @@ export async function createProduct(input: {
     ...product,
     price: formatMoney(product.price),
   };
+}
+
+export async function updateProductByActor(input: {
+  productId?: string;
+  userId: string;
+  role?: Role;
+  title?: string;
+  description?: string;
+  price?: number;
+  gameId?: string;
+  categoryId?: string;
+}) {
+  const productId = normalizeText(input.productId);
+  const userId = normalizeText(input.userId);
+  const gameId = normalizeText(input.gameId);
+  const categoryId = normalizeText(input.categoryId);
+  const price = Number(input.price);
+  const { title, description } = validateProductTextFields(input);
+
+  if (!productId) {
+    throw new Error("productId is required.");
+  }
+
+  if (!userId) {
+    throw new Error("userId is required.");
+  }
+
+  if (!gameId) {
+    throw new Error("gameId is required.");
+  }
+
+  if (!categoryId) {
+    throw new Error("categoryId is required.");
+  }
+
+  if (!Number.isFinite(price) || price <= 0) {
+    throw new Error("price must be a positive number.");
+  }
+
+  const existingProduct = await prisma.product.findUnique({
+    where: {
+      id: productId,
+    },
+    select: {
+      id: true,
+      sellerId: true,
+      game: {
+        select: {
+          slug: true,
+        },
+      },
+    },
+  });
+
+  if (!existingProduct) {
+    throw new Error(`Product with id ${productId} was not found.`);
+  }
+
+  ensureProductManagementAccess(userId, input.role, existingProduct);
+
+  const { game } = await validateCatalogSelection(gameId, categoryId);
+
+  const updatedProduct = await prisma.product.update({
+    where: {
+      id: productId,
+    },
+    data: {
+      title,
+      description,
+      price: new Prisma.Decimal(price.toFixed(MONEY_SCALE)),
+      gameId,
+      categoryId,
+    },
+    select: {
+      id: true,
+      game: {
+        select: {
+          slug: true,
+        },
+      },
+    },
+  });
+
+  return {
+    productId: updatedProduct.id,
+    currentGameSlug: updatedProduct.game.slug,
+    previousGameSlug: existingProduct.game.slug,
+  };
+}
+
+export async function deleteProductByActor(input: {
+  productId?: string;
+  userId: string;
+  role?: Role;
+}) {
+  const productId = normalizeText(input.productId);
+  const userId = normalizeText(input.userId);
+
+  if (!productId) {
+    throw new Error("productId is required.");
+  }
+
+  if (!userId) {
+    throw new Error("userId is required.");
+  }
+
+  return prisma.$transaction(
+    async (transactionClient) => {
+      const product = await transactionClient.product.findUnique({
+        where: {
+          id: productId,
+        },
+        select: {
+          id: true,
+          sellerId: true,
+          game: {
+            select: {
+              slug: true,
+            },
+          },
+          _count: {
+            select: {
+              orders: true,
+            },
+          },
+          orders: {
+            where: {
+              status: {
+                notIn: [OrderStatus.COMPLETED, OrderStatus.CANCELLED],
+              },
+            },
+            select: {
+              id: true,
+            },
+            take: 1,
+          },
+        },
+      });
+
+      if (!product) {
+        throw new Error("Товар не найден.");
+      }
+
+      ensureProductManagementAccess(userId, input.role, product);
+
+      if (product.orders.length > 0) {
+        throw new Error("Нельзя удалить товар, пока у него есть активные сделки.");
+      }
+
+      if (product._count.orders > 0) {
+        throw new Error("Нельзя удалить товар с историей сделок.");
+      }
+
+      await transactionClient.product.delete({
+        where: {
+          id: productId,
+        },
+      });
+
+      return {
+        productId: product.id,
+        gameSlug: product.game.slug,
+      };
+    },
+    {
+      isolationLevel: Prisma.TransactionIsolationLevel.Serializable,
+    },
+  );
 }
 
 export async function getUserById(userId: string) {
