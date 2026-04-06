@@ -15,6 +15,8 @@ interface CurrencyContextValue {
   setCurrency: (currency: CurrencyCode) => void;
   formatPrice: (basePriceInUsd: string | number) => string;
   currencies: CurrencyDefinition[];
+  currentRate: number;
+  currencySymbol: string;
 }
 
 const CURRENCY_STORAGE_KEY = "safeloot:currency";
@@ -91,6 +93,8 @@ export function CurrencyProvider({ children }: { children: React.ReactNode }) {
     return formatCurrencyValue(currency, basePriceInUsd);
   }
 
+  const currentCurrencyDefinition = getCurrencyDefinition(currency);
+
   return (
     <CurrencyContext.Provider
       value={{
@@ -98,6 +102,8 @@ export function CurrencyProvider({ children }: { children: React.ReactNode }) {
         setCurrency: handleSetCurrency,
         formatPrice,
         currencies: CURRENCIES,
+        currentRate: currentCurrencyDefinition.rate,
+        currencySymbol: currentCurrencyDefinition.symbol,
       }}
     >
       {children}

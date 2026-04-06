@@ -3,6 +3,7 @@
 import { FormEvent, useState } from "react";
 import { useRouter } from "next/navigation";
 
+import { useCurrency } from "@/components/providers/currency-provider";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
@@ -40,6 +41,7 @@ function createInitialFormState(games: SellGame[]) {
 
 export function SellPageClient({ games }: SellPageClientProps) {
   const router = useRouter();
+  const { currentRate, currencySymbol } = useCurrency();
   const [formState, setFormState] = useState(() => createInitialFormState(games));
   const [errorMessage, setErrorMessage] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -47,6 +49,12 @@ export function SellPageClient({ games }: SellPageClientProps) {
   const selectedGame =
     games.find((game) => game.id === formState.gameId) ?? games[0] ?? null;
   const availableCategories = selectedGame?.categories ?? [];
+  const localPriceValue = Number(formState.price);
+  const previewBasePrice =
+    Number.isFinite(localPriceValue) && localPriceValue > 0 && currentRate > 0
+      ? Math.round(((localPriceValue / currentRate) + Number.EPSILON) * 100000000) /
+        100000000
+      : 0;
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -54,6 +62,20 @@ export function SellPageClient({ games }: SellPageClientProps) {
     setIsSubmitting(true);
 
     try {
+      const numericLocalPrice = Number(formState.price);
+
+      if (!Number.isFinite(numericLocalPrice) || numericLocalPrice <= 0) {
+        throw new Error("Введите корректную цену товара.");
+      }
+
+      if (!Number.isFinite(currentRate) || currentRate <= 0) {
+        throw new Error("Не удалось определить курс валюты для публикации товара.");
+      }
+
+      const basePriceInUsdt =
+        Math.round(((numericLocalPrice / currentRate) + Number.EPSILON) * 100000000) /
+        100000000;
+
       const response = await fetch("/api/products", {
         method: "POST",
         headers: {
@@ -61,7 +83,7 @@ export function SellPageClient({ games }: SellPageClientProps) {
         },
         body: JSON.stringify({
           ...formState,
-          price: Number(formState.price),
+          price: basePriceInUsdt,
         }),
       });
 
@@ -129,7 +151,7 @@ export function SellPageClient({ games }: SellPageClientProps) {
             </FormField>
 
             <div className="grid gap-5 md:grid-cols-2">
-              <FormField label="Цена в базовой валюте (USDT / USD)">
+              <FormField label={`Цена в ${currencySymbol}`}>
                 <Input
                   type="number"
                   min="0"
@@ -145,6 +167,9 @@ export function SellPageClient({ games }: SellPageClientProps) {
                   placeholder="0.00"
                   required
                 />
+                <p className="text-xs leading-6 text-neutral-500">
+                  В базу будет сохранено {previewBasePrice > 0 ? `${previewBasePrice} USDT` : "0 USDT"} по текущему курсу.
+                </p>
               </FormField>
 
               <FormField label="Игра">

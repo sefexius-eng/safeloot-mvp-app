@@ -35,23 +35,10 @@ interface CurrentUser {
   createdAt: string;
 }
 
-function formatBalance(value: string) {
-  const numericValue = Number(value);
-
-  if (!Number.isFinite(numericValue)) {
-    return value;
-  }
-
-  return new Intl.NumberFormat("ru-RU", {
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2,
-  }).format(numericValue);
-}
-
 export function SiteHeader() {
   const router = useRouter();
   const { data: session, status } = useSession();
-  const { currencies, currency, setCurrency } = useCurrency();
+  const { currencies, currency, setCurrency, formatPrice } = useCurrency();
   const [user, setUser] = useState<CurrentUser | null>(null);
   const [refreshToken, setRefreshToken] = useState(0);
   const [query, setQuery] = useState("");
@@ -219,8 +206,8 @@ export function SiteHeader() {
           </Link>
         </div>
 
-        <form className="flex-1 lg:max-w-2xl" onSubmit={handleSearchSubmit}>
-          <div ref={searchContainerRef} className="relative">
+        <form className="w-full min-w-[250px] flex-1 max-w-md" onSubmit={handleSearchSubmit}>
+          <div ref={searchContainerRef} className="relative z-[70] w-full">
             <label className="relative block">
               <span className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-4 text-zinc-500">
                 <svg
@@ -254,7 +241,7 @@ export function SiteHeader() {
             </label>
 
             {isSearchOpen ? (
-              <div className="absolute top-[calc(100%+0.6rem)] z-50 w-full overflow-hidden rounded-[1.5rem] border border-white/10 bg-[rgba(9,9,11,0.96)] shadow-[0_24px_80px_rgba(0,0,0,0.34)] backdrop-blur-xl">
+              <div className="absolute top-[calc(100%+0.6rem)] z-[80] w-full overflow-hidden rounded-[1.5rem] border border-white/10 bg-[rgba(9,9,11,0.96)] shadow-[0_24px_80px_rgba(0,0,0,0.34)] backdrop-blur-xl">
                 {!query.trim() ? (
                   <div>
                     <div className="border-b border-white/10 px-4 py-3 text-xs font-semibold tracking-[0.22em] uppercase text-orange-200/80">
@@ -326,12 +313,10 @@ export function SiteHeader() {
               <>
                 <div className="rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-sm text-zinc-300 shadow-[0_12px_28px_rgba(0,0,0,0.22)]">
                   <span className="font-medium text-white">Доступно:</span>{" "}
-                  {formatBalance(user?.availableBalance ?? "0")}
-                  <span className="ml-1 text-zinc-500">USDT</span>
+                  {formatPrice(user?.availableBalance ?? "0")}
                   <span className="mx-2 text-zinc-600">|</span>
                   <span className="font-medium text-white">Холд:</span>{" "}
-                  {formatBalance(user?.holdBalance ?? "0")}
-                  <span className="ml-1 text-zinc-500">USDT</span>
+                  {formatPrice(user?.holdBalance ?? "0")}
                 </div>
 
                 <div className="min-w-[118px]">

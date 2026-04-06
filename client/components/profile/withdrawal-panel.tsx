@@ -6,21 +6,11 @@ import { useMemo, useState, useTransition } from "react";
 import { requestWithdrawal } from "@/app/actions/withdraw";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
-} from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
 import {
   getWithdrawalStatusMeta,
   type WithdrawalListItem,
-  WITHDRAWAL_METHOD_OPTIONS,
 } from "@/lib/withdrawals";
 
 const BALANCE_REFRESH_EVENT = "safeloot:balances-refresh";
@@ -57,9 +47,9 @@ export function WithdrawalPanel({
   withdrawals,
 }: WithdrawalPanelProps) {
   const router = useRouter();
-  const [isOpen, setIsOpen] = useState(false);
+  const [isModalOpen, setIsModalOpen] = useState(false);
   const [amount, setAmount] = useState("");
-  const [method, setMethod] = useState<string>(WITHDRAWAL_METHOD_OPTIONS[0].value);
+  const [method, setMethod] = useState<string>("USDT");
   const [details, setDetails] = useState("");
   const [errorMessage, setErrorMessage] = useState("");
   const [successMessage, setSuccessMessage] = useState("");
@@ -71,17 +61,14 @@ export function WithdrawalPanel({
 
   function resetForm() {
     setAmount("");
-    setMethod(WITHDRAWAL_METHOD_OPTIONS[0].value);
+    setMethod("USDT");
     setDetails("");
     setErrorMessage("");
   }
 
-  function handleOpenChange(nextOpen: boolean) {
-    setIsOpen(nextOpen);
-
-    if (!nextOpen) {
-      resetForm();
-    }
+  function handleCloseModal() {
+    setIsModalOpen(false);
+    resetForm();
   }
 
   function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
@@ -113,7 +100,7 @@ export function WithdrawalPanel({
           }
 
           setSuccessMessage("Заявка на вывод создана и отправлена на проверку.");
-          setIsOpen(false);
+          setIsModalOpen(false);
           resetForm();
           window.dispatchEvent(new Event(BALANCE_REFRESH_EVENT));
           router.refresh();
@@ -129,7 +116,7 @@ export function WithdrawalPanel({
   }
 
   const detailsPlaceholder =
-    method === "Банковская карта"
+    method === "Card"
       ? "Введите номер карты или IBAN"
       : "Введите адрес кошелька TRC20";
 
@@ -149,104 +136,126 @@ export function WithdrawalPanel({
         </div>
 
         {isAuthenticated ? (
-          <Dialog open={isOpen} onOpenChange={handleOpenChange}>
-            <DialogTrigger asChild>
-              <Button
-                disabled={availableBalanceValue <= 0}
-                className="h-11 rounded-2xl bg-emerald-600 px-5 text-sm font-semibold text-white shadow-[0_16px_40px_rgba(5,150,105,0.28)] hover:bg-emerald-500"
-              >
-                Вывести средства
-              </Button>
-            </DialogTrigger>
-
-            <DialogContent>
-              <DialogHeader>
-                <DialogTitle>Новая заявка на вывод</DialogTitle>
-                <DialogDescription>
-                  Доступно к выводу: {formatAmount(availableBalance)} USDT.
-                </DialogDescription>
-              </DialogHeader>
-
-              <form onSubmit={handleSubmit} className="space-y-4">
-                <div>
-                  <p className="text-xs font-semibold uppercase tracking-[0.24em] text-zinc-500">
-                    Сумма
-                  </p>
-                  <Input
-                    type="number"
-                    inputMode="decimal"
-                    step="0.00000001"
-                    min="0"
-                    max={availableBalance}
-                    value={amount}
-                    onChange={(event) => setAmount(event.target.value)}
-                    placeholder="Например, 125.50"
-                    className="mt-3 border-white/10 bg-white/5 text-zinc-100 placeholder:text-zinc-500 focus:border-orange-500/45 focus:bg-white/8"
-                    disabled={isPending}
-                  />
-                  <p className="mt-2 text-xs text-zinc-500">
-                    Максимум: {formatAmount(availableBalance)} USDT
-                  </p>
-                </div>
-
-                <div>
-                  <p className="text-xs font-semibold uppercase tracking-[0.24em] text-zinc-500">
-                    Способ вывода
-                  </p>
-                  <Select
-                    value={method}
-                    onChange={(event) => setMethod(event.target.value)}
-                    className="mt-3 border-white/10 bg-white/5 text-zinc-100 focus:border-orange-500/45 focus:bg-white/8"
-                    disabled={isPending}
-                  >
-                    {WITHDRAWAL_METHOD_OPTIONS.map((option) => (
-                      <option key={option.value} value={option.value}>
-                        {option.label}
-                      </option>
-                    ))}
-                  </Select>
-                </div>
-
-                <div>
-                  <p className="text-xs font-semibold uppercase tracking-[0.24em] text-zinc-500">
-                    Реквизиты
-                  </p>
-                  <Input
-                    type="text"
-                    value={details}
-                    onChange={(event) => setDetails(event.target.value)}
-                    placeholder={detailsPlaceholder}
-                    className="mt-3 border-white/10 bg-white/5 text-zinc-100 placeholder:text-zinc-500 focus:border-orange-500/45 focus:bg-white/8"
-                    disabled={isPending}
-                  />
-                </div>
-
-                {exceedsBalance ? (
-                  <div className="rounded-[1.25rem] border border-red-500/15 bg-red-500/10 p-4 text-sm leading-7 text-red-200">
-                    Сумма вывода не должна превышать доступный баланс.
-                  </div>
-                ) : null}
-
-                {errorMessage ? (
-                  <div className="rounded-[1.25rem] border border-red-500/15 bg-red-500/10 p-4 text-sm leading-7 text-red-200">
-                    {errorMessage}
-                  </div>
-                ) : null}
-
-                <DialogFooter>
-                  <Button
-                    type="submit"
-                    disabled={isPending || !isAmountValid || exceedsBalance || !details.trim()}
-                    className="h-12 w-full rounded-2xl bg-emerald-600 text-sm font-semibold text-white shadow-[0_18px_42px_rgba(5,150,105,0.35)] hover:bg-emerald-500 sm:w-auto"
-                  >
-                    {isPending ? "Создаем заявку..." : "Отправить заявку"}
-                  </Button>
-                </DialogFooter>
-              </form>
-            </DialogContent>
-          </Dialog>
+          <Button
+            type="button"
+            onClick={() => {
+              setErrorMessage("");
+              setIsModalOpen(true);
+            }}
+            disabled={availableBalanceValue <= 0}
+            className="h-11 rounded-2xl bg-emerald-600 px-5 text-sm font-semibold text-white shadow-[0_16px_40px_rgba(5,150,105,0.28)] hover:bg-emerald-500"
+          >
+            Вывести средства
+          </Button>
         ) : null}
       </div>
+
+      {isModalOpen ? (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 px-4 py-6">
+          <div className="w-full max-w-lg rounded-[1.75rem] border border-white/10 bg-zinc-950/95 p-6 text-zinc-50 shadow-[0_24px_80px_rgba(0,0,0,0.45)] sm:p-7">
+            <div className="flex items-start justify-between gap-4">
+              <div>
+                <h3 className="text-2xl font-semibold tracking-tight text-white">
+                  Новая заявка на вывод
+                </h3>
+                <p className="mt-2 text-sm leading-7 text-zinc-400">
+                  Доступно к выводу: {formatAmount(availableBalance)} USDT.
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={handleCloseModal}
+                className="inline-flex h-10 w-10 items-center justify-center rounded-full border border-white/10 bg-white/5 text-zinc-400 transition hover:bg-white/10 hover:text-white"
+                aria-label="Закрыть окно вывода"
+              >
+                ×
+              </button>
+            </div>
+
+            <form onSubmit={handleSubmit} className="mt-5 space-y-4">
+              <div>
+                <p className="text-xs font-semibold uppercase tracking-[0.24em] text-zinc-500">
+                  Сумма
+                </p>
+                <Input
+                  type="number"
+                  inputMode="decimal"
+                  step="0.00000001"
+                  min="0"
+                  max={availableBalance}
+                  value={amount}
+                  onChange={(event) => setAmount(event.target.value)}
+                  placeholder="Например, 125.50"
+                  className="mt-3 border-white/10 bg-white/5 text-zinc-100 placeholder:text-zinc-500 focus:border-orange-500/45 focus:bg-white/8"
+                  disabled={isPending}
+                />
+                <p className="mt-2 text-xs text-zinc-500">
+                  Максимум: {formatAmount(availableBalance)} USDT
+                </p>
+              </div>
+
+              <div>
+                <p className="text-xs font-semibold uppercase tracking-[0.24em] text-zinc-500">
+                  Способ вывода
+                </p>
+                <Select
+                  value={method}
+                  onChange={(event) => setMethod(event.target.value)}
+                  className="mt-3 border-white/10 bg-white/5 text-zinc-100 focus:border-orange-500/45 focus:bg-white/8"
+                  disabled={isPending}
+                >
+                  <option value="USDT">USDT</option>
+                  <option value="Card">Card</option>
+                </Select>
+              </div>
+
+              <div>
+                <p className="text-xs font-semibold uppercase tracking-[0.24em] text-zinc-500">
+                  Реквизиты
+                </p>
+                <Input
+                  type="text"
+                  value={details}
+                  onChange={(event) => setDetails(event.target.value)}
+                  placeholder={detailsPlaceholder}
+                  className="mt-3 border-white/10 bg-white/5 text-zinc-100 placeholder:text-zinc-500 focus:border-orange-500/45 focus:bg-white/8"
+                  disabled={isPending}
+                />
+              </div>
+
+              {exceedsBalance ? (
+                <div className="rounded-[1.25rem] border border-red-500/15 bg-red-500/10 p-4 text-sm leading-7 text-red-200">
+                  Сумма вывода не должна превышать доступный баланс.
+                </div>
+              ) : null}
+
+              {errorMessage ? (
+                <div className="rounded-[1.25rem] border border-red-500/15 bg-red-500/10 p-4 text-sm leading-7 text-red-200">
+                  {errorMessage}
+                </div>
+              ) : null}
+
+              <div className="flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
+                <Button
+                  type="button"
+                  onClick={handleCloseModal}
+                  disabled={isPending}
+                  className="h-12 w-full rounded-2xl border border-white/10 bg-white/5 text-sm font-semibold text-zinc-200 shadow-none hover:bg-white/10 sm:w-auto"
+                >
+                  Отмена
+                </Button>
+                <Button
+                  type="submit"
+                  disabled={isPending || !isAmountValid || exceedsBalance || !details.trim()}
+                  className="h-12 w-full rounded-2xl bg-emerald-600 text-sm font-semibold text-white shadow-[0_18px_42px_rgba(5,150,105,0.35)] hover:bg-emerald-500 sm:w-auto"
+                >
+                  {isPending ? "Создаем заявку..." : "Отправить"}
+                </Button>
+              </div>
+            </form>
+          </div>
+        </div>
+      ) : null}
 
       {!isAuthenticated ? (
         <div className="mt-6 rounded-[1.5rem] border border-white/10 bg-white/5 p-6 text-sm leading-7 text-zinc-400">
