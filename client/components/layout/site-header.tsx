@@ -1,6 +1,5 @@
 "use client";
 
-import Image from "next/image";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
@@ -8,7 +7,16 @@ import { signOut, useSession } from "next-auth/react";
 
 import { searchGames } from "@/app/actions/search";
 import { useCurrency } from "@/components/providers/currency-provider";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { Select } from "@/components/ui/select";
+import { UserAvatar } from "@/components/ui/user-avatar";
 import catalogSeedData from "@/lib/catalog-seed-data.json";
 
 const BALANCE_REFRESH_EVENT = "safeloot:balances-refresh";
@@ -185,12 +193,14 @@ export function SiteHeader() {
     session?.user?.name?.trim() ||
     session?.user?.email?.split("@")[0] ||
     "Профиль";
-  const avatarLetter = displayName.slice(0, 1).toUpperCase() || "S";
+  const availableBalanceLabel = formatPrice(user?.availableBalance ?? "0");
+  const holdBalanceLabel = formatPrice(user?.holdBalance ?? "0");
 
   return (
     <header className="sticky top-0 z-50 border-b border-white/10 bg-[rgba(9,9,11,0.78)] backdrop-blur-xl">
-      <div className="mx-auto flex w-full max-w-7xl flex-col gap-4 px-4 py-4 sm:px-6 lg:flex-row lg:items-center lg:justify-between lg:px-8">
-        <div className="flex items-center justify-between gap-4 lg:min-w-[220px]">
+      <div className="mx-auto w-full max-w-7xl px-4 py-3 sm:px-6 lg:px-8">
+        <div className="flex flex-col gap-4 lg:grid lg:grid-cols-[auto_minmax(0,1fr)_auto] lg:items-center lg:gap-5">
+          <div className="flex items-center justify-between gap-4 lg:min-w-[220px]">
           <Link href="/" className="flex items-center gap-3">
             <span className="flex h-11 w-11 items-center justify-center rounded-2xl bg-orange-600 text-lg font-semibold text-white shadow-[0_14px_40px_rgba(249,115,22,0.26)]">
               S
@@ -204,58 +214,86 @@ export function SiteHeader() {
               </span>
             </span>
           </Link>
-        </div>
+          </div>
 
-        <form className="w-full min-w-[250px] flex-1 max-w-md" onSubmit={handleSearchSubmit}>
-          <div ref={searchContainerRef} className="relative z-[70] w-full">
-            <label className="relative block">
-              <span className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-4 text-zinc-500">
-                <svg
-                  aria-hidden="true"
-                  viewBox="0 0 24 24"
-                  className="h-5 w-5"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="1.8"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                >
-                  <circle cx="11" cy="11" r="7" />
-                  <path d="m20 20-3.5-3.5" />
-                </svg>
-              </span>
-              <input
-                type="search"
-                name="search"
-                value={query}
-                onChange={(event) => {
-                  setQuery(event.target.value);
-                  setIsSearchOpen(true);
-                }}
-                onFocus={() => {
-                  setIsSearchOpen(true);
-                }}
-                placeholder="Поиск по играм, товарам и услугам"
-                className="h-12 w-full rounded-2xl border border-white/10 bg-white/5 pl-12 pr-4 text-sm text-zinc-100 shadow-[0_12px_30px_rgba(0,0,0,0.22)] outline-none transition placeholder:text-zinc-500 focus:border-orange-500/40 focus:bg-white/8 focus:ring-4 focus:ring-orange-500/10"
-              />
-            </label>
+          <form className="flex-1 w-full max-w-2xl lg:justify-self-center" onSubmit={handleSearchSubmit}>
+            <div ref={searchContainerRef} className="relative z-[70] w-full">
+              <label className="relative block">
+                <span className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-4 text-zinc-500">
+                  <svg
+                    aria-hidden="true"
+                    viewBox="0 0 24 24"
+                    className="h-5 w-5"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="1.8"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  >
+                    <circle cx="11" cy="11" r="7" />
+                    <path d="m20 20-3.5-3.5" />
+                  </svg>
+                </span>
+                <input
+                  type="search"
+                  name="search"
+                  value={query}
+                  onChange={(event) => {
+                    setQuery(event.target.value);
+                    setIsSearchOpen(true);
+                  }}
+                  onFocus={() => {
+                    setIsSearchOpen(true);
+                  }}
+                  placeholder="Поиск по играм, товарам и услугам"
+                  className="h-12 w-full rounded-2xl border border-white/10 bg-white/5 pl-12 pr-4 text-sm text-zinc-100 shadow-[0_12px_30px_rgba(0,0,0,0.22)] outline-none transition placeholder:text-zinc-500 focus:border-orange-500/40 focus:bg-white/8 focus:ring-4 focus:ring-orange-500/10"
+                />
+              </label>
 
-            {isSearchOpen ? (
-              <div className="absolute top-[calc(100%+0.6rem)] z-[80] w-full overflow-hidden rounded-[1.5rem] border border-white/10 bg-[rgba(9,9,11,0.96)] shadow-[0_24px_80px_rgba(0,0,0,0.34)] backdrop-blur-xl">
-                {!query.trim() ? (
-                  <div>
-                    <div className="border-b border-white/10 px-4 py-3 text-xs font-semibold tracking-[0.22em] uppercase text-orange-200/80">
-                      🔥 Популярные игры
+              {isSearchOpen ? (
+                <div className="absolute top-[calc(100%+0.6rem)] z-[80] w-full overflow-hidden rounded-[1.5rem] border border-white/10 bg-[rgba(9,9,11,0.96)] shadow-[0_24px_80px_rgba(0,0,0,0.34)] backdrop-blur-xl">
+                  {!query.trim() ? (
+                    <div>
+                      <div className="border-b border-white/10 px-4 py-3 text-xs font-semibold tracking-[0.22em] uppercase text-orange-200/80">
+                        Популярные игры
+                      </div>
+                      <div className="divide-y divide-white/10">
+                        {POPULAR_GAMES.map((game) => (
+                          <button
+                            key={game.slug}
+                            type="button"
+                            onClick={() => handleSelectGame({ ...game, id: game.slug, imageUrl: null })}
+                            className="flex w-full items-center gap-3 px-4 py-3 text-left transition hover:bg-white/5"
+                          >
+                            <span className="flex h-9 w-9 items-center justify-center rounded-full border border-orange-500/20 bg-orange-500/10 text-sm font-semibold text-orange-100">
+                              {game.name.slice(0, 1).toUpperCase()}
+                            </span>
+                            <span className="min-w-0 flex-1">
+                              <span className="block truncate text-sm font-semibold text-white">
+                                {game.name}
+                              </span>
+                              <span className="block truncate text-xs uppercase tracking-[0.18em] text-zinc-500">
+                                Быстрый переход
+                              </span>
+                            </span>
+                          </button>
+                        ))}
+                      </div>
                     </div>
+                  ) : isSearching ? (
+                    <div className="px-4 py-3 text-sm text-zinc-400">
+                      Ищем игры...
+                    </div>
+                  ) : results.length > 0 ? (
                     <div className="divide-y divide-white/10">
-                      {POPULAR_GAMES.map((game) => (
+                      {results.map((game) => (
                         <button
-                          key={game.slug}
+                          key={game.id}
                           type="button"
-                          onClick={() => handleSelectGame({ ...game, id: game.slug, imageUrl: null })}
+                          onClick={() => handleSelectGame(game)}
                           className="flex w-full items-center gap-3 px-4 py-3 text-left transition hover:bg-white/5"
                         >
-                          <span className="flex h-9 w-9 items-center justify-center rounded-full border border-orange-500/20 bg-orange-500/10 text-sm font-semibold text-orange-100">
+                          <span className="flex h-9 w-9 items-center justify-center rounded-full border border-white/10 bg-white/5 text-sm font-semibold text-zinc-200">
                             {game.name.slice(0, 1).toUpperCase()}
                           </span>
                           <span className="min-w-0 flex-1">
@@ -263,68 +301,58 @@ export function SiteHeader() {
                               {game.name}
                             </span>
                             <span className="block truncate text-xs uppercase tracking-[0.18em] text-zinc-500">
-                              Быстрый переход
+                              Каталог игры
                             </span>
                           </span>
                         </button>
                       ))}
                     </div>
-                  </div>
-                ) : isSearching ? (
-                  <div className="px-4 py-3 text-sm text-zinc-400">
-                    Ищем игры...
-                  </div>
-                ) : results.length > 0 ? (
-                  <div className="divide-y divide-white/10">
-                    {results.map((game) => (
-                      <button
-                        key={game.id}
-                        type="button"
-                        onClick={() => handleSelectGame(game)}
-                        className="flex w-full items-center gap-3 px-4 py-3 text-left transition hover:bg-white/5"
-                      >
-                        <span className="flex h-9 w-9 items-center justify-center rounded-full border border-white/10 bg-white/5 text-sm font-semibold text-zinc-200">
-                          {game.name.slice(0, 1).toUpperCase()}
-                        </span>
-                        <span className="min-w-0 flex-1">
-                          <span className="block truncate text-sm font-semibold text-white">
-                            {game.name}
-                          </span>
-                          <span className="block truncate text-xs uppercase tracking-[0.18em] text-zinc-500">
-                            Каталог игры
-                          </span>
-                        </span>
-                      </button>
-                    ))}
-                  </div>
-                ) : (
-                  <div className="px-4 py-3 text-sm text-zinc-400">
-                    Ничего не найдено.
-                  </div>
-                )}
-              </div>
-            ) : null}
-          </div>
-        </form>
+                  ) : (
+                    <div className="px-4 py-3 text-sm text-zinc-400">
+                      Ничего не найдено.
+                    </div>
+                  )}
+                </div>
+              ) : null}
+            </div>
+          </form>
 
-        <div className="flex flex-col gap-3 lg:min-w-[360px] lg:items-end">
-          <div className="flex flex-wrap items-center gap-3 lg:justify-end">
+          <div className="flex flex-wrap items-center gap-2 lg:justify-self-end">
             {status === "authenticated" ? (
               <>
-                <div className="rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-sm text-zinc-300 shadow-[0_12px_28px_rgba(0,0,0,0.22)]">
-                  <span className="font-medium text-white">Доступно:</span>{" "}
-                  {formatPrice(user?.availableBalance ?? "0")}
-                  <span className="mx-2 text-zinc-600">|</span>
-                  <span className="font-medium text-white">Холд:</span>{" "}
-                  {formatPrice(user?.holdBalance ?? "0")}
+                <div className="inline-flex items-center gap-3 rounded-2xl border border-white/10 bg-white/5 px-3 py-2 text-zinc-300 shadow-[0_12px_28px_rgba(0,0,0,0.22)]">
+                  <span className="flex h-9 w-9 items-center justify-center rounded-xl border border-white/10 bg-white/5 text-zinc-200">
+                    <svg
+                      aria-hidden="true"
+                      viewBox="0 0 24 24"
+                      className="h-4 w-4"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth="1.8"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                    >
+                      <path d="M3 7.5A2.5 2.5 0 0 1 5.5 5h10A2.5 2.5 0 0 1 18 7.5V8h1.5A1.5 1.5 0 0 1 21 9.5v7a1.5 1.5 0 0 1-1.5 1.5H18v.5a2.5 2.5 0 0 1-2.5 2.5h-10A2.5 2.5 0 0 1 3 18.5z" />
+                      <path d="M18 8v10" />
+                      <circle cx="16" cy="13" r="1" />
+                    </svg>
+                  </span>
+                  <div className="flex min-w-0 flex-col">
+                    <span className="truncate text-sm font-bold text-white">
+                      {availableBalanceLabel}
+                    </span>
+                    <span className="mt-0.5 truncate text-xs text-zinc-500">
+                      Холд: {holdBalanceLabel}
+                    </span>
+                  </div>
                 </div>
 
-                <div className="min-w-[118px]">
+                <div className="w-[92px] shrink-0">
                   <Select
                     aria-label="Выбор валюты"
                     value={currency}
                     onChange={(event) => setCurrency(event.target.value as typeof currency)}
-                    className="!h-11 !rounded-md !border !border-gray-800 !bg-[#1A1D24] !px-3 !py-1.5 !pr-10 !text-gray-300 !shadow-none outline-none focus:!border-orange-500 focus:!ring-1 focus:!ring-orange-500"
+                    className="!h-10 !rounded-xl !border !border-gray-800 !bg-[#1A1D24] !px-3 !py-1.5 !pr-9 !text-sm !text-gray-300 !shadow-none outline-none focus:!border-orange-500 focus:!ring-1 focus:!ring-orange-500"
                   >
                     {currencies.map((item) => (
                       <option key={item.code} value={item.code} className="bg-[#1A1D24] text-gray-300">
@@ -335,14 +363,14 @@ export function SiteHeader() {
                 </div>
 
                 {isBanned ? (
-                  <div className="inline-flex h-11 items-center justify-center rounded-2xl border border-red-500/20 bg-red-500/10 px-5 text-sm font-semibold text-red-100 shadow-[0_12px_28px_rgba(0,0,0,0.22)]">
+                  <div className="inline-flex h-10 items-center justify-center rounded-xl border border-red-500/20 bg-red-500/10 px-4 text-sm font-semibold text-red-100 shadow-[0_12px_28px_rgba(0,0,0,0.22)]">
                     Аккаунт заблокирован
                   </div>
                 ) : (
                   <>
                     <Link
                       href="/sell"
-                      className="sell-link inline-flex h-11 items-center justify-center rounded-2xl bg-orange-600 px-5 text-sm font-semibold shadow-[0_16px_40px_rgba(249,115,22,0.32)] transition hover:-translate-y-0.5 hover:bg-orange-500"
+                      className="sell-link inline-flex h-10 items-center justify-center rounded-xl bg-orange-600 px-4 text-sm font-semibold text-white shadow-[0_16px_40px_rgba(249,115,22,0.28)] transition hover:-translate-y-0.5 hover:bg-orange-500"
                     >
                       Продать
                     </Link>
@@ -350,7 +378,7 @@ export function SiteHeader() {
                     {session?.user?.role === "ADMIN" ? (
                       <Link
                         href="/admin"
-                        className="inline-flex h-11 items-center justify-center rounded-2xl border border-sky-400/20 bg-sky-500/10 px-5 text-sm font-semibold text-sky-100 shadow-[0_16px_40px_rgba(2,132,199,0.16)] transition hover:-translate-y-0.5 hover:bg-sky-500/20"
+                        className="inline-flex h-10 items-center justify-center rounded-xl border border-sky-400/20 bg-sky-500/10 px-4 text-sm font-semibold text-sky-100 shadow-[0_16px_40px_rgba(2,132,199,0.16)] transition hover:-translate-y-0.5 hover:bg-sky-500/20"
                       >
                         Админ-панель
                       </Link>
@@ -358,46 +386,63 @@ export function SiteHeader() {
                   </>
                 )}
 
-                <button
-                  type="button"
-                  onClick={() => void signOut({ callbackUrl: "/" })}
-                  className="inline-flex h-11 items-center justify-center rounded-2xl border border-white/10 bg-white/5 px-4 text-sm font-semibold text-zinc-200 shadow-[0_12px_28px_rgba(0,0,0,0.22)] transition hover:bg-white/10"
-                >
-                  Выйти
-                </button>
-
-                <Link
-                  href="/profile"
-                  aria-label="Профиль пользователя"
-                  title={displayName}
-                  className="relative flex h-11 w-11 items-center justify-center overflow-hidden rounded-2xl border border-white/10 bg-white/5 text-sm font-semibold text-white shadow-[0_12px_28px_rgba(0,0,0,0.22)] transition hover:bg-white/10"
-                >
-                  {user?.image ? (
-                    <Image
-                      src={user.image}
-                      alt={`Аватар ${displayName}`}
-                      fill
-                      unoptimized
-                      className="object-cover"
-                      sizes="44px"
-                    />
-                  ) : (
-                    avatarLetter
-                  )}
-                </Link>
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <button
+                      type="button"
+                      aria-label="Меню профиля"
+                      className="inline-flex h-10 w-10 items-center justify-center rounded-xl border border-white/10 bg-white/5 p-0.5 shadow-[0_12px_28px_rgba(0,0,0,0.22)] transition hover:bg-white/10"
+                    >
+                      <UserAvatar
+                        src={user?.image ?? session?.user?.image ?? null}
+                        name={displayName}
+                        email={user?.email ?? session?.user?.email ?? null}
+                        className="h-full w-full rounded-[0.8rem] border-0 bg-zinc-800/80"
+                      />
+                    </button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent className="w-64">
+                    <DropdownMenuLabel>Аккаунт</DropdownMenuLabel>
+                    <div className="px-3 pb-2">
+                      <p className="truncate text-sm font-semibold text-white">
+                        {displayName}
+                      </p>
+                      <p className="truncate text-xs text-zinc-500">
+                        {user?.email ?? session?.user?.email ?? ""}
+                      </p>
+                    </div>
+                    <DropdownMenuSeparator className="my-1 h-px bg-white/10" />
+                    <DropdownMenuItem asChild>
+                      <Link href="/profile">Профиль</Link>
+                    </DropdownMenuItem>
+                    <DropdownMenuItem asChild>
+                      <Link href="/profile/settings">Настройки профиля</Link>
+                    </DropdownMenuItem>
+                    <DropdownMenuSeparator className="my-1 h-px bg-white/10" />
+                    <DropdownMenuItem
+                      onSelect={(event) => {
+                        event.preventDefault();
+                        void signOut({ callbackUrl: "/" });
+                      }}
+                      className="text-rose-200 focus:bg-rose-500/10 focus:text-rose-100"
+                    >
+                      Выйти
+                    </DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
               </>
             ) : (
               <>
                 <Link
                   href="/login"
-                  className="inline-flex h-11 items-center justify-center rounded-2xl border border-white/10 bg-white/5 px-5 text-sm font-semibold text-zinc-100 shadow-[0_12px_28px_rgba(0,0,0,0.22)] transition hover:bg-white/10"
+                  className="inline-flex h-10 items-center justify-center rounded-xl border border-white/10 bg-white/5 px-4 text-sm font-semibold text-zinc-100 shadow-[0_12px_28px_rgba(0,0,0,0.22)] transition hover:bg-white/10"
                 >
                   Войти
                 </Link>
 
                 <Link
                   href="/register"
-                  className="inline-flex h-11 items-center justify-center rounded-2xl bg-sky-600 px-5 text-sm font-semibold text-white shadow-[0_16px_40px_rgba(2,132,199,0.28)] transition hover:-translate-y-0.5 hover:bg-sky-500"
+                  className="inline-flex h-10 items-center justify-center rounded-xl bg-sky-600 px-4 text-sm font-semibold text-white shadow-[0_16px_40px_rgba(2,132,199,0.28)] transition hover:-translate-y-0.5 hover:bg-sky-500"
                 >
                   Регистрация
                 </Link>

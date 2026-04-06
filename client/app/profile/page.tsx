@@ -1,7 +1,6 @@
 import Link from "next/link";
 
-import { ProfileDashboard } from "@/components/profile/profile-dashboard";
-import { WithdrawalPanel } from "@/components/profile/withdrawal-panel";
+import { ProfilePageClient } from "@/app/profile/profile-page-client";
 import { getAuthSession } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { mapWithdrawalListItem } from "@/lib/withdrawals";
@@ -123,9 +122,7 @@ export default async function ProfilePage() {
         </div>
       </section>
 
-      <ProfileDashboard />
-
-      <WithdrawalPanel
+      <ProfilePageClient
         isAuthenticated={Boolean(sellerId)}
         availableBalance={sellerAccount?.availableBalance.toFixed(8) ?? "0"}
         withdrawals={withdrawals.map(mapWithdrawalListItem)}

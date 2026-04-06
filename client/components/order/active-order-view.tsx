@@ -486,7 +486,12 @@ export function ActiveOrderView({ orderId }: ActiveOrderViewProps) {
   useEffect(() => {
     let isMounted = true;
 
-    if (!currentUserId || !chatRoomId || currentUserRole === "ADMIN") {
+    const isSpectator =
+      currentUserRole === "ADMIN" &&
+      currentUserId !== order?.buyerId &&
+      currentUserId !== order?.sellerId;
+
+    if (!currentUserId || !chatRoomId || isSpectator) {
       return () => {
         isMounted = false;
       };
@@ -528,7 +533,13 @@ export function ActiveOrderView({ orderId }: ActiveOrderViewProps) {
     return () => {
       isMounted = false;
     };
-  }, [chatRoomId, currentUserId, currentUserRole, messages]);
+  }, [
+    chatRoomId,
+    currentUserId,
+    currentUserRole,
+    messages,
+    order,
+  ]);
 
   useEffect(() => {
     async function updateTypingState(isTyping: boolean) {
@@ -954,19 +965,19 @@ export function ActiveOrderView({ orderId }: ActiveOrderViewProps) {
   const sellerIsTyping = remoteTypingUsers.some(
     (typingUser) => typingUser.role === "SELLER",
   );
-  const isAdminViewer = currentUserRole === "ADMIN";
   const isParticipant =
     currentUserId === order.buyerId || currentUserId === order.sellerId;
+  const isSpectator =
+    currentUserRole === "ADMIN" &&
+    currentUserId !== order.buyerId &&
+    currentUserId !== order.sellerId;
   const canOpenDispute =
-    isParticipant &&
-    !isAdminViewer &&
-    (order.status === "PAID" || order.status === "DELIVERED");
+    isParticipant && (order.status === "PAID" || order.status === "DELIVERED");
   const canCompleteOrder =
     currentUserId === order.buyerId &&
-    !isAdminViewer &&
     (order.status === "PAID" || order.status === "DELIVERED");
-  const showArbiterPanel = isAdminViewer && order.status === "DISPUTED";
-  const isChatReadOnly = isAdminViewer;
+  const showArbiterPanel = isSpectator && order.status === "DISPUTED";
+  const isChatReadOnly = isSpectator;
   const canLeaveReview =
     order.status === "COMPLETED" &&
     currentUserId === order.buyerId &&
