@@ -522,132 +522,136 @@ export function ConversationRoomView({ conversationId }: ConversationRoomViewPro
 
   if (isLoading) {
     return (
-      <section className="rounded-[2rem] border border-white/10 bg-zinc-900/80 p-6 text-zinc-300 shadow-[0_24px_80px_rgba(0,0,0,0.28)]">
+      <section className="flex min-h-0 flex-1 items-center justify-center bg-[#0f1318] p-6 text-zinc-300">
         Загружаем историю диалога...
       </section>
     );
   }
 
   return (
-    <section className="rounded-[2rem] border border-white/10 bg-zinc-900/80 p-4 shadow-[0_24px_80px_rgba(0,0,0,0.28)] md:p-6">
+    <section className="flex min-h-0 flex-1 flex-col bg-[#0f1318]">
       <div
         ref={chatScrollContainerRef}
-        className="max-h-[60vh] space-y-4 overflow-y-auto rounded-[1.5rem] border border-white/10 bg-black/20 p-4"
+        className="flex-1 overflow-y-auto p-4"
       >
-        {messages.length === 0 ? (
-          <div className="rounded-[1.5rem] border border-dashed border-white/10 bg-white/5 px-5 py-8 text-center text-sm leading-7 text-zinc-400">
-            Сообщений пока нет. Начните диалог первым.
-          </div>
-        ) : (
-          messages.map((message) => {
-            const isOwnMessage = message.senderId === currentUserId;
+        <div className="space-y-4">
+          {messages.length === 0 ? (
+            <div className="rounded-[1.5rem] border border-dashed border-white/10 bg-white/5 px-5 py-8 text-center text-sm leading-7 text-zinc-400">
+              Сообщений пока нет. Начните диалог первым.
+            </div>
+          ) : (
+            messages.map((message) => {
+              const isOwnMessage = message.senderId === currentUserId;
 
-            return (
-              <div
-                key={message.id}
-                className={`flex ${isOwnMessage ? "justify-end" : "justify-start"}`}
-              >
+              return (
                 <div
-                  className={[
-                    "max-w-[85%] rounded-[1.5rem] border px-4 py-3 shadow-[0_12px_30px_rgba(0,0,0,0.18)]",
-                    isOwnMessage
-                      ? "border-orange-500/20 bg-orange-500/12 text-orange-50"
-                      : "border-white/10 bg-white/6 text-zinc-100",
-                  ].join(" ")}
+                  key={message.id}
+                  className={`flex ${isOwnMessage ? "justify-end" : "justify-start"}`}
                 >
-                  <p className="text-xs uppercase tracking-[0.18em] text-zinc-500">
-                    {isOwnMessage ? "Вы" : message.sender.email}
-                  </p>
-                  {message.text ? (
-                    <p className="mt-2 whitespace-pre-wrap text-sm leading-7">
-                      {message.text}
+                  <div
+                    className={[
+                      "max-w-[85%] rounded-[1.5rem] border px-4 py-3 shadow-[0_12px_30px_rgba(0,0,0,0.18)]",
+                      isOwnMessage
+                        ? "border-orange-500/20 bg-orange-500/12 text-orange-50"
+                        : "border-white/10 bg-white/6 text-zinc-100",
+                    ].join(" ")}
+                  >
+                    <p className="text-xs uppercase tracking-[0.18em] text-zinc-500">
+                      {isOwnMessage ? "Вы" : message.sender.email}
                     </p>
-                  ) : null}
-                  {message.imageUrl ? (
-                    <img
-                      src={message.imageUrl}
-                      alt="Вложение к сообщению"
-                      className="mt-3 max-h-[320px] w-full rounded-[1rem] border border-white/10 object-cover"
-                    />
-                  ) : null}
-                  <p className="mt-3 text-right text-[11px] uppercase tracking-[0.16em] text-zinc-500">
-                    {formatMessageTime(message.createdAt)}
-                  </p>
+                    {message.text ? (
+                      <p className="mt-2 whitespace-pre-wrap text-sm leading-7">
+                        {message.text}
+                      </p>
+                    ) : null}
+                    {message.imageUrl ? (
+                      <img
+                        src={message.imageUrl}
+                        alt="Вложение к сообщению"
+                        className="mt-3 max-h-[320px] w-full rounded-[1rem] border border-white/10 object-cover"
+                      />
+                    ) : null}
+                    <p className="mt-3 text-right text-[11px] uppercase tracking-[0.16em] text-zinc-500">
+                      {formatMessageTime(message.createdAt)}
+                    </p>
+                  </div>
                 </div>
-              </div>
-            );
-          })
-        )}
+              );
+            })
+          )}
+        </div>
       </div>
 
-      {remoteTypingUsers.length > 0 ? (
-        <div className="mt-4 rounded-[1.25rem] border border-sky-500/15 bg-sky-500/8 px-4 py-3 text-sm text-sky-100">
-          {remoteTypingUsers.map((typingUser) => typingUser.email).join(", ")} печатает...
-        </div>
-      ) : null}
-
-      {draftImageBase64 ? (
-        <div className="mt-4 rounded-[1.5rem] border border-white/10 bg-white/5 p-4">
-          <div className="flex items-start justify-between gap-4">
-            <div>
-              <p className="text-xs font-semibold uppercase tracking-[0.22em] text-zinc-500">
-                Подготовленное вложение
-              </p>
-              <img
-                src={draftImageBase64}
-                alt="Подготовленный скриншот"
-                className="mt-3 max-h-56 rounded-[1rem] border border-white/10 object-cover"
-              />
-            </div>
-            <Button
-              type="button"
-              onClick={handleRemoveAttachment}
-              className="h-10 rounded-xl bg-zinc-800 px-4 text-sm text-zinc-200 hover:bg-zinc-700"
-            >
-              Убрать
-            </Button>
+      <div className="shrink-0 border-t border-gray-800 bg-[#11151b] p-4">
+        {remoteTypingUsers.length > 0 ? (
+          <div className="mb-4 rounded-[1.25rem] border border-sky-500/15 bg-sky-500/8 px-4 py-3 text-sm text-sky-100">
+            {remoteTypingUsers.map((typingUser) => typingUser.email).join(", ")} печатает...
           </div>
-        </div>
-      ) : null}
+        ) : null}
 
-      {errorMessage ? (
-        <div className="mt-4 rounded-[1.25rem] border border-red-500/15 bg-red-500/10 p-4 text-sm leading-7 text-red-200">
-          {errorMessage}
-        </div>
-      ) : null}
+        {draftImageBase64 ? (
+          <div className="mb-4 rounded-[1.5rem] border border-white/10 bg-white/5 p-4">
+            <div className="flex items-start justify-between gap-4">
+              <div>
+                <p className="text-xs font-semibold uppercase tracking-[0.22em] text-zinc-500">
+                  Подготовленное вложение
+                </p>
+                <img
+                  src={draftImageBase64}
+                  alt="Подготовленный скриншот"
+                  className="mt-3 max-h-56 rounded-[1rem] border border-white/10 object-cover"
+                />
+              </div>
+              <Button
+                type="button"
+                onClick={handleRemoveAttachment}
+                className="h-10 rounded-xl bg-zinc-800 px-4 text-sm text-zinc-200 hover:bg-zinc-700"
+              >
+                Убрать
+              </Button>
+            </div>
+          </div>
+        ) : null}
 
-      <form onSubmit={handleSendMessage} className="mt-4 flex items-end gap-3">
-        <input
-          ref={fileInputRef}
-          type="file"
-          accept="image/jpeg,image/png,image/webp"
-          onChange={handleAttachmentChange}
-          className="hidden"
-        />
-        <button
-          type="button"
-          title="Прикрепить скриншот"
-          onClick={() => fileInputRef.current?.click()}
-          disabled={isSending || isProcessingAttachment || !currentUserId}
-          className="inline-flex h-14 w-14 shrink-0 items-center justify-center rounded-[1.35rem] border border-white/10 bg-white/5 text-xl text-zinc-200 shadow-[0_12px_30px_rgba(0,0,0,0.18)] transition hover:bg-white/10 disabled:cursor-not-allowed disabled:opacity-60"
-        >
-          📎
-        </button>
-        <Input
-          value={draftMessage}
-          onChange={(event) => setDraftMessage(event.target.value)}
-          placeholder={!currentUserId ? "Войдите, чтобы писать в чат" : "Напишите сообщение или приложите скриншот"}
-          className="h-14 flex-1 border-white/10 bg-white/5 text-zinc-100 placeholder:text-zinc-500 focus:border-orange-500/45 focus:bg-white/8"
-          disabled={isSending || isProcessingAttachment || !currentUserId}
-        />
-        <Button
-          type="submit"
-          disabled={isSending || isProcessingAttachment || (!draftMessage.trim() && !draftImageBase64) || !currentUserId}
-          className="h-14 rounded-[1.35rem] bg-orange-600 px-6 text-sm font-semibold text-white shadow-[0_18px_42px_rgba(234,88,12,0.35)] hover:bg-orange-500"
-        >
-          {isSending ? "Отправляем..." : "Отправить"}
-        </Button>
-      </form>
+        {errorMessage ? (
+          <div className="mb-4 rounded-[1.25rem] border border-red-500/15 bg-red-500/10 p-4 text-sm leading-7 text-red-200">
+            {errorMessage}
+          </div>
+        ) : null}
+
+        <form onSubmit={handleSendMessage} className="flex items-end gap-3">
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept="image/jpeg,image/png,image/webp"
+            onChange={handleAttachmentChange}
+            className="hidden"
+          />
+          <button
+            type="button"
+            title="Прикрепить скриншот"
+            onClick={() => fileInputRef.current?.click()}
+            disabled={isSending || isProcessingAttachment || !currentUserId}
+            className="inline-flex h-14 w-14 shrink-0 items-center justify-center rounded-[1.35rem] border border-white/10 bg-white/5 text-xl text-zinc-200 shadow-[0_12px_30px_rgba(0,0,0,0.18)] transition hover:bg-white/10 disabled:cursor-not-allowed disabled:opacity-60"
+          >
+            📎
+          </button>
+          <Input
+            value={draftMessage}
+            onChange={(event) => setDraftMessage(event.target.value)}
+            placeholder={!currentUserId ? "Войдите, чтобы писать в чат" : "Напишите сообщение или приложите скриншот"}
+            className="h-14 flex-1 border-white/10 bg-white/5 text-zinc-100 placeholder:text-zinc-500 focus:border-orange-500/45 focus:bg-white/8"
+            disabled={isSending || isProcessingAttachment || !currentUserId}
+          />
+          <Button
+            type="submit"
+            disabled={isSending || isProcessingAttachment || (!draftMessage.trim() && !draftImageBase64) || !currentUserId}
+            className="h-14 rounded-[1.35rem] bg-orange-600 px-6 text-sm font-semibold text-white shadow-[0_18px_42px_rgba(234,88,12,0.35)] hover:bg-orange-500"
+          >
+            {isSending ? "Отправляем..." : "Отправить"}
+          </Button>
+        </form>
+      </div>
     </section>
   );
 }

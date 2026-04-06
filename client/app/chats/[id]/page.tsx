@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 
+import { UserAvatar } from "@/components/ui/user-avatar";
 import { BuyProductDialog } from "@/components/product/buy-product-dialog";
 import { ConversationRoomView } from "@/components/chat/conversation-room-view";
 import { getCurrentSessionUser } from "@/lib/access-control";
@@ -83,80 +84,68 @@ export default async function ChatRoomPage({ params }: ChatPageProps) {
   const statusMeta = conversation.latestOrder
     ? getOrderStatusMeta(conversation.latestOrder.status)
     : null;
+  const otherPartyName = conversation.otherParty.name?.trim() || conversation.otherParty.email;
   const canBuyProduct =
     conversation.product &&
     !conversation.latestOrder &&
     currentUser.id === conversation.buyerId;
+  const purchasableProduct = canBuyProduct ? conversation.product : null;
 
   return (
-    <main className="mx-auto flex w-full max-w-7xl flex-col gap-6 px-4 py-10 sm:px-6 lg:px-8 lg:py-14">
-      <section className="overflow-hidden rounded-[2rem] border border-white/10 bg-[radial-gradient(circle_at_top_left,rgba(249,115,22,0.14),transparent_28%),radial-gradient(circle_at_bottom_right,rgba(14,165,233,0.16),transparent_34%),rgba(9,9,11,0.92)] p-6 shadow-[0_24px_80px_rgba(0,0,0,0.28)] md:p-8">
-        <div className="flex flex-col gap-5 xl:flex-row xl:items-start xl:justify-between">
-          <div className="min-w-0 flex-1">
-            <p className="text-sm font-semibold tracking-[0.24em] uppercase text-zinc-500">
-              Direct Conversation
-            </p>
-            <h1 className="mt-3 text-3xl font-semibold tracking-tight text-white md:text-4xl">
-              {conversation.product?.title ?? "Личный диалог"}
-            </h1>
-            <p className="mt-3 max-w-3xl text-sm leading-7 text-zinc-300">
-              Собеседник: {conversation.otherParty.email}. Вы можете обсудить детали товара до покупки или сопровождать уже активную escrow-сделку.
-            </p>
+    <div className="flex min-h-0 flex-1 flex-col">
+      <header className="shrink-0 border-b border-gray-800 bg-[#11151b] px-4 py-4">
+        <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+          <div className="flex min-w-0 items-center gap-3">
+            <UserAvatar
+              src={conversation.otherParty.image}
+              name={otherPartyName}
+              email={conversation.otherParty.email}
+              className="h-12 w-12 shrink-0 border-gray-700 bg-zinc-800/80"
+              imageClassName="rounded-full object-cover"
+            />
+            <div className="min-w-0">
+              <p className="truncate text-lg font-semibold text-white">
+                {otherPartyName}
+              </p>
+              <p className="truncate text-sm text-gray-400">
+                {conversation.product?.title ?? "Личный диалог"}
+              </p>
+            </div>
           </div>
 
-          <div className="w-full max-w-md rounded-[1.6rem] border border-white/10 bg-black/20 p-4">
-            <p className="text-xs tracking-[0.24em] uppercase text-zinc-500">
-              Статус по товару
-            </p>
-            {conversation.product ? (
-              <div className="mt-3 space-y-3">
-                <div>
-                  <p className="text-lg font-semibold text-white">
-                    {conversation.product.title}
-                  </p>
-                  <p className="mt-1 text-sm text-zinc-400">
-                    Цена: {conversation.product.price} USDT
-                  </p>
-                </div>
-
-                {statusMeta && conversation.latestOrder ? (
-                  <div className="space-y-3">
-                    <span className={`inline-flex rounded-full border px-3 py-1.5 text-sm font-semibold ${statusMeta.className}`}>
-                      {statusMeta.label}
-                    </span>
-                    <div>
-                      <Link
-                        href={`/orders/${conversation.latestOrder.id}`}
-                        className="text-sm font-semibold text-sky-200 transition hover:text-sky-100 hover:underline"
-                      >
-                        Открыть сделку #{conversation.latestOrder.id}
-                      </Link>
-                    </div>
-                  </div>
-                ) : canBuyProduct ? (
-                  <BuyProductDialog
-                    product={{
-                      id: conversation.product.id,
-                      title: conversation.product.title,
-                      price: conversation.product.price,
-                    }}
-                  />
-                ) : (
-                  <p className="text-sm leading-7 text-zinc-400">
-                    Заказ по этому товару пока не создан. Сначала обсудите детали с продавцом.
-                  </p>
-                )}
+          <div className="flex flex-wrap items-center gap-3 lg:justify-end">
+            {statusMeta && conversation.latestOrder ? (
+              <>
+                <span className={`inline-flex rounded-full border px-3 py-1.5 text-sm font-semibold ${statusMeta.className}`}>
+                  {statusMeta.label}
+                </span>
+                <Link
+                  href={`/orders/${conversation.latestOrder.id}`}
+                  className="inline-flex h-11 items-center justify-center rounded-2xl border border-sky-400/20 bg-sky-500/10 px-5 text-sm font-semibold text-sky-100 transition hover:bg-sky-500/20"
+                >
+                  Перейти к заказу
+                </Link>
+              </>
+            ) : purchasableProduct ? (
+              <div className="w-full sm:w-[180px]">
+                <BuyProductDialog
+                  product={{
+                    id: purchasableProduct.id,
+                    title: purchasableProduct.title,
+                    price: purchasableProduct.price,
+                  }}
+                />
               </div>
             ) : (
-              <p className="mt-3 text-sm leading-7 text-zinc-400">
-                Исходный товар уже недоступен, но история диалога сохранена.
-              </p>
+              <span className="inline-flex rounded-full border border-gray-800 bg-gray-900/80 px-3 py-1.5 text-sm text-gray-400">
+                {conversation.product ? "Диалог по товару без заказа" : "Товар недоступен"}
+              </span>
             )}
           </div>
         </div>
-      </section>
+      </header>
 
       <ConversationRoomView conversationId={conversation.id} />
-    </main>
+    </div>
   );
 }

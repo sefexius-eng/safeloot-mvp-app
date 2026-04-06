@@ -1725,11 +1725,15 @@ async function getConversationContextById(conversationId: string) {
       buyer: {
         select: {
           email: true,
+          name: true,
+          image: true,
         },
       },
       seller: {
         select: {
           email: true,
+          name: true,
+          image: true,
         },
       },
       product: {
@@ -2050,10 +2054,14 @@ export async function getConversationRoom(conversationId: string, userId: string
       ? {
           role: "SELLER" as const,
           email: conversation.seller.email,
+          name: conversation.seller.name,
+          image: conversation.seller.image,
         }
       : {
           role: "BUYER" as const,
           email: conversation.buyer.email,
+          name: conversation.buyer.name,
+          image: conversation.buyer.image,
         },
     latestOrder: conversation.latestOrder
       ? {
