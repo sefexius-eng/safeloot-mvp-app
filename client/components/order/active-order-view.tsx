@@ -1296,27 +1296,27 @@ export function ActiveOrderView({ orderId }: ActiveOrderViewProps) {
               Проверьте переписку и примите решение о возврате покупателю или о передаче средств продавцу.
             </p>
 
-            <div className="mt-4 grid gap-3">
-              <Button
+            <div className="mt-4 grid gap-3 sm:grid-cols-2">
+              <button
                 type="button"
                 onClick={handleResolveDisputeToBuyer}
                 disabled={isResolvingToBuyer || isResolvingToSeller}
-                className="h-12 w-full rounded-[1.2rem] bg-amber-500 text-sm font-semibold text-zinc-950 shadow-[0_18px_42px_rgba(245,158,11,0.28)] hover:bg-amber-400"
+                className="rounded-md bg-red-500 px-4 py-2 font-medium text-white transition-colors hover:bg-red-600 disabled:cursor-not-allowed disabled:opacity-60"
               >
                 {isResolvingToBuyer
                   ? "Возвращаем средства..."
-                  : "Вернуть деньги покупателю"}
-              </Button>
-              <Button
+                  : "Вернуть средства покупателю"}
+              </button>
+              <button
                 type="button"
                 onClick={handleResolveDisputeToSeller}
                 disabled={isResolvingToBuyer || isResolvingToSeller}
-                className="h-12 w-full rounded-[1.2rem] bg-emerald-600 text-sm font-semibold text-white shadow-[0_18px_42px_rgba(5,150,105,0.28)] hover:bg-emerald-500"
+                className="rounded-md bg-green-600 px-4 py-2 font-medium text-white transition-colors hover:bg-green-700 disabled:cursor-not-allowed disabled:opacity-60"
               >
                 {isResolvingToSeller
                   ? "Передаем средства..."
                   : "Передать средства продавцу"}
-              </Button>
+              </button>
             </div>
           </div>
         ) : null}
