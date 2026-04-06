@@ -11,11 +11,18 @@ import { prisma } from "@/lib/prisma";
 const MONEY_SCALE = 8;
 const PLATFORM_FEE_RATE = new Prisma.Decimal("0.05");
 const TYPING_TTL_MS = 5000;
+const MAX_MESSAGE_IMAGE_BASE64_LENGTH = 2_000_000;
 
 const chatTypingState = new Map<string, Map<string, number>>();
 
 function normalizeText(value?: string) {
   return value?.trim() ?? "";
+}
+
+function normalizeOptionalText(value?: string | null) {
+  const normalizedValue = value?.trim() ?? "";
+
+  return normalizedValue || null;
 }
 
 function formatMoney(value: Prisma.Decimal) {
@@ -659,6 +666,30 @@ async function getChatRoomContext(orderId: string) {
   });
 }
 
+async function getChatRoomContextById(chatRoomId: string) {
+  return prisma.chatRoom.findUnique({
+    where: {
+      id: chatRoomId,
+    },
+    select: {
+      id: true,
+      orderId: true,
+      buyerId: true,
+      sellerId: true,
+      buyer: {
+        select: {
+          email: true,
+        },
+      },
+      seller: {
+        select: {
+          email: true,
+        },
+      },
+    },
+  });
+}
+
 export async function getChatMessages(orderId: string, userId: string) {
   const normalizedOrderId = normalizeText(orderId);
   const normalizedUserId = normalizeText(userId);
@@ -687,6 +718,8 @@ export async function getChatMessages(orderId: string, userId: string) {
         select: {
           id: true,
           content: true,
+          imageUrl: true,
+          isRead: true,
           senderId: true,
           createdAt: true,
           updatedAt: true,
@@ -718,10 +751,12 @@ export async function createChatMessage(input: {
   orderId: string;
   senderId: string;
   content?: string;
+  imageBase64?: string | null;
 }) {
   const orderId = normalizeText(input.orderId);
   const senderId = normalizeText(input.senderId);
   const content = normalizeText(input.content);
+  const imageBase64 = normalizeOptionalText(input.imageBase64);
 
   if (!orderId) {
     throw new Error("orderId is required.");
@@ -731,8 +766,16 @@ export async function createChatMessage(input: {
     throw new Error("senderId is required.");
   }
 
-  if (!content) {
-    throw new Error("content is required.");
+  if (!content && !imageBase64) {
+    throw new Error("content or imageBase64 is required.");
+  }
+
+  if (imageBase64 && !imageBase64.startsWith("data:image/webp;base64,")) {
+    throw new Error("imageBase64 must be a WebP data URL.");
+  }
+
+  if (imageBase64 && imageBase64.length > MAX_MESSAGE_IMAGE_BASE64_LENGTH) {
+    throw new Error("imageBase64 is too large.");
   }
 
   const chatRoom = await prisma.chatRoom.findUnique({
@@ -759,10 +802,13 @@ export async function createChatMessage(input: {
       chatRoomId: chatRoom.id,
       senderId,
       content,
+      imageUrl: imageBase64,
     },
     select: {
       id: true,
       content: true,
+      imageUrl: true,
+      isRead: true,
       senderId: true,
       createdAt: true,
       updatedAt: true,
@@ -779,6 +825,49 @@ export async function createChatMessage(input: {
     orderId: chatRoom.orderId,
     chatRoomId: chatRoom.id,
     message,
+  };
+}
+
+export async function markChatMessagesAsRead(input: {
+  chatRoomId: string;
+  userId: string;
+}) {
+  const chatRoomId = normalizeText(input.chatRoomId);
+  const userId = normalizeText(input.userId);
+
+  if (!chatRoomId) {
+    throw new Error("chatRoomId is required.");
+  }
+
+  if (!userId) {
+    throw new Error("userId is required.");
+  }
+
+  const chatRoom = await getChatRoomContextById(chatRoomId);
+
+  if (!chatRoom) {
+    throw new Error(`Chat room ${chatRoomId} was not found.`);
+  }
+
+  ensureChatParticipant(userId, chatRoom);
+
+  const updatedMessages = await prisma.message.updateMany({
+    where: {
+      chatRoomId,
+      senderId: {
+        not: userId,
+      },
+      isRead: false,
+    },
+    data: {
+      isRead: true,
+    },
+  });
+
+  return {
+    chatRoomId: chatRoom.id,
+    orderId: chatRoom.orderId,
+    updatedCount: updatedMessages.count,
   };
 }
 

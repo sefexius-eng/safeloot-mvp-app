@@ -156,6 +156,8 @@ model Message {
   chatRoomId String
   senderId   String
   content    String
+  imageUrl   String?
+  isRead     Boolean  @default(false)
   chatRoom   ChatRoom @relation(fields: [chatRoomId], references: [id], onDelete: Cascade, onUpdate: Cascade)
   sender     User     @relation("MessageSender", fields: [senderId], references: [id], onDelete: Restrict, onUpdate: Cascade)
   createdAt  DateTime @default(now())

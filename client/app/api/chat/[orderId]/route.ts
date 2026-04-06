@@ -60,6 +60,7 @@ export async function POST(
       orderId,
       senderId: userId,
       content: payload?.content,
+      imageBase64: payload?.imageBase64,
     });
 
     return NextResponse.json(result, { status: 201 });

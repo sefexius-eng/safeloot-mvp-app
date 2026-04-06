@@ -5,6 +5,7 @@ import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { useSession } from "next-auth/react";
 
+import { markMessagesAsRead, sendMessage } from "@/app/actions/chat";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 
@@ -12,6 +13,13 @@ const CHAT_POLL_INTERVAL_MS = 3000;
 const TYPING_POLL_INTERVAL_MS = 1500;
 const TYPING_IDLE_TIMEOUT_MS = 1800;
 const BALANCE_REFRESH_EVENT = "safeloot:balances-refresh";
+const MAX_CHAT_IMAGE_WIDTH = 800;
+const CHAT_IMAGE_QUALITY = 0.7;
+const ACCEPTED_CHAT_IMAGE_TYPES = new Set([
+  "image/jpeg",
+  "image/png",
+  "image/webp",
+]);
 
 type OrderStatus =
   | "PENDING"
@@ -39,6 +47,8 @@ interface OrderDetail {
 interface ChatMessage {
   id: string;
   content: string;
+  imageUrl: string | null;
+  isRead: boolean;
   senderId: string;
   createdAt: string;
   updatedAt: string;
@@ -133,22 +143,91 @@ function formatAmount(value: string) {
   }).format(parsedValue);
 }
 
+function readFileAsDataUrl(file: Blob) {
+  return new Promise<string>((resolve, reject) => {
+    const reader = new FileReader();
+
+    reader.onload = () => {
+      if (typeof reader.result === "string") {
+        resolve(reader.result);
+        return;
+      }
+
+      reject(new Error("Не удалось прочитать изображение."));
+    };
+
+    reader.onerror = () => {
+      reject(new Error("Не удалось прочитать изображение."));
+    };
+
+    reader.readAsDataURL(file);
+  });
+}
+
+function loadImage(source: string) {
+  return new Promise<HTMLImageElement>((resolve, reject) => {
+    const image = new window.Image();
+
+    image.onload = () => resolve(image);
+    image.onerror = () => reject(new Error("Не удалось обработать скриншот."));
+    image.src = source;
+  });
+}
+
+async function compressChatImage(file: File) {
+  if (!ACCEPTED_CHAT_IMAGE_TYPES.has(file.type)) {
+    throw new Error("Поддерживаются только JPG, PNG и WebP.");
+  }
+
+  const source = await readFileAsDataUrl(file);
+  const image = await loadImage(source);
+  const scale = Math.min(MAX_CHAT_IMAGE_WIDTH / image.width, 1);
+  const targetWidth = Math.max(1, Math.round(image.width * scale));
+  const targetHeight = Math.max(1, Math.round(image.height * scale));
+  const canvas = document.createElement("canvas");
+
+  canvas.width = targetWidth;
+  canvas.height = targetHeight;
+
+  const context = canvas.getContext("2d");
+
+  if (!context) {
+    throw new Error("Не удалось подготовить изображение для отправки.");
+  }
+
+  context.drawImage(image, 0, 0, targetWidth, targetHeight);
+
+  const webpBlob = await new Promise<Blob | null>((resolve) => {
+    canvas.toBlob(resolve, "image/webp", CHAT_IMAGE_QUALITY);
+  });
+
+  if (!webpBlob) {
+    throw new Error("Не удалось сжать скриншот.");
+  }
+
+  return readFileAsDataUrl(webpBlob);
+}
+
 export function ActiveOrderView({ orderId }: ActiveOrderViewProps) {
   const { data: session, status: sessionStatus } = useSession();
   const router = useRouter();
   const [order, setOrder] = useState<OrderDetail | null>(null);
+  const [chatRoomId, setChatRoomId] = useState("");
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [typingUsers, setTypingUsers] = useState<TypingUser[]>([]);
   const [draftMessage, setDraftMessage] = useState("");
+  const [draftImageBase64, setDraftImageBase64] = useState<string | null>(null);
   const [isOrderLoading, setIsOrderLoading] = useState(true);
   const [isChatLoading, setIsChatLoading] = useState(true);
   const [isSending, setIsSending] = useState(false);
+  const [isProcessingAttachment, setIsProcessingAttachment] = useState(false);
   const [isCompleting, setIsCompleting] = useState(false);
   const [loadError, setLoadError] = useState("");
   const [chatError, setChatError] = useState("");
   const [actionError, setActionError] = useState("");
   const [completeMessage, setCompleteMessage] = useState("");
   const messagesEndRef = useRef<HTMLDivElement | null>(null);
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
   const typingTimeoutRef = useRef<number | null>(null);
   const hasActiveTypingRef = useRef(false);
   const currentUserId = session?.user?.id ?? "";
@@ -248,7 +327,9 @@ export function ActiveOrderView({ orderId }: ActiveOrderViewProps) {
         }
 
         if (isMounted) {
-          setMessages((payload as ChatResponse).messages);
+          const chatPayload = payload as ChatResponse;
+          setChatRoomId(chatPayload.chatRoomId);
+          setMessages(chatPayload.messages);
           setChatError("");
         }
       } catch (error) {
@@ -333,6 +414,53 @@ export function ActiveOrderView({ orderId }: ActiveOrderViewProps) {
   }, [messages]);
 
   useEffect(() => {
+    let isMounted = true;
+
+    if (!currentUserId || !chatRoomId) {
+      return () => {
+        isMounted = false;
+      };
+    }
+
+    const hasUnreadRemoteMessages = messages.some(
+      (message) => message.senderId !== currentUserId && !message.isRead,
+    );
+
+    if (!hasUnreadRemoteMessages) {
+      return () => {
+        isMounted = false;
+      };
+    }
+
+    async function syncReadState() {
+      try {
+        await markMessagesAsRead(chatRoomId);
+
+        if (isMounted) {
+          setMessages((currentMessages) =>
+            currentMessages.map((message) =>
+              message.senderId !== currentUserId
+                ? {
+                    ...message,
+                    isRead: true,
+                  }
+                : message,
+            ),
+          );
+        }
+      } catch {
+        return;
+      }
+    }
+
+    void syncReadState();
+
+    return () => {
+      isMounted = false;
+    };
+  }, [chatRoomId, currentUserId, messages]);
+
+  useEffect(() => {
     async function updateTypingState(isTyping: boolean) {
       if (!currentUserId) {
         return;
@@ -415,6 +543,44 @@ export function ActiveOrderView({ orderId }: ActiveOrderViewProps) {
     };
   }, [currentUserId, orderId]);
 
+  async function handleAttachmentSelection(file: File) {
+    setChatError("");
+    setIsProcessingAttachment(true);
+
+    try {
+      const compressedImage = await compressChatImage(file);
+      setDraftImageBase64(compressedImage);
+    } finally {
+      setIsProcessingAttachment(false);
+    }
+  }
+
+  function handleAttachmentChange(event: React.ChangeEvent<HTMLInputElement>) {
+    const file = event.target.files?.[0];
+
+    event.target.value = "";
+
+    if (!file) {
+      return;
+    }
+
+    void handleAttachmentSelection(file).catch((error) => {
+      setChatError(
+        error instanceof Error
+          ? error.message
+          : "Не удалось подготовить скриншот.",
+      );
+    });
+  }
+
+  function handleRemoveAttachment() {
+    setDraftImageBase64(null);
+
+    if (fileInputRef.current) {
+      fileInputRef.current.value = "";
+    }
+  }
+
   async function handleSendMessage(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
 
@@ -425,7 +591,7 @@ export function ActiveOrderView({ orderId }: ActiveOrderViewProps) {
 
     const content = draftMessage.trim();
 
-    if (!content) {
+    if (!content && !draftImageBase64) {
       return;
     }
 
@@ -434,45 +600,32 @@ export function ActiveOrderView({ orderId }: ActiveOrderViewProps) {
     setActionError("");
 
     try {
-      const response = await fetch(`/api/chat/${orderId}`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          content,
-        }),
-      });
-
-      const payload = (await response.json().catch(() => null)) as
-        | { message?: string; error?: string }
-        | { message: ChatMessage }
-        | ChatResponse
-        | null;
-
-      if (!response.ok) {
-        throw new Error(
-          (payload && "message" in payload && typeof payload.message === "string" && payload.message) ||
-            (payload && "error" in payload && payload.error) ||
-            "Не удалось отправить сообщение.",
-        );
-      }
+      const result = await sendMessage(orderId, content, draftImageBase64);
 
       setDraftMessage("");
+      setDraftImageBase64(null);
       setTypingUsers((currentTypingUsers) =>
         currentTypingUsers.filter((typingUser) => typingUser.senderId !== currentUserId),
       );
       hasActiveTypingRef.current = false;
+      setChatRoomId(result.chatRoomId);
 
       if (typingTimeoutRef.current) {
         window.clearTimeout(typingTimeoutRef.current);
         typingTimeoutRef.current = null;
       }
 
-      const nextMessage =
-        payload && "message" in payload && typeof payload.message !== "string"
-          ? payload.message
-          : null;
+      if (fileInputRef.current) {
+        fileInputRef.current.value = "";
+      }
+
+      const nextMessage = result.message
+        ? {
+            ...result.message,
+            createdAt: new Date(result.message.createdAt).toISOString(),
+            updatedAt: new Date(result.message.updatedAt).toISOString(),
+          }
+        : null;
 
       if (nextMessage) {
         setMessages((currentMessages) => [...currentMessages, nextMessage]);
@@ -650,13 +803,41 @@ export function ActiveOrderView({ orderId }: ActiveOrderViewProps) {
                       <span className={isOwnMessage ? "text-orange-100/85" : "text-zinc-300"}>
                         {authorLabel}
                       </span>
+                    </div>
+
+                    {message.content ? (
+                      <p className="mt-2 whitespace-pre-wrap break-words text-sm leading-7">
+                        {message.content}
+                      </p>
+                    ) : null}
+
+                    {message.imageUrl ? (
+                      <a
+                        href={message.imageUrl}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="mt-3 block overflow-hidden rounded-[1rem] border border-white/10 bg-black/15"
+                      >
+                        <img
+                          src={message.imageUrl}
+                          alt="Скриншот из чата"
+                          className="max-h-[360px] w-auto max-w-full object-cover"
+                        />
+                      </a>
+                    ) : null}
+
+                    <div className="mt-3 flex items-center justify-end gap-2 text-xs">
                       <span className={isOwnMessage ? "text-orange-100/70" : isSellerMessage ? "text-sky-200/70" : "text-zinc-500"}>
                         {formatMessageTime(message.createdAt)}
                       </span>
+                      {isOwnMessage ? (
+                        <span
+                          className={message.isRead ? "font-semibold text-sky-300" : "font-semibold text-orange-100/80"}
+                        >
+                          {message.isRead ? "✓✓" : "✓"}
+                        </span>
+                      ) : null}
                     </div>
-                    <p className="mt-2 whitespace-pre-wrap break-words text-sm leading-7">
-                      {message.content}
-                    </p>
                   </div>
                 </div>
               );
@@ -688,17 +869,66 @@ export function ActiveOrderView({ orderId }: ActiveOrderViewProps) {
           </div>
         ) : null}
 
+        {draftImageBase64 ? (
+          <div className="mt-4 flex items-start gap-3 rounded-[1.25rem] border border-white/10 bg-white/5 p-3">
+            <img
+              src={draftImageBase64}
+              alt="Предпросмотр скриншота"
+              className="h-20 w-28 rounded-2xl object-cover"
+            />
+            <div className="min-w-0 flex-1">
+              <p className="text-sm font-semibold text-white">Скриншот готов к отправке</p>
+              <p className="mt-1 text-sm text-zinc-400">
+                Можно отправить его вместе с текстом или отдельным сообщением.
+              </p>
+            </div>
+            <button
+              type="button"
+              onClick={handleRemoveAttachment}
+              className="inline-flex h-10 items-center justify-center rounded-2xl border border-white/10 bg-white/5 px-4 text-sm font-semibold text-zinc-200 transition hover:bg-white/10"
+            >
+              Убрать
+            </button>
+          </div>
+        ) : null}
+
+        {isProcessingAttachment ? (
+          <p className="mt-4 text-sm text-zinc-400">Подготавливаем скриншот для отправки...</p>
+        ) : null}
+
         <form onSubmit={handleSendMessage} className="mt-5 flex gap-3">
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept="image/jpeg,image/png,image/webp"
+            onChange={handleAttachmentChange}
+            className="hidden"
+          />
+          <button
+            type="button"
+            aria-label="Прикрепить скриншот"
+            title="Прикрепить скриншот"
+            onClick={() => fileInputRef.current?.click()}
+            disabled={isSending || isProcessingAttachment || !currentUserId}
+            className="inline-flex h-14 w-14 shrink-0 items-center justify-center rounded-[1.35rem] border border-white/10 bg-white/5 text-xl text-zinc-200 shadow-[0_12px_30px_rgba(0,0,0,0.18)] transition hover:bg-white/10 disabled:cursor-not-allowed disabled:opacity-60"
+          >
+            📎
+          </button>
           <Input
             value={draftMessage}
             onChange={(event) => setDraftMessage(event.target.value)}
-            placeholder={currentUserId ? "Напишите сообщение продавцу" : "Войдите, чтобы писать в чат"}
+            placeholder={currentUserId ? "Напишите сообщение или приложите скриншот" : "Войдите, чтобы писать в чат"}
             className="h-14 flex-1 border-white/10 bg-white/5 text-zinc-100 placeholder:text-zinc-500 focus:border-orange-500/45 focus:bg-white/8"
-            disabled={isSending || !currentUserId}
+            disabled={isSending || isProcessingAttachment || !currentUserId}
           />
           <Button
             type="submit"
-            disabled={isSending || !draftMessage.trim() || !currentUserId}
+            disabled={
+              isSending ||
+              isProcessingAttachment ||
+              (!draftMessage.trim() && !draftImageBase64) ||
+              !currentUserId
+            }
             className="h-14 rounded-[1.35rem] bg-orange-600 px-6 text-sm font-semibold text-white shadow-[0_18px_42px_rgba(234,88,12,0.35)] hover:bg-orange-500"
           >
             {isSending ? "Отправляем..." : "Отправить"}
