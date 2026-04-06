@@ -104,6 +104,7 @@ async function getGameCatalog(
   const products = await prisma.product.findMany({
     where: {
       gameId: game.id,
+      isActive: true,
       ...(activeCategory
         ? {
             categoryId: activeCategory.id,

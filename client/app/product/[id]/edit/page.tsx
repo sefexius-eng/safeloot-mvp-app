@@ -27,7 +27,10 @@ export default async function EditProductPage({ params }: EditProductPageProps) 
 
   const { id } = await params;
   const [product, games] = await Promise.all([
-    getProductById(id),
+    getProductById(id, {
+      viewerId: currentUser.id,
+      viewerRole: currentUser.role,
+    }),
     listCatalogGamesForProductForms(),
   ]);
 

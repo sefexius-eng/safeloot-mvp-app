@@ -2,9 +2,11 @@
 
 import Image from "next/image";
 import Link from "next/link";
-import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
+import { useEffect, useState, useTransition } from "react";
 import { useSession } from "next-auth/react";
 
+import { toggleAllProductsVisibility } from "@/app/actions/product";
 import { ProfileProductActions } from "@/components/profile/profile-product-actions";
 import { useCurrency } from "@/components/providers/currency-provider";
 import { SellerRatingBadge } from "@/components/reviews/seller-rating-badge";
@@ -31,6 +33,7 @@ interface ProductItem {
   title: string;
   description: string;
   price: string;
+  isActive: boolean;
   game: {
     id: string;
     name: string;
@@ -57,13 +60,16 @@ interface ProductItem {
 }
 
 export function ProfileDashboard() {
+  const router = useRouter();
   const { status } = useSession();
   const { formatPrice } = useCurrency();
   const [user, setUser] = useState<CurrentUser | null>(null);
   const [products, setProducts] = useState<ProductItem[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [errorMessage, setErrorMessage] = useState("");
+  const [bulkError, setBulkError] = useState("");
   const [refreshToken, setRefreshToken] = useState(0);
+  const [isBulkPending, startBulkTransition] = useTransition();
 
   useEffect(() => {
     function handleBalanceRefresh() {
@@ -196,6 +202,47 @@ export function ProfileDashboard() {
     );
   }
 
+  function handleProductVisibilityChanged(productId: string, isActive: boolean) {
+    setProducts((currentProducts) =>
+      currentProducts.map((product) =>
+        product.id === productId
+          ? {
+              ...product,
+              isActive,
+            }
+          : product,
+      ),
+    );
+  }
+
+  function handleToggleAllProducts(nextIsActive: boolean) {
+    setBulkError("");
+
+    startBulkTransition(() => {
+      void toggleAllProductsVisibility(nextIsActive)
+        .then((result) => {
+          if (!result.ok) {
+            setBulkError(result.message ?? "Не удалось изменить видимость товаров.");
+            return;
+          }
+
+          setProducts((currentProducts) =>
+            currentProducts.map((product) => ({
+              ...product,
+              isActive: nextIsActive,
+            })),
+          );
+          router.refresh();
+        })
+        .catch(() => {
+          setBulkError("Не удалось изменить видимость товаров.");
+        });
+    });
+  }
+
+  const activeProductsCount = products.filter((product) => product.isActive).length;
+  const hiddenProductsCount = products.length - activeProductsCount;
+
   return (
     <section className="space-y-8">
       <div className="grid gap-5 xl:grid-cols-[minmax(0,1.15fr)_minmax(320px,0.85fr)]">
@@ -308,6 +355,37 @@ export function ProfileDashboard() {
           </div>
         </div>
 
+        {products.length > 0 ? (
+          <div className="mt-6 flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+            <div className="text-sm text-zinc-400">
+              Активных: <span className="font-medium text-zinc-200">{activeProductsCount}</span> · Скрытых: <span className="font-medium text-zinc-200">{hiddenProductsCount}</span>
+            </div>
+
+            <div className="flex flex-wrap gap-3">
+              <button
+                type="button"
+                onClick={() => handleToggleAllProducts(false)}
+                disabled={isBulkPending || hiddenProductsCount === products.length}
+                className="inline-flex h-11 items-center justify-center rounded-2xl border border-amber-500/20 bg-amber-500/10 px-5 text-sm font-semibold text-amber-100 transition hover:bg-amber-500/20 disabled:cursor-not-allowed disabled:opacity-60"
+              >
+                {isBulkPending ? "Обновляем..." : "🙈 Скрыть все"}
+              </button>
+              <button
+                type="button"
+                onClick={() => handleToggleAllProducts(true)}
+                disabled={isBulkPending || activeProductsCount === products.length}
+                className="inline-flex h-11 items-center justify-center rounded-2xl border border-emerald-500/20 bg-emerald-500/10 px-5 text-sm font-semibold text-emerald-100 transition hover:bg-emerald-500/20 disabled:cursor-not-allowed disabled:opacity-60"
+              >
+                {isBulkPending ? "Обновляем..." : "👁️ Показать все"}
+              </button>
+            </div>
+          </div>
+        ) : null}
+
+        {bulkError ? (
+          <p className="mt-4 text-sm text-rose-300">{bulkError}</p>
+        ) : null}
+
         {products.length === 0 ? (
           <div className="mt-6 rounded-[1.5rem] border border-white/10 bg-white/5 p-6 text-sm leading-7 text-zinc-400">
             У вас пока нет опубликованных товаров. <Link href="/sell" className="font-semibold text-orange-300 transition hover:text-orange-200">Перейти к размещению</Link>
@@ -331,7 +409,10 @@ export function ProfileDashboard() {
                 return (
                   <div
                     key={product.id}
-                    className="grid grid-cols-[minmax(0,1.2fr)_120px_140px_minmax(180px,1fr)_120px_220px] gap-4 px-5 py-4 transition hover:bg-white/5"
+                    className={[
+                      "grid grid-cols-[minmax(0,1.2fr)_120px_140px_minmax(180px,1fr)_120px_220px] gap-4 px-5 py-4 transition hover:bg-white/5",
+                      product.isActive ? "opacity-100" : "opacity-50",
+                    ].join(" ")}
                   >
                     <div className="min-w-0">
                       <Link
@@ -343,6 +424,16 @@ export function ProfileDashboard() {
                       <p className="mt-1 truncate text-sm text-zinc-500">
                         #{product.id}
                       </p>
+                      <span
+                        className={[
+                          "mt-2 inline-flex rounded-full border px-2.5 py-1 text-[11px] font-semibold uppercase tracking-[0.14em]",
+                          product.isActive
+                            ? "border-emerald-500/20 bg-emerald-500/10 text-emerald-200"
+                            : "border-amber-500/20 bg-amber-500/10 text-amber-200",
+                        ].join(" ")}
+                      >
+                        {product.isActive ? "Виден" : "Скрыт"}
+                      </span>
                     </div>
                     <span className="text-sm text-zinc-300">{product.game.name}</span>
                     <span className="text-sm text-zinc-300">{product.category.name}</span>
@@ -368,7 +459,9 @@ export function ProfileDashboard() {
                     <div className="flex items-start justify-end">
                       <ProfileProductActions
                         productId={product.id}
+                        isActive={product.isActive}
                         onDeleted={handleProductDeleted}
+                        onVisibilityChanged={handleProductVisibilityChanged}
                       />
                     </div>
                   </div>

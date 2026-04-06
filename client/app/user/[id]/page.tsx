@@ -7,9 +7,12 @@ import {
   MarketplaceProductCard,
   type MarketplaceProductCardData,
 } from "@/components/product/marketplace-product-card";
+import { SellerReviewReplyForm } from "@/components/reviews/seller-review-reply-form";
 import { RatingStars } from "@/components/reviews/rating-stars";
 import { TeamBadge } from "@/components/ui/team-badge";
 import { UserAvatar } from "@/components/ui/user-avatar";
+import { getCurrentSessionUser } from "@/lib/access-control";
+import { getAuthSession } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 
 export const dynamic = 'force-dynamic';
@@ -108,6 +111,7 @@ async function getPublicSellerProfile(id: string) {
       createdAt: true,
       products: {
         where: {
+          isActive: true,
           orders: {
             none: {
               status: {
@@ -152,6 +156,8 @@ async function getPublicSellerProfile(id: string) {
           id: true,
           rating: true,
           comment: true,
+          sellerReply: true,
+          replyCreatedAt: true,
           createdAt: true,
           author: {
             select: {
@@ -219,6 +225,7 @@ async function getPublicSellerProfile(id: string) {
 
 export default async function PublicUserPage({ params }: PublicUserPageProps) {
   const { id } = await params;
+  const currentUser = await getCurrentSessionUser(await getAuthSession());
   const seller = await getPublicSellerProfile(id);
 
   if (!seller) {
@@ -400,6 +407,26 @@ export default async function PublicUserPage({ params }: PublicUserPageProps) {
                       text={review.comment?.trim() || "Покупатель поставил оценку без текстового комментария."}
                     />
                   </div>
+
+                  {review.sellerReply?.trim() ? (
+                    <div className="ml-6 mt-4 rounded-[1.35rem] border-l-2 border-gray-600 bg-gray-800/50 px-4 py-4 text-sm leading-7 text-zinc-200">
+                      <p className="text-xs font-semibold tracking-[0.16em] uppercase text-zinc-400">
+                        Ответ продавца
+                      </p>
+                      <div className="mt-2">
+                        <CensoredText text={review.sellerReply} />
+                      </div>
+                      {review.replyCreatedAt ? (
+                        <p className="mt-3 text-xs uppercase tracking-[0.16em] text-zinc-500">
+                          {formatReviewDate(review.replyCreatedAt)}
+                        </p>
+                      ) : null}
+                    </div>
+                  ) : currentUser?.id === seller.id ? (
+                    <div className="mt-4">
+                      <SellerReviewReplyForm reviewId={review.id} />
+                    </div>
+                  ) : null}
                 </article>
               );
             })}

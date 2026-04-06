@@ -104,6 +104,7 @@ model Product {
   description String
   images      String[]  @default([])
   price       Decimal   @db.Decimal(36, 8)
+  isActive    Boolean   @default(true)
   gameId      String    @map("catalog_game_id")
   categoryId  String
   sellerId    String
@@ -152,6 +153,8 @@ model Review {
   sellerId   String
   rating     Int
   comment    String?
+  sellerReply String?
+  replyCreatedAt DateTime?
   order      Order    @relation(fields: [orderId], references: [id], onDelete: Cascade, onUpdate: Cascade)
   author     User     @relation("ReviewAuthor", fields: [authorId], references: [id], onDelete: Restrict, onUpdate: Cascade)
   seller     User     @relation("ReviewSeller", fields: [sellerId], references: [id], onDelete: Restrict, onUpdate: Cascade)

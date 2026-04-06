@@ -8,6 +8,7 @@ import { getAuthSession } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 
 const MAX_REVIEW_COMMENT_LENGTH = 1000;
+const MAX_REVIEW_REPLY_LENGTH = 1000;
 
 async function requireActiveReviewUserId() {
   const session = await getAuthSession();
@@ -34,6 +35,26 @@ function normalizeComment(comment?: string | null) {
   }
 
   return normalizedComment || null;
+}
+
+function stripHtmlTags(value: string) {
+  return value.replace(/<[^>]*>?/gm, "");
+}
+
+function normalizeReplyText(text?: string | null) {
+  const normalizedText = stripHtmlTags(text?.trim() ?? "").trim();
+
+  if (!normalizedText) {
+    throw new Error("Текст ответа обязателен.");
+  }
+
+  if (normalizedText.length > MAX_REVIEW_REPLY_LENGTH) {
+    throw new Error(
+      `Ответ не должен превышать ${MAX_REVIEW_REPLY_LENGTH} символов.`,
+    );
+  }
+
+  return normalizedText;
 }
 
 export async function createReview(
@@ -169,6 +190,75 @@ export async function createReview(
       ok: false,
       message:
         error instanceof Error ? error.message : "Не удалось сохранить отзыв.",
+    };
+  }
+}
+
+export async function replyToReview(reviewId: string, text: string) {
+  try {
+    const userId = await requireActiveReviewUserId();
+    const normalizedReviewId = reviewId.trim();
+    const normalizedReply = normalizeReplyText(text);
+
+    if (!normalizedReviewId) {
+      return {
+        ok: false,
+        message: "reviewId is required.",
+      };
+    }
+
+    const review = await prisma.review.findUnique({
+      where: {
+        id: normalizedReviewId,
+      },
+      select: {
+        id: true,
+        sellerId: true,
+        sellerReply: true,
+      },
+    });
+
+    if (!review) {
+      return {
+        ok: false,
+        message: "Отзыв не найден.",
+      };
+    }
+
+    if (review.sellerId !== userId) {
+      return {
+        ok: false,
+        message: "Отвечать на отзыв может только продавец-получатель.",
+      };
+    }
+
+    if (review.sellerReply?.trim()) {
+      return {
+        ok: false,
+        message: "Ответ на этот отзыв уже опубликован.",
+      };
+    }
+
+    await prisma.review.update({
+      where: {
+        id: normalizedReviewId,
+      },
+      data: {
+        sellerReply: normalizedReply,
+        replyCreatedAt: new Date(),
+      },
+    });
+
+    revalidatePath(`/user/${review.sellerId}`);
+
+    return {
+      ok: true,
+    };
+  } catch (error) {
+    return {
+      ok: false,
+      message:
+        error instanceof Error ? error.message : "Не удалось сохранить ответ.",
     };
   }
 }

@@ -47,9 +47,15 @@ interface ProductDetail {
   };
 }
 
-async function getProduct(id: string): Promise<ProductDetail | null> {
+async function getProduct(
+  id: string,
+  options?: {
+    viewerId?: string | null;
+    viewerRole?: string | null;
+  },
+): Promise<ProductDetail | null> {
   try {
-    return await getProductById(id);
+    return await getProductById(id, options);
   } catch (error) {
     console.error("[PRODUCT_DETAIL_ERROR]", error);
     return null;
@@ -96,7 +102,10 @@ function getGalleryGridClassName(imageCount: number) {
 export default async function ProductPage({ params }: ProductPageProps) {
   const currentUser = await getCurrentSessionUser(await getAuthSession());
   const { id } = await params;
-  const product = await getProduct(id);
+  const product = await getProduct(id, {
+    viewerId: currentUser?.id,
+    viewerRole: currentUser?.role,
+  });
 
   if (!product) {
     return (

@@ -9,6 +9,8 @@ import {
 import { getAuthSession } from "@/lib/auth";
 import {
   deleteProductByActor,
+  toggleAllProductsVisibilityBySeller,
+  toggleProductVisibilityBySeller,
   updateProductByActor,
 } from "@/lib/marketplace";
 
@@ -16,6 +18,14 @@ interface ProductActionResult {
   ok: boolean;
   message?: string;
   productId?: string;
+  isActive?: boolean;
+}
+
+interface BulkProductVisibilityActionResult {
+  ok: boolean;
+  message?: string;
+  updatedCount?: number;
+  isActive?: boolean;
 }
 
 interface UpdateProductPayload {
@@ -49,6 +59,16 @@ function revalidateManagedProductPaths(productId: string) {
   revalidatePath("/admin");
   revalidatePath(`/product/${productId}`);
   revalidatePath(`/product/${productId}/edit`);
+}
+
+function revalidateVisibilityPaths(input: {
+  productId: string;
+  sellerId: string;
+  gameSlug: string;
+}) {
+  revalidateManagedProductPaths(input.productId);
+  revalidatePath(`/games/${input.gameSlug}`);
+  revalidatePath(`/user/${input.sellerId}`);
 }
 
 export async function deleteProduct(
@@ -107,6 +127,78 @@ export async function updateProduct(
       ok: false,
       message:
         error instanceof Error ? error.message : "Не удалось обновить товар.",
+    };
+  }
+}
+
+export async function toggleProductVisibility(
+  productId: string,
+): Promise<ProductActionResult> {
+  try {
+    const currentUser = await requireActiveProductUser();
+    const result = await toggleProductVisibilityBySeller({
+      productId,
+      userId: currentUser.id,
+    });
+
+    revalidateVisibilityPaths({
+      productId: result.productId,
+      sellerId: result.sellerId,
+      gameSlug: result.gameSlug,
+    });
+
+    return {
+      ok: true,
+      productId: result.productId,
+      isActive: result.isActive,
+    };
+  } catch (error) {
+    return {
+      ok: false,
+      message:
+        error instanceof Error
+          ? error.message
+          : "Не удалось изменить видимость товара.",
+    };
+  }
+}
+
+export async function toggleAllProductsVisibility(
+  isActive: boolean,
+): Promise<BulkProductVisibilityActionResult> {
+  try {
+    const currentUser = await requireActiveProductUser();
+    const result = await toggleAllProductsVisibilityBySeller({
+      userId: currentUser.id,
+      isActive,
+    });
+
+    revalidatePath("/");
+    revalidatePath("/profile");
+    revalidatePath("/sell");
+    revalidatePath("/admin");
+    revalidatePath(`/user/${result.sellerId}`);
+
+    for (const gameSlug of result.gameSlugs) {
+      revalidatePath(`/games/${gameSlug}`);
+    }
+
+    for (const productId of result.productIds) {
+      revalidateManagedProductPaths(productId);
+    }
+
+    return {
+      ok: true,
+      updatedCount: result.updatedCount,
+      isActive,
+    };
+  } catch (error) {
+    return {
+      ok: false,
+      message:
+        error instanceof Error
+          ? error.message
+          : "Не удалось изменить видимость всех товаров.",
     };
   }
 }

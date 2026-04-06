@@ -510,6 +510,9 @@ export function mapMarketplaceErrorToStatusCode(message: string) {
 
 export async function listProducts() {
   const products = await prisma.product.findMany({
+    where: {
+      isActive: true,
+    },
     include: {
       game: {
         select: {
@@ -612,7 +615,13 @@ export async function listCatalogGamesForProductForms() {
   }));
 }
 
-export async function getProductById(productId: string) {
+export async function getProductById(
+  productId: string,
+  options?: {
+    viewerId?: string | null;
+    viewerRole?: Role | string | null;
+  },
+) {
   const normalizedProductId = normalizeText(productId);
 
   if (!normalizedProductId) {
@@ -655,6 +664,14 @@ export async function getProductById(productId: string) {
   });
 
   if (!product) {
+    return null;
+  }
+
+  if (
+    !product.isActive &&
+    product.sellerId !== normalizeText(options?.viewerId ?? "") &&
+    !isAdminRole((options?.viewerRole as Role | null | undefined) ?? undefined)
+  ) {
     return null;
   }
 
@@ -931,6 +948,126 @@ export async function deleteProductByActor(input: {
   );
 }
 
+export async function toggleProductVisibilityBySeller(input: {
+  productId?: string;
+  userId: string;
+}) {
+  const productId = normalizeText(input.productId);
+  const userId = normalizeText(input.userId);
+
+  if (!productId) {
+    throw new Error("productId is required.");
+  }
+
+  if (!userId) {
+    throw new Error("userId is required.");
+  }
+
+  const product = await prisma.product.findUnique({
+    where: {
+      id: productId,
+    },
+    select: {
+      id: true,
+      sellerId: true,
+      isActive: true,
+      game: {
+        select: {
+          slug: true,
+        },
+      },
+    },
+  });
+
+  if (!product) {
+    throw new Error("Товар не найден.");
+  }
+
+  if (product.sellerId !== userId) {
+    throw new Error("Только продавец может менять видимость своего товара.");
+  }
+
+  const updatedProduct = await prisma.product.update({
+    where: {
+      id: productId,
+    },
+    data: {
+      isActive: !product.isActive,
+    },
+    select: {
+      id: true,
+      sellerId: true,
+      isActive: true,
+      game: {
+        select: {
+          slug: true,
+        },
+      },
+    },
+  });
+
+  return {
+    productId: updatedProduct.id,
+    sellerId: updatedProduct.sellerId,
+    isActive: updatedProduct.isActive,
+    gameSlug: updatedProduct.game.slug,
+  };
+}
+
+export async function toggleAllProductsVisibilityBySeller(input: {
+  userId: string;
+  isActive: boolean;
+}) {
+  const userId = normalizeText(input.userId);
+
+  if (!userId) {
+    throw new Error("userId is required.");
+  }
+
+  const seller = await prisma.user.findUnique({
+    where: {
+      id: userId,
+    },
+    select: {
+      id: true,
+    },
+  });
+
+  if (!seller) {
+    throw new Error(`User with id ${userId} was not found.`);
+  }
+
+  const products = await prisma.product.findMany({
+    where: {
+      sellerId: userId,
+    },
+    select: {
+      id: true,
+      game: {
+        select: {
+          slug: true,
+        },
+      },
+    },
+  });
+
+  const result = await prisma.product.updateMany({
+    where: {
+      sellerId: userId,
+    },
+    data: {
+      isActive: input.isActive,
+    },
+  });
+
+  return {
+    updatedCount: result.count,
+    sellerId: userId,
+    productIds: products.map((product) => product.id),
+    gameSlugs: [...new Set(products.map((product) => product.game.slug))],
+  };
+}
+
 export async function getUserById(userId: string) {
   const normalizedUserId = normalizeText(userId);
 
@@ -1046,6 +1183,7 @@ export async function createOrder(input: {
         id: true,
         price: true,
         sellerId: true,
+        isActive: true,
       },
     }),
   ]);
@@ -1056,6 +1194,10 @@ export async function createOrder(input: {
 
   if (!product) {
     throw new Error(`Product with id ${productId} was not found.`);
+  }
+
+  if (!product.isActive) {
+    throw new Error("Товар скрыт продавцом и недоступен для покупки.");
   }
 
   if (product.sellerId === buyerId) {
