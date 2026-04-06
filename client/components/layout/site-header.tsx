@@ -68,6 +68,7 @@ export function SiteHeader() {
   const [isSearchOpen, setIsSearchOpen] = useState(false);
   const [isSearching, setIsSearching] = useState(false);
   const searchContainerRef = useRef<HTMLDivElement | null>(null);
+  const lastSeenIntervalRef = useRef<number | null>(null);
   const isBanned = Boolean(session?.user?.isBanned);
 
   useEffect(() => {
@@ -140,6 +141,11 @@ export function SiteHeader() {
   }, [refreshToken, status, session?.user?.id]);
 
   useEffect(() => {
+    if (lastSeenIntervalRef.current !== null) {
+      window.clearInterval(lastSeenIntervalRef.current);
+      lastSeenIntervalRef.current = null;
+    }
+
     if (status !== "authenticated") {
       return undefined;
     }
@@ -156,12 +162,15 @@ export function SiteHeader() {
     }
 
     void updateLastSeen();
-    const intervalId = window.setInterval(() => {
+    lastSeenIntervalRef.current = window.setInterval(() => {
       void updateLastSeen();
     }, LAST_SEEN_UPDATE_INTERVAL_MS);
 
     return () => {
-      window.clearInterval(intervalId);
+      if (lastSeenIntervalRef.current !== null) {
+        window.clearInterval(lastSeenIntervalRef.current);
+        lastSeenIntervalRef.current = null;
+      }
     };
   }, [status, session?.user?.id]);
 

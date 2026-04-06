@@ -8,7 +8,7 @@ import { UserAvatar } from "@/components/ui/user-avatar";
 import type { SellerReviewSummary } from "@/lib/review-summary";
 
 type SellerRank = "BRONZE" | "SILVER" | "GOLD";
-const SELLER_ONLINE_WINDOW_MS = 15 * 60 * 1000;
+const SELLER_ONLINE_WINDOW_MS = 5 * 60 * 1000;
 
 export interface MarketplaceProductCardData {
   id: string;
@@ -79,7 +79,7 @@ function isSellerOnline(lastSeen?: string | null) {
     return false;
   }
 
-  return Date.now() - lastSeenTime <= SELLER_ONLINE_WINDOW_MS;
+  return lastSeenTime > Date.now() - SELLER_ONLINE_WINDOW_MS;
 }
 
 interface MarketplaceProductCardProps {

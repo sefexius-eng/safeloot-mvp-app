@@ -10,8 +10,10 @@ import { RatingStars } from "@/components/reviews/rating-stars";
 import { UserAvatar } from "@/components/ui/user-avatar";
 import { prisma } from "@/lib/prisma";
 
+export const dynamic = 'force-dynamic';
+
 type SellerRank = "BRONZE" | "SILVER" | "GOLD";
-const SELLER_ONLINE_WINDOW_MS = 15 * 60 * 1000;
+const SELLER_ONLINE_WINDOW_MS = 5 * 60 * 1000;
 
 interface PublicUserPageProps {
   params: Promise<{
@@ -85,7 +87,7 @@ function isSellerOnline(lastSeen?: Date | string | null) {
     return false;
   }
 
-  return Date.now() - lastSeenTime <= SELLER_ONLINE_WINDOW_MS;
+  return lastSeenTime > Date.now() - SELLER_ONLINE_WINDOW_MS;
 }
 
 async function getPublicSellerProfile(id: string) {

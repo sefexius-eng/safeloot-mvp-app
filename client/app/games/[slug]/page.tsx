@@ -27,7 +27,7 @@ interface GameCatalogPageProps {
   }>;
 }
 
-const SELLER_ONLINE_WINDOW_MS = 15 * 60 * 1000;
+const SELLER_ONLINE_WINDOW_MS = 5 * 60 * 1000;
 
 function normalizeSearchText(value?: string) {
   return value?.trim() ?? "";
