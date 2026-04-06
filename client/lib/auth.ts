@@ -1,3 +1,4 @@
+import type { Role } from "@prisma/client";
 import { compare } from "bcryptjs";
 import type { NextAuthOptions } from "next-auth";
 import { getServerSession } from "next-auth";
@@ -36,6 +37,8 @@ export const authOptions: NextAuthOptions = {
             id: true,
             email: true,
             password: true,
+            role: true,
+            isBanned: true,
           },
         });
 
@@ -53,6 +56,8 @@ export const authOptions: NextAuthOptions = {
           id: user.id,
           email: user.email,
           name: user.email.split("@")[0],
+          role: user.role,
+          isBanned: user.isBanned,
         };
       },
     }),
@@ -65,6 +70,30 @@ export const authOptions: NextAuthOptions = {
         token.name = user.name;
       }
 
+      const userId =
+        user?.id ??
+        (typeof token.id === "string" ? token.id : undefined) ??
+        token.sub;
+
+      if (!userId) {
+        return token;
+      }
+
+      const dbUser = await prisma.user.findUnique({
+        where: {
+          id: userId,
+        },
+        select: {
+          role: true,
+          isBanned: true,
+        },
+      });
+
+      if (dbUser) {
+        token.role = dbUser.role;
+        token.isBanned = dbUser.isBanned;
+      }
+
       return token;
     },
     async session({ session, token }) {
@@ -72,6 +101,8 @@ export const authOptions: NextAuthOptions = {
         session.user.id = (token.id as string) ?? token.sub ?? "";
         session.user.email = token.email;
         session.user.name = token.name;
+        session.user.role = (token.role as Role | undefined) ?? "USER";
+        session.user.isBanned = Boolean(token.isBanned);
       }
 
       return session;

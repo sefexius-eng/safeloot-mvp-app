@@ -7,9 +7,9 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
-enum UserRole {
-  ADMIN
+enum Role {
   USER
+  ADMIN
 }
 
 enum SellerRank {
@@ -51,7 +51,8 @@ model User {
   id               String        @id @default(cuid())
   email            String        @unique
   password         String
-  role             UserRole      @default(USER)
+  role             Role          @default(USER)
+  isBanned         Boolean       @default(false)
   rank             SellerRank    @default(BRONZE)
   holdBalance      Decimal       @default(0) @db.Decimal(36, 8)
   availableBalance Decimal       @default(0) @db.Decimal(36, 8)
