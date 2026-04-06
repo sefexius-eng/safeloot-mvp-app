@@ -188,6 +188,7 @@ export function AdminReleaseHoldButton({
 }: AdminReleaseHoldButtonProps) {
   const [isPending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
+  const hasHold = canRelease;
 
   function handleClick() {
     if (!canRelease) {
@@ -215,19 +216,18 @@ export function AdminReleaseHoldButton({
 
   return (
     <div className="flex flex-col items-end gap-2">
-      <Button
+      <button
         type="button"
         onClick={handleClick}
-        disabled={!canRelease || isPending}
-        className={cn(
-          "h-10 rounded-xl px-4 shadow-none",
-          canRelease
-            ? "bg-amber-500 text-zinc-950 hover:bg-amber-400"
-            : "bg-zinc-800 text-zinc-500 hover:translate-y-0 hover:bg-zinc-800",
-        )}
+        disabled={!hasHold || isPending}
+        className={`w-full rounded-md px-3 py-1.5 text-xs font-medium transition-colors ${
+          hasHold
+            ? "bg-orange-500 text-white hover:bg-orange-600 cursor-pointer"
+            : "bg-gray-800 text-gray-500 cursor-not-allowed opacity-70"
+        }`}
       >
         {isPending ? "Загрузка..." : "Снять холд"}
-      </Button>
+      </button>
       {error ? <p className="max-w-[220px] text-right text-xs text-rose-300">{error}</p> : null}
     </div>
   );
