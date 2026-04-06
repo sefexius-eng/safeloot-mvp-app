@@ -4,6 +4,7 @@ import { useState, useTransition } from "react";
 
 import {
   deleteProductAdmin,
+  releaseUserHoldBalance,
   toggleBanUser,
 } from "@/app/admin/actions";
 import {
@@ -16,6 +17,11 @@ import { cn } from "@/lib/utils";
 interface AdminToggleBanButtonProps {
   userId: string;
   currentStatus: boolean;
+}
+
+interface AdminReleaseHoldButtonProps {
+  userId: string;
+  canRelease: boolean;
 }
 
 interface AdminDeleteProductButtonProps {
@@ -172,6 +178,57 @@ export function AdminWithdrawalActionButtons({
         </Button>
       </div>
       {error ? <p className="max-w-[260px] text-right text-xs text-rose-300">{error}</p> : null}
+    </div>
+  );
+}
+
+export function AdminReleaseHoldButton({
+  userId,
+  canRelease,
+}: AdminReleaseHoldButtonProps) {
+  const [isPending, startTransition] = useTransition();
+  const [error, setError] = useState<string | null>(null);
+
+  function handleClick() {
+    if (!canRelease) {
+      return;
+    }
+
+    if (!window.confirm("Перенести все средства из холда в доступный баланс пользователя?")) {
+      return;
+    }
+
+    setError(null);
+
+    startTransition(() => {
+      void releaseUserHoldBalance(userId)
+        .then((result) => {
+          if (!result.ok) {
+            setError(result.message ?? "Не удалось снять холд пользователя.");
+          }
+        })
+        .catch(() => {
+          setError("Не удалось снять холд пользователя.");
+        });
+    });
+  }
+
+  return (
+    <div className="flex flex-col items-end gap-2">
+      <Button
+        type="button"
+        onClick={handleClick}
+        disabled={!canRelease || isPending}
+        className={cn(
+          "h-10 rounded-xl px-4 shadow-none",
+          canRelease
+            ? "bg-amber-500 text-zinc-950 hover:bg-amber-400"
+            : "bg-zinc-800 text-zinc-500 hover:translate-y-0 hover:bg-zinc-800",
+        )}
+      >
+        {isPending ? "Загрузка..." : "Снять холд"}
+      </Button>
+      {error ? <p className="max-w-[220px] text-right text-xs text-rose-300">{error}</p> : null}
     </div>
   );
 }

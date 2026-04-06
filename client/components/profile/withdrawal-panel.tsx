@@ -4,6 +4,7 @@ import { useRouter } from "next/navigation";
 import { useMemo, useState, useTransition } from "react";
 
 import { requestWithdrawal } from "@/app/actions/withdraw";
+import { useCurrency } from "@/components/providers/currency-provider";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -32,19 +33,6 @@ interface WithdrawalPanelProps {
   onOpenChange?: (open: boolean) => void;
 }
 
-function formatAmount(value: string) {
-  const numericValue = Number(value);
-
-  if (!Number.isFinite(numericValue)) {
-    return value;
-  }
-
-  return new Intl.NumberFormat("ru-RU", {
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 8,
-  }).format(numericValue);
-}
-
 function formatDate(value: string) {
   return new Intl.DateTimeFormat("ru-RU", {
     dateStyle: "medium",
@@ -60,6 +48,7 @@ export function WithdrawalPanel({
   onOpenChange,
 }: WithdrawalPanelProps) {
   const router = useRouter();
+  const { formatPrice } = useCurrency();
   const [internalIsModalOpen, setInternalIsModalOpen] = useState(false);
   const [amount, setAmount] = useState("");
   const [method, setMethod] = useState<string>(WITHDRAWAL_METHOD_OPTIONS[0].value);
@@ -186,7 +175,7 @@ export function WithdrawalPanel({
           <DialogHeader>
             <DialogTitle>Новая заявка на вывод</DialogTitle>
             <DialogDescription>
-              Доступно к выводу: {formatAmount(availableBalance)} USDT.
+              Доступно к выводу: {formatPrice(availableBalance)}.
             </DialogDescription>
           </DialogHeader>
 
@@ -208,7 +197,7 @@ export function WithdrawalPanel({
                 disabled={isPending}
               />
               <p className="mt-2 text-xs text-zinc-500">
-                Максимум: {formatAmount(availableBalance)} USDT
+                Максимум по балансу: {formatPrice(availableBalance)}
               </p>
             </div>
 
@@ -318,7 +307,7 @@ export function WithdrawalPanel({
                               Сумма
                             </p>
                             <p className="mt-2 text-lg font-semibold text-white">
-                              {formatAmount(withdrawal.amount)} USDT
+                              {formatPrice(withdrawal.amount)}
                             </p>
                           </div>
                           <div>

@@ -55,19 +55,6 @@ interface ProductItem {
   updatedAt: string;
 }
 
-function formatBalance(value: string) {
-  const numericValue = Number(value);
-
-  if (!Number.isFinite(numericValue)) {
-    return value;
-  }
-
-  return new Intl.NumberFormat("ru-RU", {
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2,
-  }).format(numericValue);
-}
-
 export function ProfileDashboard() {
   const { status } = useSession();
   const { formatPrice } = useCurrency();
@@ -278,7 +265,7 @@ export function ProfileDashboard() {
             Доступно к выводу
           </p>
           <p className="mt-4 text-4xl font-semibold tracking-tight text-white md:text-5xl">
-            {formatBalance(user.availableBalance)}
+            {formatPrice(user.availableBalance)}
           </p>
           <p className="mt-3 text-sm leading-7 text-zinc-300">
             Баланс, который продавец может использовать после вывода из внутренней системы.
@@ -290,7 +277,7 @@ export function ProfileDashboard() {
             В холде (Escrow)
           </p>
           <p className="mt-4 text-4xl font-semibold tracking-tight text-white md:text-5xl">
-            {formatBalance(user.holdBalance)}
+            {formatPrice(user.holdBalance)}
           </p>
           <p className="mt-3 text-sm leading-7 text-zinc-300">
             Средства по завершенным сделкам, зафиксированные во внутреннем escrow-балансе.

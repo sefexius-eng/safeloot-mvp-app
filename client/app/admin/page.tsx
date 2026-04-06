@@ -3,6 +3,7 @@ import { redirect } from "next/navigation";
 
 import {
   AdminDeleteProductButton,
+  AdminReleaseHoldButton,
   AdminToggleBanButton,
   AdminWithdrawalActionButtons,
 } from "@/components/admin/admin-action-buttons";
@@ -458,10 +459,16 @@ export default async function AdminDashboardPage() {
                               </Badge>
                             </TableCell>
                             <TableCell className="text-right">
-                              <AdminToggleBanButton
-                                userId={user.id}
-                                currentStatus={user.isBanned}
-                              />
+                              <div className="flex flex-col items-end gap-3">
+                                <AdminReleaseHoldButton
+                                  userId={user.id}
+                                  canRelease={Number(user.holdBalance) > 0}
+                                />
+                                <AdminToggleBanButton
+                                  userId={user.id}
+                                  currentStatus={user.isBanned}
+                                />
+                              </div>
                             </TableCell>
                           </TableRow>
                         ))}

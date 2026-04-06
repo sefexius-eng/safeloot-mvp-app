@@ -1,6 +1,6 @@
 "use server";
 
-import { OrderStatus } from "@prisma/client";
+import { OrderStatus, Prisma } from "@prisma/client";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 
@@ -147,4 +147,73 @@ export async function deleteProductAdmin(
   return {
     ok: true,
   };
+}
+
+export async function releaseUserHoldBalance(
+  userId: string,
+): Promise<AdminActionResult> {
+  await requireAdminAccess();
+
+  const normalizedUserId = userId.trim();
+
+  if (!normalizedUserId) {
+    return {
+      ok: false,
+      message: "Не удалось определить пользователя.",
+    };
+  }
+
+  try {
+    await prisma.$transaction(
+      async (transactionClient) => {
+        const user = await transactionClient.user.findUnique({
+          where: {
+            id: normalizedUserId,
+          },
+          select: {
+            id: true,
+            holdBalance: true,
+          },
+        });
+
+        if (!user) {
+          throw new Error("Пользователь не найден.");
+        }
+
+        if (user.holdBalance.lte(new Prisma.Decimal(0))) {
+          throw new Error("У пользователя нет средств в холде.");
+        }
+
+        await transactionClient.user.update({
+          where: {
+            id: normalizedUserId,
+          },
+          data: {
+            availableBalance: {
+              increment: user.holdBalance,
+            },
+            holdBalance: {
+              decrement: user.holdBalance,
+            },
+          },
+        });
+      },
+      {
+        isolationLevel: Prisma.TransactionIsolationLevel.Serializable,
+      },
+    );
+
+    revalidatePath("/admin");
+    revalidatePath("/profile");
+
+    return {
+      ok: true,
+    };
+  } catch (error) {
+    return {
+      ok: false,
+      message:
+        error instanceof Error ? error.message : "Не удалось снять холд пользователя.",
+    };
+  }
 }
