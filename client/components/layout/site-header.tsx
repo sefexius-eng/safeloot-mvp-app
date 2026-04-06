@@ -339,10 +339,10 @@ export function SiteHeader() {
                     aria-label="Выбор валюты"
                     value={currency}
                     onChange={(event) => setCurrency(event.target.value as typeof currency)}
-                    className="h-11 rounded-2xl border-white/10 bg-white/5 pr-10 text-sm font-semibold text-zinc-100 shadow-[0_12px_28px_rgba(0,0,0,0.22)] focus:border-orange-500/40 focus:bg-white/8"
+                    className="!h-11 !rounded-md !border !border-gray-800 !bg-[#1A1D24] !px-3 !py-1.5 !pr-10 !text-gray-300 !shadow-none outline-none focus:!border-orange-500 focus:!ring-1 focus:!ring-orange-500"
                   >
                     {currencies.map((item) => (
-                      <option key={item.code} value={item.code} className="text-neutral-950">
+                      <option key={item.code} value={item.code} className="bg-[#1A1D24] text-gray-300">
                         {item.code}
                       </option>
                     ))}

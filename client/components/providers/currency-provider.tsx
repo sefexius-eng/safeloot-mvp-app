@@ -8,7 +8,6 @@ interface CurrencyDefinition {
   code: CurrencyCode;
   symbol: string;
   rate: number;
-  locale: string;
 }
 
 interface CurrencyContextValue {
@@ -21,12 +20,12 @@ interface CurrencyContextValue {
 const CURRENCY_STORAGE_KEY = "safeloot:currency";
 
 const CURRENCIES: CurrencyDefinition[] = [
-  { code: "USD", symbol: "$", rate: 1, locale: "en-US" },
-  { code: "RUB", symbol: "₽", rate: 93, locale: "ru-RU" },
-  { code: "UAH", symbol: "₴", rate: 39, locale: "uk-UA" },
-  { code: "EUR", symbol: "€", rate: 0.92, locale: "de-DE" },
-  { code: "KZT", symbol: "₸", rate: 445, locale: "kk-KZ" },
-  { code: "PLN", symbol: "zł", rate: 3.98, locale: "pl-PL" },
+  { code: "USD", symbol: "$", rate: 1 },
+  { code: "RUB", symbol: "₽", rate: 93 },
+  { code: "UAH", symbol: "₴", rate: 39 },
+  { code: "EUR", symbol: "€", rate: 0.92 },
+  { code: "KZT", symbol: "₸", rate: 445 },
+  { code: "PLN", symbol: "zł", rate: 3.98 },
 ];
 
 const CurrencyContext = createContext<CurrencyContextValue | null>(null);
@@ -35,28 +34,37 @@ function getCurrencyDefinition(currency: CurrencyCode) {
   return CURRENCIES.find((item) => item.code === currency) ?? CURRENCIES[0];
 }
 
+function attachCurrencySymbol(currency: CurrencyDefinition, formattedValue: string) {
+  if (currency.code === "PLN") {
+    return `${formattedValue} ${currency.symbol}`;
+  }
+
+  if (currency.code === "USD" || currency.code === "EUR") {
+    return `${currency.symbol}${formattedValue}`;
+  }
+
+  return `${formattedValue} ${currency.symbol}`;
+}
+
 function formatCurrencyValue(currency: CurrencyCode, basePriceInUsd: string | number) {
   const numericPrice = Number(basePriceInUsd);
+  const currentCurrency = getCurrencyDefinition(currency);
 
   if (!Number.isFinite(numericPrice)) {
-    return `${getCurrencyDefinition(currency).symbol}0.00`;
+    return attachCurrencySymbol(currentCurrency, "0");
   }
 
-  const currentCurrency = getCurrencyDefinition(currency);
-  const localizedValue = new Intl.NumberFormat(currentCurrency.locale, {
-    minimumFractionDigits: 2,
+  const convertedValue = numericPrice * currentCurrency.rate;
+  const roundedValue = Math.round((convertedValue + Number.EPSILON) * 100) / 100;
+  const hasFraction = Math.abs(roundedValue % 1) > Number.EPSILON;
+  const localizedValue = new Intl.NumberFormat("en-US", {
+    minimumFractionDigits: hasFraction ? 2 : 0,
     maximumFractionDigits: 2,
-  }).format(numericPrice * currentCurrency.rate);
+  })
+    .format(roundedValue)
+    .replace(/,/g, " ");
 
-  if (currentCurrency.code === "PLN") {
-    return `${localizedValue} ${currentCurrency.symbol}`;
-  }
-
-  if (currentCurrency.code === "USD" || currentCurrency.code === "EUR") {
-    return `${currentCurrency.symbol}${localizedValue}`;
-  }
-
-  return `${localizedValue} ${currentCurrency.symbol}`;
+  return attachCurrencySymbol(currentCurrency, localizedValue);
 }
 
 export function CurrencyProvider({ children }: { children: React.ReactNode }) {

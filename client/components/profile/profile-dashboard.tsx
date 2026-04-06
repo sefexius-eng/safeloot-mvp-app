@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useEffect, useState } from "react";
 import { useSession } from "next-auth/react";
 
+import { useCurrency } from "@/components/providers/currency-provider";
 import { UserAvatar } from "@/components/ui/user-avatar";
 
 interface CurrentUser {
@@ -63,6 +64,7 @@ function formatBalance(value: string) {
 
 export function ProfileDashboard() {
   const { status } = useSession();
+  const { formatPrice } = useCurrency();
   const [user, setUser] = useState<CurrentUser | null>(null);
   const [products, setProducts] = useState<ProductItem[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -338,7 +340,7 @@ export function ProfileDashboard() {
                         {sellerDisplayName}
                       </span>
                     </div>
-                    <span className="text-sm font-semibold text-white">{formatBalance(product.price)}</span>
+                    <span className="text-sm font-semibold text-white">{formatPrice(product.price)}</span>
                   </Link>
                 );
               })}
