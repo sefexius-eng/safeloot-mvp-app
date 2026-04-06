@@ -250,11 +250,16 @@ export function ActiveOrderView({ orderId }: ActiveOrderViewProps) {
   const [completeMessage, setCompleteMessage] = useState("");
   const [reviewError, setReviewError] = useState("");
   const [reviewSuccess, setReviewSuccess] = useState("");
-  const messagesEndRef = useRef<HTMLDivElement | null>(null);
+  const chatScrollContainerRef = useRef<HTMLDivElement | null>(null);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const typingTimeoutRef = useRef<number | null>(null);
   const hasActiveTypingRef = useRef(false);
+  const previousMessageCountRef = useRef(0);
   const currentUserId = session?.user?.id ?? "";
+
+  useEffect(() => {
+    previousMessageCountRef.current = 0;
+  }, [orderId]);
 
   useEffect(() => {
     let isMounted = true;
@@ -434,8 +439,35 @@ export function ActiveOrderView({ orderId }: ActiveOrderViewProps) {
   }, [orderId, sessionStatus]);
 
   useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: "smooth", block: "end" });
-  }, [messages]);
+    const chatScrollContainer = chatScrollContainerRef.current;
+
+    if (!chatScrollContainer) {
+      previousMessageCountRef.current = messages.length;
+      return;
+    }
+
+    const nextMessageCount = messages.length;
+    const previousMessageCount = previousMessageCountRef.current;
+
+    if (nextMessageCount === 0 || nextMessageCount === previousMessageCount) {
+      previousMessageCountRef.current = nextMessageCount;
+      return;
+    }
+
+    const scrollBehavior = previousMessageCount === 0 ? "auto" : "smooth";
+    const animationFrameId = window.requestAnimationFrame(() => {
+      chatScrollContainer.scrollTo({
+        top: chatScrollContainer.scrollHeight,
+        behavior: scrollBehavior,
+      });
+    });
+
+    previousMessageCountRef.current = nextMessageCount;
+
+    return () => {
+      window.cancelAnimationFrame(animationFrameId);
+    };
+  }, [messages.length]);
 
   useEffect(() => {
     let isMounted = true;
@@ -828,7 +860,10 @@ export function ActiveOrderView({ orderId }: ActiveOrderViewProps) {
           </span>
         </div>
 
-        <div className="mt-5 h-[480px] overflow-y-auto rounded-[1.5rem] border border-white/10 bg-[linear-gradient(180deg,rgba(15,23,42,0.74),rgba(9,9,11,0.86))] p-4">
+        <div
+          ref={chatScrollContainerRef}
+          className="mt-5 h-[480px] overflow-y-auto rounded-[1.5rem] border border-white/10 bg-[linear-gradient(180deg,rgba(15,23,42,0.74),rgba(9,9,11,0.86))] p-4"
+        >
           {isChatLoading ? (
             <p className="text-sm text-zinc-500">Загружаем сообщения...</p>
           ) : null}
@@ -934,8 +969,6 @@ export function ActiveOrderView({ orderId }: ActiveOrderViewProps) {
                 </div>
               </div>
             ) : null}
-
-            <div ref={messagesEndRef} />
           </div>
         </div>
 
