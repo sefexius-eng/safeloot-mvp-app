@@ -7,10 +7,12 @@ import { useEffect, useRef, useState } from "react";
 import { signOut, useSession } from "next-auth/react";
 
 import { searchGames } from "@/app/actions/search";
+import catalogSeedData from "@/lib/catalog-seed-data.json";
 
 const BALANCE_REFRESH_EVENT = "safeloot:balances-refresh";
 const PROFILE_REFRESH_INTERVAL_MS = 5000;
 const SEARCH_DEBOUNCE_MS = 250;
+const POPULAR_GAMES = catalogSeedData.popularGames;
 
 interface SearchGameResult {
   id: string;
@@ -241,18 +243,44 @@ export function SiteHeader() {
                   setIsSearchOpen(true);
                 }}
                 onFocus={() => {
-                  if (query.trim()) {
-                    setIsSearchOpen(true);
-                  }
+                  setIsSearchOpen(true);
                 }}
                 placeholder="Поиск по играм, товарам и услугам"
                 className="h-12 w-full rounded-2xl border border-white/10 bg-white/5 pl-12 pr-4 text-sm text-zinc-100 shadow-[0_12px_30px_rgba(0,0,0,0.22)] outline-none transition placeholder:text-zinc-500 focus:border-orange-500/40 focus:bg-white/8 focus:ring-4 focus:ring-orange-500/10"
               />
             </label>
 
-            {isSearchOpen && query.trim() ? (
+            {isSearchOpen ? (
               <div className="absolute top-[calc(100%+0.6rem)] z-50 w-full overflow-hidden rounded-[1.5rem] border border-white/10 bg-[rgba(9,9,11,0.96)] shadow-[0_24px_80px_rgba(0,0,0,0.34)] backdrop-blur-xl">
-                {isSearching ? (
+                {!query.trim() ? (
+                  <div>
+                    <div className="border-b border-white/10 px-4 py-3 text-xs font-semibold tracking-[0.22em] uppercase text-orange-200/80">
+                      🔥 Популярные игры
+                    </div>
+                    <div className="divide-y divide-white/10">
+                      {POPULAR_GAMES.map((game) => (
+                        <button
+                          key={game.slug}
+                          type="button"
+                          onClick={() => handleSelectGame({ ...game, id: game.slug, imageUrl: null })}
+                          className="flex w-full items-center gap-3 px-4 py-3 text-left transition hover:bg-white/5"
+                        >
+                          <span className="flex h-9 w-9 items-center justify-center rounded-full border border-orange-500/20 bg-orange-500/10 text-sm font-semibold text-orange-100">
+                            {game.name.slice(0, 1).toUpperCase()}
+                          </span>
+                          <span className="min-w-0 flex-1">
+                            <span className="block truncate text-sm font-semibold text-white">
+                              {game.name}
+                            </span>
+                            <span className="block truncate text-xs uppercase tracking-[0.18em] text-zinc-500">
+                              Быстрый переход
+                            </span>
+                          </span>
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                ) : isSearching ? (
                   <div className="px-4 py-3 text-sm text-zinc-400">
                     Ищем игры...
                   </div>

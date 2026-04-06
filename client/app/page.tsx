@@ -6,6 +6,12 @@ import {
 } from "@/components/product/marketplace-product-card";
 import { prisma } from "@/lib/prisma";
 
+interface GameDirectoryItem {
+  id: string;
+  name: string;
+  slug: string;
+}
+
 async function getProducts(): Promise<MarketplaceProductCardData[]> {
   try {
     const products = await prisma.product.findMany({
@@ -37,8 +43,43 @@ async function getProducts(): Promise<MarketplaceProductCardData[]> {
   }
 }
 
+async function getGames(): Promise<GameDirectoryItem[]> {
+  try {
+    return prisma.game.findMany({
+      orderBy: {
+        name: "asc",
+      },
+      select: {
+        id: true,
+        name: true,
+        slug: true,
+      },
+    });
+  } catch (error) {
+    console.error("[HOME_GAMES_ERROR]", error);
+    return [];
+  }
+}
+
+function groupGamesByInitial(games: GameDirectoryItem[]) {
+  return games.reduce<Record<string, GameDirectoryItem[]>>((accumulator, game) => {
+    const initial = game.name.slice(0, 1).toUpperCase() || "#";
+
+    if (!accumulator[initial]) {
+      accumulator[initial] = [];
+    }
+
+    accumulator[initial].push(game);
+    return accumulator;
+  }, {});
+}
+
 export default async function Home() {
-  const products = await getProducts();
+  const [products, games] = await Promise.all([getProducts(), getGames()]);
+  const groupedGames = groupGamesByInitial(games);
+  const gameInitials = Object.keys(groupedGames).sort((left, right) =>
+    left.localeCompare(right, "ru-RU"),
+  );
 
   return (
     <main className="mx-auto flex w-full max-w-7xl flex-col gap-12 px-4 py-10 sm:px-6 lg:gap-16 lg:px-8 lg:py-14">
@@ -138,6 +179,56 @@ export default async function Home() {
             </div>
           </div>
         </div>
+      </section>
+
+      <section className="space-y-6">
+        <div className="flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
+          <div>
+            <p className="text-sm font-semibold tracking-[0.24em] uppercase text-zinc-500">
+              Все игры
+            </p>
+            <h2 className="mt-2 text-3xl font-semibold tracking-tight text-white">
+              Быстрый переход по каталогу
+            </h2>
+          </div>
+          <p className="max-w-2xl text-sm leading-7 text-zinc-400">
+            Плотный каталог в духе FunPay: выберите игру и сразу перейдите к её категориям и товарам.
+          </p>
+        </div>
+
+        {games.length === 0 ? (
+          <div className="rounded-[1.9rem] border border-dashed border-white/10 bg-white/5 px-6 py-10 text-sm leading-7 text-zinc-400 shadow-[0_14px_36px_rgba(0,0,0,0.16)]">
+            Каталог игр ещё не заполнен. Выполните seed через /api/seed или npm run seed:catalog.
+          </div>
+        ) : (
+          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+            {gameInitials.map((initial) => (
+              <section
+                key={initial}
+                className="rounded-[1.5rem] border border-white/10 bg-white/5 p-4 shadow-[0_14px_36px_rgba(0,0,0,0.16)]"
+              >
+                <div className="flex items-center justify-between gap-3 border-b border-white/10 pb-3">
+                  <span className="text-lg font-semibold text-white">{initial}</span>
+                  <span className="text-xs uppercase tracking-[0.18em] text-zinc-500">
+                    {groupedGames[initial].length} игр
+                  </span>
+                </div>
+
+                <div className="mt-4 grid gap-2">
+                  {groupedGames[initial].map((game) => (
+                    <Link
+                      key={game.id}
+                      href={`/games/${game.slug}`}
+                      className="truncate rounded-xl border border-transparent px-3 py-2 text-sm font-medium text-zinc-200 transition hover:border-white/10 hover:bg-white/6 hover:text-white"
+                    >
+                      {game.name}
+                    </Link>
+                  ))}
+                </div>
+              </section>
+            ))}
+          </div>
+        )}
       </section>
 
       <section className="space-y-6">

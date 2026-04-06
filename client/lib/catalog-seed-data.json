@@ -1,0 +1,192 @@
+{
+  "games": [
+    {
+      "name": "Albion Online",
+      "slug": "albion-online",
+      "categories": [
+        { "name": "Аккаунты", "slug": "accounts" },
+        { "name": "Серебро", "slug": "silver" },
+        { "name": "Услуги", "slug": "services" }
+      ]
+    },
+    {
+      "name": "Apex Legends",
+      "slug": "apex-legends",
+      "categories": [
+        { "name": "Аккаунты", "slug": "accounts" },
+        { "name": "Монеты", "slug": "coins" },
+        { "name": "Буст", "slug": "boost" }
+      ]
+    },
+    {
+      "name": "Black Desert",
+      "slug": "black-desert",
+      "categories": [
+        { "name": "Аккаунты", "slug": "accounts" },
+        { "name": "Серебро", "slug": "silver" },
+        { "name": "Фарм", "slug": "farm" }
+      ]
+    },
+    {
+      "name": "CS2",
+      "slug": "cs2",
+      "categories": [
+        { "name": "Аккаунты", "slug": "accounts" },
+        { "name": "Скины", "slug": "skins" },
+        { "name": "Услуги", "slug": "services" }
+      ]
+    },
+    {
+      "name": "Dota 2",
+      "slug": "dota2",
+      "categories": [
+        { "name": "Аккаунты", "slug": "accounts" },
+        { "name": "Предметы", "slug": "items" },
+        { "name": "Рейтинг", "slug": "rating" }
+      ]
+    },
+    {
+      "name": "EA Sports FC 25",
+      "slug": "ea-sports-fc-25",
+      "categories": [
+        { "name": "Аккаунты", "slug": "accounts" },
+        { "name": "Монеты", "slug": "coins" },
+        { "name": "Буст", "slug": "boost" }
+      ]
+    },
+    {
+      "name": "Escape from Tarkov",
+      "slug": "escape-from-tarkov",
+      "categories": [
+        { "name": "Аккаунты", "slug": "accounts" },
+        { "name": "Рубли", "slug": "rubles" },
+        { "name": "Услуги", "slug": "services" }
+      ]
+    },
+    {
+      "name": "Fortnite",
+      "slug": "fortnite",
+      "categories": [
+        { "name": "Аккаунты", "slug": "accounts" },
+        { "name": "V-Bucks", "slug": "v-bucks" },
+        { "name": "Услуги", "slug": "services" }
+      ]
+    },
+    {
+      "name": "Genshin Impact",
+      "slug": "genshin-impact",
+      "categories": [
+        { "name": "Аккаунты", "slug": "accounts" },
+        { "name": "Кристаллы", "slug": "crystals" },
+        { "name": "Фарм", "slug": "farm" }
+      ]
+    },
+    {
+      "name": "GTA 5",
+      "slug": "gta-5",
+      "categories": [
+        { "name": "Аккаунты", "slug": "accounts" },
+        { "name": "Валюта", "slug": "currency" },
+        { "name": "Прокачка", "slug": "leveling" }
+      ]
+    },
+    {
+      "name": "League of Legends",
+      "slug": "league-of-legends",
+      "categories": [
+        { "name": "Аккаунты", "slug": "accounts" },
+        { "name": "RP", "slug": "rp" },
+        { "name": "Услуги", "slug": "services" }
+      ]
+    },
+    {
+      "name": "Minecraft",
+      "slug": "minecraft",
+      "categories": [
+        { "name": "Аккаунты", "slug": "accounts" },
+        { "name": "Ресурсы", "slug": "resources" },
+        { "name": "Услуги", "slug": "services" }
+      ]
+    },
+    {
+      "name": "Path of Exile",
+      "slug": "path-of-exile",
+      "categories": [
+        { "name": "Аккаунты", "slug": "accounts" },
+        { "name": "Валюта", "slug": "currency" },
+        { "name": "Билды", "slug": "builds" }
+      ]
+    },
+    {
+      "name": "PUBG",
+      "slug": "pubg",
+      "categories": [
+        { "name": "Аккаунты", "slug": "accounts" },
+        { "name": "UC", "slug": "uc" },
+        { "name": "Прокачка", "slug": "leveling" }
+      ]
+    },
+    {
+      "name": "Roblox",
+      "slug": "roblox",
+      "categories": [
+        { "name": "Аккаунты", "slug": "accounts" },
+        { "name": "Robux", "slug": "robux" },
+        { "name": "Прокачка", "slug": "leveling" }
+      ]
+    },
+    {
+      "name": "Rust",
+      "slug": "rust",
+      "categories": [
+        { "name": "Аккаунты", "slug": "accounts" },
+        { "name": "Скины", "slug": "skins" },
+        { "name": "Ресурсы", "slug": "resources" }
+      ]
+    },
+    {
+      "name": "Valorant",
+      "slug": "valorant",
+      "categories": [
+        { "name": "Аккаунты", "slug": "accounts" },
+        { "name": "Услуги", "slug": "services" },
+        { "name": "Riot Points", "slug": "riot-points" }
+      ]
+    },
+    {
+      "name": "War Thunder",
+      "slug": "war-thunder",
+      "categories": [
+        { "name": "Аккаунты", "slug": "accounts" },
+        { "name": "Орлы", "slug": "eagles" },
+        { "name": "Прокачка", "slug": "leveling" }
+      ]
+    },
+    {
+      "name": "World of Tanks",
+      "slug": "world-of-tanks",
+      "categories": [
+        { "name": "Аккаунты", "slug": "accounts" },
+        { "name": "Золото", "slug": "gold" },
+        { "name": "Прокачка", "slug": "leveling" }
+      ]
+    },
+    {
+      "name": "World of Warcraft",
+      "slug": "wow",
+      "categories": [
+        { "name": "Золото", "slug": "gold" },
+        { "name": "Таймкарты", "slug": "timecards" },
+        { "name": "Услуги", "slug": "services" }
+      ]
+    }
+  ],
+  "popularGames": [
+    { "name": "CS2", "slug": "cs2" },
+    { "name": "Dota 2", "slug": "dota2" },
+    { "name": "GTA 5", "slug": "gta-5" },
+    { "name": "Valorant", "slug": "valorant" },
+    { "name": "Rust", "slug": "rust" },
+    { "name": "Escape from Tarkov", "slug": "escape-from-tarkov" }
+  ]
+}

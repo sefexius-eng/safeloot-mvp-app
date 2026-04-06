@@ -1,39 +1,10 @@
 const { PrismaClient } = require("@prisma/client");
+const catalogSeedData = require("../lib/catalog-seed-data.json");
 
 const prisma = new PrismaClient();
 
-const catalog = [
-  {
-    name: "CS2",
-    slug: "cs2",
-    categories: [
-      { name: "Аккаунты", slug: "accounts" },
-      { name: "Скины", slug: "skins" },
-      { name: "Услуги", slug: "services" },
-    ],
-  },
-  {
-    name: "Dota 2",
-    slug: "dota2",
-    categories: [
-      { name: "Аккаунты", slug: "accounts" },
-      { name: "Предметы", slug: "items" },
-      { name: "Рейтинг", slug: "rating" },
-    ],
-  },
-  {
-    name: "World of Warcraft",
-    slug: "wow",
-    categories: [
-      { name: "Золото", slug: "gold" },
-      { name: "Таймкарты", slug: "timecards" },
-      { name: "Услуги", slug: "services" },
-    ],
-  },
-];
-
 async function main() {
-  for (const game of catalog) {
+  for (const game of catalogSeedData.games) {
     const upsertedGame = await prisma.game.upsert({
       where: { slug: game.slug },
       update: {
@@ -65,7 +36,7 @@ async function main() {
     }
   }
 
-  console.log(`Seeded ${catalog.length} games with categories.`);
+  console.log(`Seeded ${catalogSeedData.games.length} games with categories.`);
 }
 
 main()
