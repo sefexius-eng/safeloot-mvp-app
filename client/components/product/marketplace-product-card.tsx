@@ -72,50 +72,53 @@ interface MarketplaceProductCardProps {
 
 export function MarketplaceProductCard({ product }: MarketplaceProductCardProps) {
   const { formatPrice } = useCurrency();
+  const sellerDisplayName = getSellerDisplayName(product.seller);
 
   return (
-    <Link
-      href={`/product/${product.id}`}
-      className="group rounded-[1.75rem] border border-white/10 bg-white/5 p-5 shadow-[0_14px_36px_rgba(0,0,0,0.18)] transition hover:-translate-y-1 hover:border-orange-500/30 hover:shadow-[0_20px_46px_rgba(0,0,0,0.26)]"
-    >
-      <div className="flex items-start justify-between gap-4">
-        <div className="space-y-3">
-          <div className="flex flex-wrap items-center gap-2">
-            <span className="rounded-full border border-white/10 bg-white/6 px-2.5 py-1 text-xs font-medium uppercase tracking-[0.18em] text-zinc-400">
-              {product.category.name}
-            </span>
-            <span
-              className={`rounded-full border px-2.5 py-1 text-xs font-medium ${getRankClassName(product.seller.rank)}`}
-            >
-              {getRankLabel(product.seller.rank)}
-            </span>
+    <article className="group rounded-[1.75rem] border border-white/10 bg-white/5 p-5 shadow-[0_14px_36px_rgba(0,0,0,0.18)] transition hover:-translate-y-1 hover:border-orange-500/30 hover:shadow-[0_20px_46px_rgba(0,0,0,0.26)]">
+      <Link href={`/product/${product.id}`} className="block">
+        <div className="flex items-start justify-between gap-4">
+          <div className="space-y-3">
+            <div className="flex flex-wrap items-center gap-2">
+              <span className="rounded-full border border-white/10 bg-white/6 px-2.5 py-1 text-xs font-medium uppercase tracking-[0.18em] text-zinc-400">
+                {product.category.name}
+              </span>
+              <span
+                className={`rounded-full border px-2.5 py-1 text-xs font-medium ${getRankClassName(product.seller.rank)}`}
+              >
+                {getRankLabel(product.seller.rank)}
+              </span>
+            </div>
+
+            <div>
+              <h3 className="text-xl font-semibold tracking-tight text-white transition group-hover:text-orange-200">
+                {product.title}
+              </h3>
+              <p className="mt-2 text-sm leading-6 text-zinc-400">
+                Игра: {product.game.name}
+              </p>
+            </div>
           </div>
 
-          <div>
-            <h3 className="text-xl font-semibold tracking-tight text-white">
-              {product.title}
-            </h3>
-            <p className="mt-2 text-sm leading-6 text-zinc-400">
-              Игра: {product.game.name}
+          <div className="min-w-fit shrink-0 rounded-[1.2rem] bg-black/40 px-4 py-3 text-right text-white shadow-[0_12px_26px_rgba(0,0,0,0.24)]">
+            <p className="text-xs uppercase tracking-[0.2em] text-zinc-500">
+              Цена
+            </p>
+            <p className="mt-1 flex flex-row items-center justify-end whitespace-nowrap text-lg font-bold tracking-tight">
+              {formatPrice(product.price)}
             </p>
           </div>
         </div>
-
-        <div className="min-w-fit shrink-0 rounded-[1.2rem] bg-black/40 px-4 py-3 text-right text-white shadow-[0_12px_26px_rgba(0,0,0,0.24)]">
-          <p className="text-xs uppercase tracking-[0.2em] text-zinc-500">
-            Цена
-          </p>
-          <p className="mt-1 flex flex-row items-center justify-end whitespace-nowrap text-lg font-bold tracking-tight">
-            {formatPrice(product.price)}
-          </p>
-        </div>
-      </div>
+      </Link>
 
       <div className="mt-6 flex items-end justify-between gap-4 border-t border-white/10 pt-4">
-        <div className="flex min-w-0 flex-row items-center gap-3">
+        <Link
+          href={`/user/${product.seller.id}`}
+          className="group/seller flex min-w-0 flex-row items-center gap-3"
+        >
           <UserAvatar
             src={product.seller.image}
-            name={getSellerDisplayName(product.seller)}
+            name={sellerDisplayName}
             email={product.seller.email}
             className="h-12 w-12 shrink-0 border-transparent bg-zinc-900/80"
             imageClassName="rounded-full border border-gray-700/50 object-cover"
@@ -124,8 +127,8 @@ export function MarketplaceProductCard({ product }: MarketplaceProductCardProps)
             <p className="text-[11px] font-semibold tracking-[0.18em] uppercase text-zinc-500">
               Продавец
             </p>
-            <p className="truncate text-sm font-semibold text-white">
-              {getSellerDisplayName(product.seller)}
+            <p className="truncate text-sm font-semibold text-white transition group-hover/seller:text-orange-300 group-hover/seller:underline">
+              {sellerDisplayName}
             </p>
             <SellerRatingBadge
               summary={product.seller.reviewSummary}
@@ -133,11 +136,14 @@ export function MarketplaceProductCard({ product }: MarketplaceProductCardProps)
               size="sm"
             />
           </div>
-        </div>
-        <span className="shrink-0 text-sm font-medium text-white group-hover:text-orange-400">
+        </Link>
+        <Link
+          href={`/product/${product.id}`}
+          className="shrink-0 text-sm font-medium text-white transition group-hover:text-orange-400"
+        >
           Открыть карточку
-        </span>
+        </Link>
       </div>
-    </Link>
+    </article>
   );
 }

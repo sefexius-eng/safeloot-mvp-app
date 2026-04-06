@@ -211,33 +211,38 @@ export default async function ProductPage({ params }: ProductPageProps) {
                 Продавец
               </p>
               <div className="mt-4 flex items-start gap-4">
-                <UserAvatar
-                  src={product.seller.image}
-                  name={sellerName}
-                  email={product.seller.email}
-                  className="h-12 w-12 shrink-0"
-                />
-                <div className="min-w-0 flex-1">
-                  <p className="truncate text-xl font-semibold text-white">
-                    {sellerName}
-                  </p>
-                  <p className="mt-1 truncate text-sm text-zinc-400">{product.seller.email}</p>
-                  <SellerRatingBadge
-                    summary={product.seller.reviewSummary}
-                    className="mt-3"
-                    size="sm"
-                  />
-                  <div
-                    className={`mt-3 inline-flex items-center gap-2 rounded-full border px-3 py-1.5 text-sm font-medium ${rankStyle.badgeClassName}`}
+                  <Link
+                    href={`/user/${product.seller.id}`}
+                    className="group flex min-w-0 flex-1 items-start gap-4 rounded-[1.25rem] transition hover:bg-white/5"
                   >
-                    <span
-                      className={`flex h-6 w-6 items-center justify-center rounded-full text-[11px] font-bold ${rankStyle.iconClassName}`}
-                    >
-                      {rankStyle.label.slice(0, 1)}
-                    </span>
-                    Ранг: {rankStyle.label}
-                  </div>
-                </div>
+                    <UserAvatar
+                      src={product.seller.image}
+                      name={sellerName}
+                      email={product.seller.email}
+                      className="h-12 w-12 shrink-0"
+                    />
+                    <div className="min-w-0 flex-1">
+                      <p className="truncate text-xl font-semibold text-white transition group-hover:text-orange-200 group-hover:underline">
+                        {sellerName}
+                      </p>
+                      <p className="mt-1 truncate text-sm text-zinc-400">{product.seller.email}</p>
+                      <SellerRatingBadge
+                        summary={product.seller.reviewSummary}
+                        className="mt-3"
+                        size="sm"
+                      />
+                      <div
+                        className={`mt-3 inline-flex items-center gap-2 rounded-full border px-3 py-1.5 text-sm font-medium ${rankStyle.badgeClassName}`}
+                      >
+                        <span
+                          className={`flex h-6 w-6 items-center justify-center rounded-full text-[11px] font-bold ${rankStyle.iconClassName}`}
+                        >
+                          {rankStyle.label.slice(0, 1)}
+                        </span>
+                        Ранг: {rankStyle.label}
+                      </div>
+                    </div>
+                  </Link>
               </div>
             </div>
 

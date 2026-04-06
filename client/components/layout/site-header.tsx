@@ -430,7 +430,7 @@ export function SiteHeader() {
                     </div>
                     <DropdownMenuSeparator className="my-1 h-px bg-white/10" />
                     <DropdownMenuItem asChild>
-                      <Link href="/profile">Профиль</Link>
+                      <Link href="/profile">Мой профиль</Link>
                     </DropdownMenuItem>
                     <DropdownMenuItem asChild>
                       <Link href="/profile/settings">Настройки профиля</Link>
