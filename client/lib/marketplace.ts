@@ -16,11 +16,17 @@ const MONEY_SCALE = 8;
 const PLATFORM_FEE_RATE = new Prisma.Decimal("0.05");
 const TYPING_TTL_MS = 5000;
 const MAX_MESSAGE_IMAGE_BASE64_LENGTH = 2_000_000;
+const MAX_PRODUCT_TITLE_LENGTH = 60;
+const MAX_PRODUCT_DESCRIPTION_LENGTH = 1000;
 
 const chatTypingState = new Map<string, Map<string, number>>();
 
 function normalizeText(value?: string) {
   return value?.trim() ?? "";
+}
+
+function stripHtmlTags(value: string) {
+  return value.replace(/<[^>]*>?/gm, "");
 }
 
 function normalizeOptionalText(value?: string | null) {
@@ -337,8 +343,10 @@ export async function createProduct(input: {
   categoryId?: string;
   sellerId?: string;
 }) {
-  const title = normalizeText(input.title);
-  const description = normalizeText(input.description);
+  const title = normalizeText(stripHtmlTags(normalizeText(input.title)));
+  const description = normalizeText(
+    stripHtmlTags(normalizeText(input.description)),
+  );
   const gameId = normalizeText(input.gameId);
   const categoryId = normalizeText(input.categoryId);
   const sellerId = normalizeText(input.sellerId);
@@ -350,6 +358,18 @@ export async function createProduct(input: {
 
   if (!description) {
     throw new Error("description is required.");
+  }
+
+  if (title.length > MAX_PRODUCT_TITLE_LENGTH) {
+    throw new Error(
+      `title must be at most ${MAX_PRODUCT_TITLE_LENGTH} characters.`,
+    );
+  }
+
+  if (description.length > MAX_PRODUCT_DESCRIPTION_LENGTH) {
+    throw new Error(
+      `description must be at most ${MAX_PRODUCT_DESCRIPTION_LENGTH} characters.`,
+    );
   }
 
   if (!gameId) {

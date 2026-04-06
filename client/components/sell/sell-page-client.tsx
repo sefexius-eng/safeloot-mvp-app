@@ -132,6 +132,7 @@ export function SellPageClient({ games }: SellPageClientProps) {
                   }))
                 }
                 placeholder="Например: Аккаунт CS2 Prime с инвентарем"
+                maxLength={60}
                 required
               />
             </FormField>
@@ -146,6 +147,7 @@ export function SellPageClient({ games }: SellPageClientProps) {
                   }))
                 }
                 placeholder="Опишите состав товара, прогресс, условия передачи и важные детали для покупателя"
+                maxLength={1000}
                 required
               />
             </FormField>
