@@ -19,6 +19,10 @@ const TYPING_TTL_MS = 5000;
 const MAX_MESSAGE_IMAGE_BASE64_LENGTH = 2_000_000;
 const MAX_PRODUCT_TITLE_LENGTH = 60;
 const MAX_PRODUCT_DESCRIPTION_LENGTH = 1000;
+const MAX_PRODUCT_IMAGE_COUNT = 3;
+const MAX_PRODUCT_IMAGE_BASE64_LENGTH = 2_000_000;
+const PRODUCT_IMAGE_BASE64_PATTERN =
+  /^data:image\/webp;base64,[A-Za-z0-9+/=]+$/;
 
 const chatTypingState = new Map<string, Map<string, number>>();
 
@@ -65,6 +69,30 @@ function validateProductTextFields(input: {
     title,
     description,
   };
+}
+
+function validateProductImages(images?: string[]) {
+  const normalizedImages = Array.isArray(images)
+    ? images
+        .map((image) => normalizeText(image))
+        .filter(Boolean)
+    : [];
+
+  if (normalizedImages.length > MAX_PRODUCT_IMAGE_COUNT) {
+    throw new Error(`images must contain at most ${MAX_PRODUCT_IMAGE_COUNT} items.`);
+  }
+
+  for (const image of normalizedImages) {
+    if (image.length > MAX_PRODUCT_IMAGE_BASE64_LENGTH) {
+      throw new Error("images must be compressed before upload.");
+    }
+
+    if (!PRODUCT_IMAGE_BASE64_PATTERN.test(image)) {
+      throw new Error("images must be valid webp base64 data.");
+    }
+  }
+
+  return normalizedImages;
 }
 
 async function validateCatalogSelection(gameId: string, categoryId: string) {
@@ -428,12 +456,14 @@ export async function getProductById(productId: string) {
 export async function createProduct(input: {
   title?: string;
   description?: string;
+  images?: string[];
   price?: number;
   gameId?: string;
   categoryId?: string;
   sellerId?: string;
 }) {
   const { title, description } = validateProductTextFields(input);
+  const images = validateProductImages(input.images);
   const gameId = normalizeText(input.gameId);
   const categoryId = normalizeText(input.categoryId);
   const sellerId = normalizeText(input.sellerId);
@@ -475,6 +505,7 @@ export async function createProduct(input: {
     data: {
       title,
       description,
+      images,
       gameId,
       categoryId,
       sellerId,
@@ -521,6 +552,7 @@ export async function updateProductByActor(input: {
   role?: Role;
   title?: string;
   description?: string;
+  images?: string[];
   price?: number;
   gameId?: string;
   categoryId?: string;
@@ -531,6 +563,7 @@ export async function updateProductByActor(input: {
   const categoryId = normalizeText(input.categoryId);
   const price = Number(input.price);
   const { title, description } = validateProductTextFields(input);
+  const images = validateProductImages(input.images);
 
   if (!productId) {
     throw new Error("productId is required.");
@@ -582,6 +615,7 @@ export async function updateProductByActor(input: {
     data: {
       title,
       description,
+      images,
       price: new Prisma.Decimal(price.toFixed(MONEY_SCALE)),
       gameId,
       categoryId,

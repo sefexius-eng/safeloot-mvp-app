@@ -21,6 +21,7 @@ interface ProductActionResult {
 interface UpdateProductPayload {
   title: string;
   description: string;
+  images: string[];
   price: number;
   gameId: string;
   categoryId: string;

@@ -55,6 +55,7 @@ export default async function EditProductPage({ params }: EditProductPageProps) 
           id: product.id,
           title: product.title,
           description: product.description,
+          images: product.images,
           price: product.price,
           gameId: product.game.id,
           categoryId: product.category.id,

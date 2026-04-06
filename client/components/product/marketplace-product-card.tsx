@@ -12,6 +12,7 @@ type SellerRank = "BRONZE" | "SILVER" | "GOLD";
 export interface MarketplaceProductCardData {
   id: string;
   title: string;
+  images: string[];
   price: string;
   game: {
     id: string;
@@ -116,9 +117,10 @@ export function MarketplaceProductCard({ product }: MarketplaceProductCardProps)
             src={product.seller.image}
             name={getSellerDisplayName(product.seller)}
             email={product.seller.email}
-            className="h-6 w-6 shrink-0"
+            className="h-10 w-10 shrink-0 border-transparent bg-zinc-900/80"
+            imageClassName="rounded-full border border-gray-700/50 object-cover"
           />
-          <div className="min-w-0">
+          <div className="min-w-0 self-center">
             <p className="text-[11px] font-semibold tracking-[0.18em] uppercase text-zinc-500">
               Продавец
             </p>

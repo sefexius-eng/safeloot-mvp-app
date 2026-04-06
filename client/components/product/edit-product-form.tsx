@@ -4,6 +4,7 @@ import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 
 import { updateProduct } from "@/app/actions/product";
+import { ProductImageUploader } from "@/components/product/product-image-uploader";
 import { useCurrency } from "@/components/providers/currency-provider";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -27,6 +28,7 @@ interface EditProductInitialData {
   id: string;
   title: string;
   description: string;
+  images: string[];
   price: string;
   gameId: string;
   categoryId: string;
@@ -51,6 +53,7 @@ export function EditProductForm({ product, games }: EditProductFormProps) {
   const [formState, setFormState] = useState({
     title: product.title,
     description: product.description,
+    images: product.images,
     price: "",
     gameId: product.gameId,
     categoryId: product.categoryId,
@@ -106,6 +109,7 @@ export function EditProductForm({ product, games }: EditProductFormProps) {
       const result = await updateProduct(product.id, {
         title: formState.title,
         description: formState.description,
+        images: formState.images,
         price: basePriceInUsdt,
         gameId: formState.gameId,
         categoryId: formState.categoryId,
@@ -179,6 +183,17 @@ export function EditProductForm({ product, games }: EditProductFormProps) {
               required
             />
           </EditFormField>
+
+          <ProductImageUploader
+            images={formState.images}
+            onChange={(images) =>
+              setFormState((current) => ({
+                ...current,
+                images,
+              }))
+            }
+            disabled={isSubmitting}
+          />
 
           <div className="grid gap-5 md:grid-cols-2">
             <EditFormField label={`Цена в ${currencySymbol}`}>

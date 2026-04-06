@@ -19,6 +19,7 @@ interface ProductDetail {
   id: string;
   title: string;
   description: string;
+  images: string[];
   price: string;
   game: {
     id: string;
@@ -76,6 +77,18 @@ const rankStyles: Record<
   },
 };
 
+function getGalleryGridClassName(imageCount: number) {
+  if (imageCount <= 1) {
+    return "grid-cols-1";
+  }
+
+  if (imageCount === 2) {
+    return "grid-cols-1 md:grid-cols-2";
+  }
+
+  return "grid-cols-1 md:grid-cols-2 xl:grid-cols-3";
+}
+
 export default async function ProductPage({ params }: ProductPageProps) {
   const { id } = await params;
   const product = await getProduct(id);
@@ -131,6 +144,28 @@ export default async function ProductPage({ params }: ProductPageProps) {
               {product.description}
             </p>
           </div>
+
+          {product.images.length > 0 ? (
+            <div className="mt-8">
+              <p className="text-xs font-semibold tracking-[0.24em] uppercase text-zinc-500">
+                Скриншоты товара
+              </p>
+              <div className={`mt-4 grid gap-4 ${getGalleryGridClassName(product.images.length)}`}>
+                {product.images.map((image, index) => (
+                  <div
+                    key={`${product.id}-image-${index + 1}`}
+                    className="overflow-hidden rounded-lg border border-white/10 bg-black/20"
+                  >
+                    <img
+                      src={image}
+                      alt={`Скриншот ${index + 1} для ${product.title}`}
+                      className="aspect-[16/9] h-full w-full rounded-lg object-cover"
+                    />
+                  </div>
+                ))}
+              </div>
+            </div>
+          ) : null}
 
           <div className="mt-8 grid gap-4 md:grid-cols-3">
             <div className="rounded-[1.5rem] border border-white/10 bg-white/5 p-4">

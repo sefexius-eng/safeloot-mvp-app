@@ -3,6 +3,7 @@
 import { FormEvent, useState } from "react";
 import { useRouter } from "next/navigation";
 
+import { ProductImageUploader } from "@/components/product/product-image-uploader";
 import { useCurrency } from "@/components/providers/currency-provider";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -33,6 +34,7 @@ function createInitialFormState(games: SellGame[]) {
   return {
     title: "",
     description: "",
+    images: [] as string[],
     price: "",
     gameId: firstGame?.id ?? "",
     categoryId: firstCategory?.id ?? "",
@@ -151,6 +153,17 @@ export function SellPageClient({ games }: SellPageClientProps) {
                 required
               />
             </FormField>
+
+            <ProductImageUploader
+              images={formState.images}
+              onChange={(images) =>
+                setFormState((current) => ({
+                  ...current,
+                  images,
+                }))
+              }
+              disabled={isSubmitting}
+            />
 
             <div className="grid gap-5 md:grid-cols-2">
               <FormField label={`Цена в ${currencySymbol}`}>

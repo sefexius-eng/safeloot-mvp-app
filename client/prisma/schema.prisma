@@ -97,6 +97,7 @@ model Product {
   id          String    @id @default(cuid())
   title       String
   description String
+  images      String[]  @default([])
   price       Decimal   @db.Decimal(36, 8)
   gameId      String    @map("catalog_game_id")
   categoryId  String

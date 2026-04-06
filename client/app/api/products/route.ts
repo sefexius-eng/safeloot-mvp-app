@@ -11,6 +11,7 @@ import { requireActiveSessionUserId } from "@/lib/session-user";
 interface CreateProductPayload {
   title?: string;
   description?: string;
+  images?: string[];
   price?: number;
   gameId?: string;
   categoryId?: string;
