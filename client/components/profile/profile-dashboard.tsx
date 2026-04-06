@@ -7,8 +7,6 @@ import { useSession } from "next-auth/react";
 
 import { UserAvatar } from "@/components/ui/user-avatar";
 
-type ProductType = "ITEM" | "ACCOUNT" | "SERVICE";
-
 interface CurrentUser {
   id: string;
   email: string;
@@ -26,7 +24,18 @@ interface ProductItem {
   title: string;
   description: string;
   price: string;
-  gameId: string;
+  game: {
+    id: string;
+    name: string;
+    slug: string;
+    imageUrl: string | null;
+  };
+  category: {
+    id: string;
+    name: string;
+    slug: string;
+    gameId: string;
+  };
   sellerId: string;
   seller: {
     id: string;
@@ -35,7 +44,6 @@ interface ProductItem {
     image: string | null;
     rank: string;
   };
-  type: ProductType;
   createdAt: string;
   updatedAt: string;
 }
@@ -51,19 +59,6 @@ function formatBalance(value: string) {
     minimumFractionDigits: 2,
     maximumFractionDigits: 2,
   }).format(numericValue);
-}
-
-function getProductTypeLabel(type: ProductType) {
-  switch (type) {
-    case "ITEM":
-      return "Предмет";
-    case "ACCOUNT":
-      return "Аккаунт";
-    case "SERVICE":
-      return "Услуга";
-    default:
-      return type;
-  }
 }
 
 export function ProfileDashboard() {
@@ -303,10 +298,10 @@ export function ProfileDashboard() {
           </div>
         ) : (
           <div className="mt-6 overflow-hidden rounded-[1.5rem] border border-white/10">
-            <div className="grid grid-cols-[minmax(0,1.4fr)_120px_130px_minmax(160px,1fr)_120px] gap-4 border-b border-white/10 bg-white/5 px-5 py-4 text-xs font-semibold tracking-[0.2em] uppercase text-zinc-500">
+            <div className="grid grid-cols-[minmax(0,1.35fr)_140px_140px_minmax(160px,1fr)_120px] gap-4 border-b border-white/10 bg-white/5 px-5 py-4 text-xs font-semibold tracking-[0.2em] uppercase text-zinc-500">
               <span>Товар</span>
               <span>Игра</span>
-              <span>Тип</span>
+              <span>Категория</span>
               <span>Продавец</span>
               <span>Цена</span>
             </div>
@@ -320,7 +315,7 @@ export function ProfileDashboard() {
                   <Link
                     key={product.id}
                     href={`/product/${product.id}`}
-                    className="grid grid-cols-[minmax(0,1.4fr)_120px_130px_minmax(160px,1fr)_120px] gap-4 px-5 py-4 transition hover:bg-white/5"
+                    className="grid grid-cols-[minmax(0,1.35fr)_140px_140px_minmax(160px,1fr)_120px] gap-4 px-5 py-4 transition hover:bg-white/5"
                   >
                     <div className="min-w-0">
                       <p className="truncate text-sm font-semibold text-white">
@@ -330,8 +325,8 @@ export function ProfileDashboard() {
                         #{product.id}
                       </p>
                     </div>
-                    <span className="text-sm text-zinc-300">{product.gameId}</span>
-                    <span className="text-sm text-zinc-300">{getProductTypeLabel(product.type)}</span>
+                    <span className="text-sm text-zinc-300">{product.game.name}</span>
+                    <span className="text-sm text-zinc-300">{product.category.name}</span>
                     <div className="flex min-w-0 items-center gap-3">
                       <UserAvatar
                         src={product.seller.image}

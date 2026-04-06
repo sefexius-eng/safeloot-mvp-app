@@ -5,7 +5,6 @@ import { UserAvatar } from "@/components/ui/user-avatar";
 import { prisma } from "@/lib/prisma";
 
 type SellerRank = "BRONZE" | "SILVER" | "GOLD";
-type ProductType = "ITEM" | "ACCOUNT" | "SERVICE";
 
 interface ProductPageProps {
   params: Promise<{
@@ -16,10 +15,20 @@ interface ProductPageProps {
 interface ProductDetail {
   id: string;
   title: string;
-  gameId: string;
-  type: ProductType;
   description: string;
   price: string;
+  game: {
+    id: string;
+    name: string;
+    slug: string;
+    imageUrl: string | null;
+  };
+  category: {
+    id: string;
+    name: string;
+    slug: string;
+    gameId: string;
+  };
   seller: {
     id: string;
     email: string;
@@ -36,6 +45,22 @@ async function getProduct(id: string): Promise<ProductDetail | null> {
         id,
       },
       include: {
+        game: {
+          select: {
+            id: true,
+            name: true,
+            slug: true,
+            imageUrl: true,
+          },
+        },
+        category: {
+          select: {
+            id: true,
+            name: true,
+            slug: true,
+            gameId: true,
+          },
+        },
         seller: {
           select: {
             id: true,
@@ -59,19 +84,6 @@ async function getProduct(id: string): Promise<ProductDetail | null> {
   } catch (error) {
     console.error("[PRODUCT_DETAIL_ERROR]", error);
     return null;
-  }
-}
-
-function getTypeLabel(type: ProductType) {
-  switch (type) {
-    case "ITEM":
-      return "Предмет";
-    case "ACCOUNT":
-      return "Аккаунт";
-    case "SERVICE":
-      return "Услуга";
-    default:
-      return type;
   }
 }
 
@@ -132,7 +144,7 @@ export default async function ProductPage({ params }: ProductPageProps) {
 
   const sellerName = product.seller.name?.trim() || product.seller.email;
   const rankStyle = rankStyles[product.seller.rank];
-  const categoryLabel = getTypeLabel(product.type);
+  const categoryLabel = product.category.name;
 
   return (
     <main className="mx-auto flex w-full max-w-7xl flex-col gap-8 px-4 py-10 sm:px-6 lg:px-8 lg:py-14">
@@ -162,7 +174,7 @@ export default async function ProductPage({ params }: ProductPageProps) {
                 Игра
               </p>
               <p className="mt-3 text-lg font-semibold text-white">
-                {product.gameId}
+                {product.game.name}
               </p>
             </div>
             <div className="rounded-[1.5rem] border border-white/10 bg-white/5 p-4">

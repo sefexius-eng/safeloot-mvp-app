@@ -1,7 +1,6 @@
 import {
   OrderStatus,
   Prisma,
-  ProductType,
   TransactionStatus,
   TransactionType,
 } from "@prisma/client";
@@ -27,24 +26,6 @@ function normalizeOptionalText(value?: string | null) {
 
 function formatMoney(value: Prisma.Decimal) {
   return value.toFixed(MONEY_SCALE);
-}
-
-function parseProductType(type: string): ProductType {
-  const normalizedType = normalizeText(type).toUpperCase();
-
-  if (normalizedType === ProductType.ITEM) {
-    return ProductType.ITEM;
-  }
-
-  if (normalizedType === ProductType.ACCOUNT) {
-    return ProductType.ACCOUNT;
-  }
-
-  if (normalizedType === ProductType.SERVICE) {
-    return ProductType.SERVICE;
-  }
-
-  throw new Error("type must be one of ITEM, ACCOUNT, SERVICE.");
 }
 
 function ensureOrderParticipant(
@@ -165,10 +146,28 @@ export function mapMarketplaceErrorToStatusCode(message: string) {
 export async function listProducts() {
   const products = await prisma.product.findMany({
     include: {
+      game: {
+        select: {
+          id: true,
+          name: true,
+          slug: true,
+          imageUrl: true,
+        },
+      },
+      category: {
+        select: {
+          id: true,
+          name: true,
+          slug: true,
+          gameId: true,
+        },
+      },
       seller: {
         select: {
           id: true,
           email: true,
+          name: true,
+          image: true,
           rank: true,
         },
       },
@@ -196,10 +195,28 @@ export async function getProductById(productId: string) {
       id: normalizedProductId,
     },
     include: {
+      game: {
+        select: {
+          id: true,
+          name: true,
+          slug: true,
+          imageUrl: true,
+        },
+      },
+      category: {
+        select: {
+          id: true,
+          name: true,
+          slug: true,
+          gameId: true,
+        },
+      },
       seller: {
         select: {
           id: true,
           email: true,
+          name: true,
+          image: true,
           rank: true,
         },
       },
@@ -221,12 +238,13 @@ export async function createProduct(input: {
   description?: string;
   price?: number;
   gameId?: string;
-  type?: string;
+  categoryId?: string;
   sellerId?: string;
 }) {
   const title = normalizeText(input.title);
   const description = normalizeText(input.description);
   const gameId = normalizeText(input.gameId);
+  const categoryId = normalizeText(input.categoryId);
   const sellerId = normalizeText(input.sellerId);
   const price = Number(input.price);
 
@@ -242,6 +260,10 @@ export async function createProduct(input: {
     throw new Error("gameId is required.");
   }
 
+  if (!categoryId) {
+    throw new Error("categoryId is required.");
+  }
+
   if (!sellerId) {
     throw new Error("sellerId is required.");
   }
@@ -250,17 +272,48 @@ export async function createProduct(input: {
     throw new Error("price must be a positive number.");
   }
 
-  const seller = await prisma.user.findUnique({
-    where: {
-      id: sellerId,
-    },
-    select: {
-      id: true,
-    },
-  });
+  const [seller, game, category] = await Promise.all([
+    prisma.user.findUnique({
+      where: {
+        id: sellerId,
+      },
+      select: {
+        id: true,
+      },
+    }),
+    prisma.game.findUnique({
+      where: {
+        id: gameId,
+      },
+      select: {
+        id: true,
+      },
+    }),
+    prisma.category.findUnique({
+      where: {
+        id: categoryId,
+      },
+      select: {
+        id: true,
+        gameId: true,
+      },
+    }),
+  ]);
 
   if (!seller) {
     throw new Error(`Seller with id ${sellerId} was not found.`);
+  }
+
+  if (!game) {
+    throw new Error(`Game with id ${gameId} was not found.`);
+  }
+
+  if (!category) {
+    throw new Error(`Category with id ${categoryId} was not found.`);
+  }
+
+  if (category.gameId !== gameId) {
+    throw new Error("categoryId does not belong to selected gameId.");
   }
 
   const product = await prisma.product.create({
@@ -268,9 +321,36 @@ export async function createProduct(input: {
       title,
       description,
       gameId,
+      categoryId,
       sellerId,
-      type: parseProductType(input.type ?? ""),
       price: new Prisma.Decimal(price.toFixed(MONEY_SCALE)),
+    },
+    include: {
+      game: {
+        select: {
+          id: true,
+          name: true,
+          slug: true,
+          imageUrl: true,
+        },
+      },
+      category: {
+        select: {
+          id: true,
+          name: true,
+          slug: true,
+          gameId: true,
+        },
+      },
+      seller: {
+        select: {
+          id: true,
+          email: true,
+          name: true,
+          image: true,
+          rank: true,
+        },
+      },
     },
   });
 
@@ -328,6 +408,22 @@ export async function listProductsBySeller(userId: string) {
       sellerId: normalizedUserId,
     },
     include: {
+      game: {
+        select: {
+          id: true,
+          name: true,
+          slug: true,
+          imageUrl: true,
+        },
+      },
+      category: {
+        select: {
+          id: true,
+          name: true,
+          slug: true,
+          gameId: true,
+        },
+      },
       seller: {
         select: {
           id: true,

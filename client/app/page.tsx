@@ -6,9 +6,19 @@ import { prisma } from "@/lib/prisma";
 interface ProductCard {
   id: string;
   title: string;
-  gameId: string;
-  type: "ITEM" | "ACCOUNT" | "SERVICE";
   price: string;
+  game: {
+    id: string;
+    name: string;
+    slug: string;
+    imageUrl: string | null;
+  };
+  category: {
+    id: string;
+    name: string;
+    slug: string;
+    gameId: string;
+  };
   seller: {
     id: string;
     email: string;
@@ -22,6 +32,22 @@ async function getProducts(): Promise<ProductCard[]> {
   try {
     const products = await prisma.product.findMany({
       include: {
+        game: {
+          select: {
+            id: true,
+            name: true,
+            slug: true,
+            imageUrl: true,
+          },
+        },
+        category: {
+          select: {
+            id: true,
+            name: true,
+            slug: true,
+            gameId: true,
+          },
+        },
         seller: {
           select: {
             id: true,
@@ -44,19 +70,6 @@ async function getProducts(): Promise<ProductCard[]> {
   } catch (error) {
     console.error("[HOME_PRODUCTS_ERROR]", error);
     return [];
-  }
-}
-
-function getTypeLabel(type: ProductCard["type"]) {
-  switch (type) {
-    case "ITEM":
-      return "Предмет";
-    case "ACCOUNT":
-      return "Аккаунт";
-    case "SERVICE":
-      return "Услуга";
-    default:
-      return type;
   }
 }
 
@@ -240,7 +253,7 @@ export default async function Home() {
                   <div className="space-y-3">
                     <div className="flex flex-wrap items-center gap-2">
                       <span className="rounded-full border border-white/10 bg-white/6 px-2.5 py-1 text-xs font-medium uppercase tracking-[0.18em] text-zinc-400">
-                        {getTypeLabel(product.type)}
+                            {product.category.name}
                       </span>
                       <span
                         className={`rounded-full border px-2.5 py-1 text-xs font-medium ${getRankClassName(product.seller.rank)}`}
@@ -254,7 +267,7 @@ export default async function Home() {
                         {product.title}
                       </h3>
                       <p className="mt-2 text-sm leading-6 text-zinc-400">
-                        Игра: {product.gameId}
+                            Игра: {product.game.name}
                       </p>
                     </div>
                   </div>

@@ -8,19 +8,45 @@ import { Input } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 
-const initialFormState = {
-  title: "",
-  description: "",
-  price: "",
-  type: "ITEM",
-  gameId: "Dota 2",
-};
+interface SellCategory {
+  id: string;
+  name: string;
+  slug: string;
+}
 
-export function SellPageClient() {
+interface SellGame {
+  id: string;
+  name: string;
+  slug: string;
+  categories: SellCategory[];
+}
+
+interface SellPageClientProps {
+  games: SellGame[];
+}
+
+function createInitialFormState(games: SellGame[]) {
+  const firstGame = games[0];
+  const firstCategory = firstGame?.categories[0];
+
+  return {
+    title: "",
+    description: "",
+    price: "",
+    gameId: firstGame?.id ?? "",
+    categoryId: firstCategory?.id ?? "",
+  };
+}
+
+export function SellPageClient({ games }: SellPageClientProps) {
   const router = useRouter();
-  const [formState, setFormState] = useState(initialFormState);
+  const [formState, setFormState] = useState(() => createInitialFormState(games));
   const [errorMessage, setErrorMessage] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
+
+  const selectedGame =
+    games.find((game) => game.id === formState.gameId) ?? games[0] ?? null;
+  const availableCategories = selectedGame?.categories ?? [];
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -121,36 +147,54 @@ export function SellPageClient() {
                 />
               </FormField>
 
-              <FormField label="Категория / Тип">
+              <FormField label="Игра">
                 <Select
-                  value={formState.type}
+                  value={formState.gameId}
                   onChange={(event) =>
-                    setFormState((current) => ({
-                      ...current,
-                      type: event.target.value,
-                    }))
+                    setFormState((current) => {
+                      const nextGame = games.find(
+                        (game) => game.id === event.target.value,
+                      );
+
+                      return {
+                        ...current,
+                        gameId: event.target.value,
+                        categoryId: nextGame?.categories[0]?.id ?? "",
+                      };
+                    })
                   }
+                  required
                 >
-                  <option value="ITEM">Предмет</option>
-                  <option value="ACCOUNT">Аккаунт</option>
-                  <option value="SERVICE">Услуга</option>
+                  {games.map((game) => (
+                    <option key={game.id} value={game.id}>
+                      {game.name}
+                    </option>
+                  ))}
                 </Select>
               </FormField>
             </div>
 
-            <FormField label="Игра">
+            <FormField label="Категория">
               <Select
-                value={formState.gameId}
+                value={formState.categoryId}
                 onChange={(event) =>
                   setFormState((current) => ({
                     ...current,
-                    gameId: event.target.value,
+                    categoryId: event.target.value,
                   }))
                 }
+                required
+                disabled={!selectedGame || availableCategories.length === 0}
               >
-                <option value="Dota 2">Dota 2</option>
-                <option value="CS2">CS2</option>
-                <option value="WoW">WoW</option>
+                {availableCategories.length === 0 ? (
+                  <option value="">Нет доступных категорий</option>
+                ) : (
+                  availableCategories.map((category) => (
+                    <option key={category.id} value={category.id}>
+                      {category.name}
+                    </option>
+                  ))
+                )}
               </Select>
             </FormField>
           </div>
@@ -167,13 +211,19 @@ export function SellPageClient() {
                 Товар публикуется от имени пользователя из активной сессии. Если вы не вошли в аккаунт, API вернет ошибку авторизации.
               </div>
 
+              {games.length === 0 ? (
+                <div className="rounded-2xl border border-amber-500/20 bg-amber-500/10 p-4 text-sm leading-7 text-amber-900">
+                  Каталог игр пока не инициализирован. Запустите seed командой npm run seed:catalog.
+                </div>
+              ) : null}
+
               {errorMessage ? (
                 <div className="rounded-2xl border border-red-500/15 bg-red-500/8 p-4 text-sm leading-7 text-red-800">
                   {errorMessage}
                 </div>
               ) : null}
 
-              <Button type="submit" disabled={isSubmitting} className="w-full">
+              <Button type="submit" disabled={isSubmitting || games.length === 0} className="w-full">
                 {isSubmitting ? "Публикуем товар..." : "Опубликовать товар"}
               </Button>
             </div>

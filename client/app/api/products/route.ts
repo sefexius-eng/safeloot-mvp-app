@@ -13,7 +13,7 @@ interface CreateProductPayload {
   description?: string;
   price?: number;
   gameId?: string;
-  type?: string;
+  categoryId?: string;
   sellerId?: string;
 }
 

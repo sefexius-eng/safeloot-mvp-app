@@ -140,8 +140,16 @@ export default async function AdminDashboardPage() {
       select: {
         id: true,
         title: true,
-        gameId: true,
-        type: true,
+        game: {
+          select: {
+            name: true,
+          },
+        },
+        category: {
+          select: {
+            name: true,
+          },
+        },
         price: true,
         seller: {
           select: {
@@ -170,7 +178,20 @@ export default async function AdminDashboardPage() {
     }),
     prisma.order.findMany({
       include: {
-        product: true,
+        product: {
+          include: {
+            game: {
+              select: {
+                name: true,
+              },
+            },
+            category: {
+              select: {
+                name: true,
+              },
+            },
+          },
+        },
         buyer: true,
         seller: true,
       },
@@ -396,7 +417,7 @@ export default async function AdminDashboardPage() {
                           <TableHead>Товар</TableHead>
                           <TableHead>Продавец</TableHead>
                           <TableHead>Цена</TableHead>
-                          <TableHead>Тип</TableHead>
+                          <TableHead>Категория</TableHead>
                           <TableHead>Статус</TableHead>
                           <TableHead className="text-right">Действие</TableHead>
                         </TableRow>
@@ -412,7 +433,7 @@ export default async function AdminDashboardPage() {
                               <TableCell>
                                 <div className="space-y-1">
                                   <p className="font-semibold text-white">{product.title}</p>
-                                  <p className="text-sm text-zinc-400">Game ID: {product.gameId}</p>
+                                  <p className="text-sm text-zinc-400">{product.game.name}</p>
                                 </div>
                               </TableCell>
                               <TableCell>
@@ -429,7 +450,7 @@ export default async function AdminDashboardPage() {
                                 </span>
                               </TableCell>
                               <TableCell>
-                                <Badge variant="secondary">{product.type}</Badge>
+                                <Badge variant="secondary">{product.category.name}</Badge>
                               </TableCell>
                               <TableCell>
                                 <div className="space-y-2">
@@ -506,7 +527,9 @@ export default async function AdminDashboardPage() {
                               <TableCell>
                                 <div className="space-y-1">
                                   <p className="font-semibold text-white">{order.product.title}</p>
-                                  <p className="text-sm text-zinc-400">{order.product.gameId}</p>
+                                  <p className="text-sm text-zinc-400">
+                                    {order.product.game.name} / {order.product.category.name}
+                                  </p>
                                 </div>
                               </TableCell>
                               <TableCell className="text-zinc-300">{order.buyer.email}</TableCell>
