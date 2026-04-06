@@ -1,0 +1,174 @@
+"use server";
+
+import { OrderStatus, Prisma } from "@prisma/client";
+import { revalidatePath } from "next/cache";
+
+import { BANNED_USER_MESSAGE, getCurrentSessionUser } from "@/lib/access-control";
+import { getAuthSession } from "@/lib/auth";
+import { prisma } from "@/lib/prisma";
+
+const MAX_REVIEW_COMMENT_LENGTH = 1000;
+
+async function requireActiveReviewUserId() {
+  const session = await getAuthSession();
+  const currentUser = await getCurrentSessionUser(session);
+
+  if (!currentUser) {
+    throw new Error("Unauthorized");
+  }
+
+  if (currentUser.isBanned) {
+    throw new Error(BANNED_USER_MESSAGE);
+  }
+
+  return currentUser.id;
+}
+
+function normalizeComment(comment?: string | null) {
+  const normalizedComment = comment?.trim() ?? "";
+
+  if (normalizedComment.length > MAX_REVIEW_COMMENT_LENGTH) {
+    throw new Error(
+      `Комментарий не должен превышать ${MAX_REVIEW_COMMENT_LENGTH} символов.`,
+    );
+  }
+
+  return normalizedComment || null;
+}
+
+export async function createReview(
+  orderId: string,
+  rating: number,
+  comment?: string | null,
+) {
+  try {
+    const userId = await requireActiveReviewUserId();
+    const normalizedOrderId = orderId.trim();
+    const normalizedRating = Number(rating);
+    const normalizedComment = normalizeComment(comment);
+
+    if (!normalizedOrderId) {
+      return {
+        ok: false,
+        message: "orderId is required.",
+      };
+    }
+
+    if (
+      !Number.isInteger(normalizedRating) ||
+      normalizedRating < 1 ||
+      normalizedRating > 5
+    ) {
+      return {
+        ok: false,
+        message: "Поставьте оценку от 1 до 5.",
+      };
+    }
+
+    const result = await prisma.$transaction(
+      async (transactionClient) => {
+        const order = await transactionClient.order.findUnique({
+          where: {
+            id: normalizedOrderId,
+          },
+          select: {
+            id: true,
+            buyerId: true,
+            sellerId: true,
+            productId: true,
+            status: true,
+            review: {
+              select: {
+                id: true,
+              },
+            },
+            product: {
+              select: {
+                id: true,
+                game: {
+                  select: {
+                    slug: true,
+                  },
+                },
+              },
+            },
+          },
+        });
+
+        if (!order) {
+          throw new Error(`Order with id ${normalizedOrderId} was not found.`);
+        }
+
+        if (order.buyerId !== userId) {
+          throw new Error("Только покупатель может оставить отзыв.");
+        }
+
+        if (order.status !== OrderStatus.COMPLETED) {
+          throw new Error("Оставить отзыв можно только после завершения сделки.");
+        }
+
+        if (order.review) {
+          throw new Error("Отзыв по этому заказу уже существует.");
+        }
+
+        const review = await transactionClient.review.create({
+          data: {
+            orderId: order.id,
+            authorId: userId,
+            sellerId: order.sellerId,
+            rating: normalizedRating,
+            comment: normalizedComment,
+          },
+          select: {
+            id: true,
+            rating: true,
+            comment: true,
+            createdAt: true,
+          },
+        });
+
+        return {
+          order,
+          review,
+        };
+      },
+      {
+        isolationLevel: Prisma.TransactionIsolationLevel.Serializable,
+      },
+    );
+
+    revalidatePath(`/order/${result.order.id}`);
+    revalidatePath(`/product/${result.order.productId}`);
+
+    if (result.order.product.game?.slug) {
+      revalidatePath(`/games/${result.order.product.game.slug}`);
+    }
+
+    revalidatePath("/");
+    revalidatePath("/profile");
+
+    return {
+      ok: true,
+      review: {
+        ...result.review,
+        createdAt: result.review.createdAt.toISOString(),
+      },
+    };
+  } catch (error) {
+    if (
+      error instanceof Prisma.PrismaClientKnownRequestError &&
+      error.code === "P2002"
+    ) {
+      return {
+        ok: false,
+        message: "Отзыв по этому заказу уже существует.",
+      };
+    }
+
+    return {
+      ok: false,
+      message:
+        error instanceof Error ? error.message : "Не удалось сохранить отзыв.",
+    };
+  }
+}

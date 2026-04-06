@@ -6,7 +6,9 @@ import { useEffect, useState } from "react";
 import { useSession } from "next-auth/react";
 
 import { useCurrency } from "@/components/providers/currency-provider";
+import { SellerRatingBadge } from "@/components/reviews/seller-rating-badge";
 import { UserAvatar } from "@/components/ui/user-avatar";
+import type { SellerReviewSummary } from "@/lib/review-summary";
 
 interface CurrentUser {
   id: string;
@@ -17,6 +19,7 @@ interface CurrentUser {
   rank: string;
   availableBalance: string;
   holdBalance: string;
+  reviewSummary: SellerReviewSummary;
   createdAt: string;
 }
 
@@ -44,6 +47,7 @@ interface ProductItem {
     name: string | null;
     image: string | null;
     rank: string;
+    reviewSummary: SellerReviewSummary;
   };
   createdAt: string;
   updatedAt: string;
@@ -211,6 +215,7 @@ export function ProfileDashboard() {
                 {displayName}
               </h2>
               <p className="mt-2 truncate text-sm text-zinc-300">{user.email}</p>
+              <SellerRatingBadge summary={user.reviewSummary} className="mt-4" />
 
               <div className="mt-5 flex flex-wrap gap-2 text-xs font-semibold uppercase tracking-[0.18em]">
                 <span className="rounded-full border border-white/10 bg-white/8 px-3 py-2 text-zinc-200">
@@ -336,9 +341,16 @@ export function ProfileDashboard() {
                         email={product.seller.email}
                         className="h-6 w-6 shrink-0"
                       />
-                      <span className="truncate text-sm font-medium text-zinc-200">
-                        {sellerDisplayName}
-                      </span>
+                      <div className="min-w-0">
+                        <span className="block truncate text-sm font-medium text-zinc-200">
+                          {sellerDisplayName}
+                        </span>
+                        <SellerRatingBadge
+                          summary={product.seller.reviewSummary}
+                          className="mt-1"
+                          size="sm"
+                        />
+                      </div>
                     </div>
                     <span className="text-sm font-semibold text-white">{formatPrice(product.price)}</span>
                   </Link>

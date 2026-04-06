@@ -6,6 +6,11 @@ import {
 } from "@prisma/client";
 
 import { prisma } from "@/lib/prisma";
+import {
+  getSellerReviewSummary,
+  getSellerReviewSummaryBySellerId,
+  getSellerReviewSummaryMap,
+} from "@/lib/review-summary";
 
 const MONEY_SCALE = 8;
 const PLATFORM_FEE_RATE = new Prisma.Decimal("0.05");
@@ -26,6 +31,28 @@ function normalizeOptionalText(value?: string | null) {
 
 function formatMoney(value: Prisma.Decimal) {
   return value.toFixed(MONEY_SCALE);
+}
+
+async function mapProductsWithSellerReviewSummary<
+  T extends {
+    price: Prisma.Decimal;
+    seller: {
+      id: string;
+    };
+  },
+>(products: T[]) {
+  const reviewSummaryMap = await getSellerReviewSummaryMap(
+    products.map((product) => product.seller.id),
+  );
+
+  return products.map((product) => ({
+    ...product,
+    price: formatMoney(product.price),
+    seller: {
+      ...product.seller,
+      reviewSummary: getSellerReviewSummary(reviewSummaryMap, product.seller.id),
+    },
+  }));
 }
 
 function ensureOrderParticipant(
@@ -177,10 +204,7 @@ export async function listProducts() {
     },
   });
 
-  return products.map((product) => ({
-    ...product,
-    price: formatMoney(product.price),
-  }));
+  return mapProductsWithSellerReviewSummary(products);
 }
 
 export async function getProductById(productId: string) {
@@ -227,10 +251,9 @@ export async function getProductById(productId: string) {
     return null;
   }
 
-  return {
-    ...product,
-    price: formatMoney(product.price),
-  };
+  const [mappedProduct] = await mapProductsWithSellerReviewSummary([product]);
+
+  return mappedProduct ?? null;
 }
 
 export async function createProduct(input: {
@@ -388,11 +411,14 @@ export async function getUserById(userId: string) {
     throw new Error(`User with id ${normalizedUserId} was not found.`);
   }
 
+  const reviewSummary = await getSellerReviewSummaryBySellerId(normalizedUserId);
+
   return {
     ...user,
     name: user.name ?? user.email.split("@")[0],
     availableBalance: formatMoney(user.availableBalance),
     holdBalance: formatMoney(user.holdBalance),
+    reviewSummary,
   };
 }
 
@@ -439,10 +465,7 @@ export async function listProductsBySeller(userId: string) {
     },
   });
 
-  return products.map((product) => ({
-    ...product,
-    price: formatMoney(product.price),
-  }));
+  return mapProductsWithSellerReviewSummary(products);
 }
 
 export async function createOrder(input: {
@@ -533,6 +556,14 @@ export async function getOrderById(orderId: string, userId: string) {
           id: true,
         },
       },
+      review: {
+        select: {
+          id: true,
+          rating: true,
+          comment: true,
+          createdAt: true,
+        },
+      },
       product: {
         select: {
           id: true,
@@ -557,6 +588,12 @@ export async function getOrderById(orderId: string, userId: string) {
     platformFee: formatMoney(order.platformFee),
     status: order.status,
     chatRoomId: order.chatRoom?.id ?? null,
+    review: order.review
+      ? {
+          ...order.review,
+          createdAt: order.review.createdAt.toISOString(),
+        }
+      : null,
     product: order.product,
   };
 }

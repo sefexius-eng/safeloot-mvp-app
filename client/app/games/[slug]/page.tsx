@@ -7,6 +7,10 @@ import {
   type MarketplaceProductCardData,
 } from "@/components/product/marketplace-product-card";
 import { prisma } from "@/lib/prisma";
+import {
+  getSellerReviewSummary,
+  getSellerReviewSummaryMap,
+} from "@/lib/review-summary";
 
 interface GameCatalogPageProps {
   params: Promise<{
@@ -65,12 +69,20 @@ async function getGameCatalog(slug: string, categorySlug?: string) {
     },
   });
 
+  const reviewSummaryMap = await getSellerReviewSummaryMap(
+    products.map((product) => product.seller.id),
+  );
+
   return {
     game,
     activeCategorySlug: activeCategory?.slug ?? null,
     products: products.map((product) => ({
       ...product,
       price: product.price.toFixed(8),
+      seller: {
+        ...product.seller,
+        reviewSummary: getSellerReviewSummary(reviewSummaryMap, product.seller.id),
+      },
     })) satisfies MarketplaceProductCardData[],
   };
 }

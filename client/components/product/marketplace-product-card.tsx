@@ -2,8 +2,10 @@
 
 import Link from "next/link";
 
+import { SellerRatingBadge } from "@/components/reviews/seller-rating-badge";
 import { useCurrency } from "@/components/providers/currency-provider";
 import { UserAvatar } from "@/components/ui/user-avatar";
+import type { SellerReviewSummary } from "@/lib/review-summary";
 
 type SellerRank = "BRONZE" | "SILVER" | "GOLD";
 
@@ -29,6 +31,7 @@ export interface MarketplaceProductCardData {
     name: string | null;
     image: string | null;
     rank: SellerRank;
+    reviewSummary: SellerReviewSummary;
   };
 }
 
@@ -107,7 +110,7 @@ export function MarketplaceProductCard({ product }: MarketplaceProductCardProps)
         </div>
       </div>
 
-      <div className="mt-6 flex items-center justify-between gap-4 border-t border-white/10 pt-4">
+      <div className="mt-6 flex items-end justify-between gap-4 border-t border-white/10 pt-4">
         <div className="flex min-w-0 items-center gap-3">
           <UserAvatar
             src={product.seller.image}
@@ -122,6 +125,11 @@ export function MarketplaceProductCard({ product }: MarketplaceProductCardProps)
             <p className="truncate text-sm font-semibold text-white">
               {getSellerDisplayName(product.seller)}
             </p>
+            <SellerRatingBadge
+              summary={product.seller.reviewSummary}
+              className="mt-2"
+              size="sm"
+            />
           </div>
         </div>
         <span className="shrink-0 text-sm font-medium text-white group-hover:text-orange-400">

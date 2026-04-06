@@ -1,9 +1,11 @@
 import Link from "next/link";
 
+import { SellerRatingBadge } from "@/components/reviews/seller-rating-badge";
 import { BuyProductDialog } from "@/components/product/buy-product-dialog";
 import { UserAvatar } from "@/components/ui/user-avatar";
 import { FormattedPrice } from "@/components/ui/formatted-price";
-import { prisma } from "@/lib/prisma";
+import { getProductById } from "@/lib/marketplace";
+import type { SellerReviewSummary } from "@/lib/review-summary";
 
 type SellerRank = "BRONZE" | "SILVER" | "GOLD";
 
@@ -36,52 +38,13 @@ interface ProductDetail {
     name: string | null;
     image: string | null;
     rank: SellerRank;
+    reviewSummary: SellerReviewSummary;
   };
 }
 
 async function getProduct(id: string): Promise<ProductDetail | null> {
   try {
-    const product = await prisma.product.findUnique({
-      where: {
-        id,
-      },
-      include: {
-        game: {
-          select: {
-            id: true,
-            name: true,
-            slug: true,
-            imageUrl: true,
-          },
-        },
-        category: {
-          select: {
-            id: true,
-            name: true,
-            slug: true,
-            gameId: true,
-          },
-        },
-        seller: {
-          select: {
-            id: true,
-            email: true,
-            name: true,
-            image: true,
-            rank: true,
-          },
-        },
-      },
-    });
-
-    if (!product) {
-      return null;
-    }
-
-    return {
-      ...product,
-      price: product.price.toFixed(8),
-    };
+    return await getProductById(id);
   } catch (error) {
     console.error("[PRODUCT_DETAIL_ERROR]", error);
     return null;
@@ -224,6 +187,11 @@ export default async function ProductPage({ params }: ProductPageProps) {
                     {sellerName}
                   </p>
                   <p className="mt-1 truncate text-sm text-zinc-400">{product.seller.email}</p>
+                  <SellerRatingBadge
+                    summary={product.seller.reviewSummary}
+                    className="mt-3"
+                    size="sm"
+                  />
                   <div
                     className={`mt-3 inline-flex items-center gap-2 rounded-full border px-3 py-1.5 text-sm font-medium ${rankStyle.badgeClassName}`}
                   >

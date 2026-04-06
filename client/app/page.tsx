@@ -4,6 +4,7 @@ import {
   MarketplaceProductCard,
   type MarketplaceProductCardData,
 } from "@/components/product/marketplace-product-card";
+import { listProducts } from "@/lib/marketplace";
 import { prisma } from "@/lib/prisma";
 
 interface GameDirectoryItem {
@@ -14,29 +15,7 @@ interface GameDirectoryItem {
 
 async function getProducts(): Promise<MarketplaceProductCardData[]> {
   try {
-    const products = await prisma.product.findMany({
-      include: {
-        game: true,
-        category: true,
-        seller: {
-          select: {
-            id: true,
-            email: true,
-            name: true,
-            image: true,
-            rank: true,
-          },
-        },
-      },
-      orderBy: {
-        createdAt: "desc",
-      },
-    });
-
-    return products.map((product) => ({
-      ...product,
-      price: product.price.toFixed(8),
-    }));
+    return await listProducts();
   } catch (error) {
     console.error("[HOME_PRODUCTS_ERROR]", error);
     return [];

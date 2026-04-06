@@ -1,13 +1,16 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, useTransition } from "react";
 import Link from "next/link";
 import { useSession } from "next-auth/react";
 
 import { markMessagesAsRead, sendMessage } from "@/app/actions/chat";
+import { createReview } from "@/app/actions/reviews";
+import { RatingStars } from "@/components/reviews/rating-stars";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
 
 const CHAT_POLL_INTERVAL_MS = 3000;
 const TYPING_POLL_INTERVAL_MS = 1500;
@@ -42,6 +45,12 @@ interface OrderDetail {
     id: string;
     title: string;
   };
+  review: {
+    id: string;
+    rating: number;
+    comment: string | null;
+    createdAt: string;
+  } | null;
 }
 
 interface ChatMessage {
@@ -143,6 +152,16 @@ function formatAmount(value: string) {
   }).format(parsedValue);
 }
 
+function formatReviewTime(value: string) {
+  return new Intl.DateTimeFormat("ru-RU", {
+    day: "2-digit",
+    month: "long",
+    year: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+  }).format(new Date(value));
+}
+
 function readFileAsDataUrl(file: Blob) {
   return new Promise<string>((resolve, reject) => {
     const reader = new FileReader();
@@ -211,12 +230,15 @@ async function compressChatImage(file: File) {
 export function ActiveOrderView({ orderId }: ActiveOrderViewProps) {
   const { data: session, status: sessionStatus } = useSession();
   const router = useRouter();
+  const [isReviewPending, startReviewTransition] = useTransition();
   const [order, setOrder] = useState<OrderDetail | null>(null);
   const [chatRoomId, setChatRoomId] = useState("");
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [typingUsers, setTypingUsers] = useState<TypingUser[]>([]);
   const [draftMessage, setDraftMessage] = useState("");
   const [draftImageBase64, setDraftImageBase64] = useState<string | null>(null);
+  const [reviewRating, setReviewRating] = useState(0);
+  const [reviewComment, setReviewComment] = useState("");
   const [isOrderLoading, setIsOrderLoading] = useState(true);
   const [isChatLoading, setIsChatLoading] = useState(true);
   const [isSending, setIsSending] = useState(false);
@@ -226,6 +248,8 @@ export function ActiveOrderView({ orderId }: ActiveOrderViewProps) {
   const [chatError, setChatError] = useState("");
   const [actionError, setActionError] = useState("");
   const [completeMessage, setCompleteMessage] = useState("");
+  const [reviewError, setReviewError] = useState("");
+  const [reviewSuccess, setReviewSuccess] = useState("");
   const messagesEndRef = useRef<HTMLDivElement | null>(null);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const typingTimeoutRef = useRef<number | null>(null);
@@ -694,6 +718,53 @@ export function ActiveOrderView({ orderId }: ActiveOrderViewProps) {
     }
   }
 
+  function handleSubmitReview(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+
+    if (!currentUserId) {
+      setReviewError("Чтобы оставить отзыв, выполните вход.");
+      return;
+    }
+
+    if (reviewRating < 1 || reviewRating > 5) {
+      setReviewError("Поставьте оценку от 1 до 5.");
+      return;
+    }
+
+    setReviewError("");
+    setReviewSuccess("");
+
+    startReviewTransition(() => {
+      void createReview(orderId, reviewRating, reviewComment)
+        .then((result) => {
+          if (!result.ok || !result.review) {
+            setReviewError(result.message ?? "Не удалось сохранить отзыв.");
+            return;
+          }
+
+          setOrder((currentOrder) =>
+            currentOrder
+              ? {
+                  ...currentOrder,
+                  review: result.review,
+                }
+              : currentOrder,
+          );
+          setReviewComment("");
+          setReviewRating(0);
+          setReviewSuccess("Отзыв опубликован. Спасибо за обратную связь.");
+          router.refresh();
+        })
+        .catch((error) => {
+          setReviewError(
+            error instanceof Error
+              ? error.message
+              : "Не удалось сохранить отзыв.",
+          );
+        });
+    });
+  }
+
   if (isOrderLoading) {
     return (
       <div className="rounded-[2rem] border border-white/10 bg-zinc-900/80 p-8 text-sm text-zinc-400 shadow-[0_24px_80px_rgba(0,0,0,0.28)] backdrop-blur">
@@ -726,6 +797,11 @@ export function ActiveOrderView({ orderId }: ActiveOrderViewProps) {
   const sellerIsTyping = remoteTypingUsers.some(
     (typingUser) => typingUser.role === "SELLER",
   );
+  const canLeaveReview =
+    order.status === "COMPLETED" &&
+    currentUserId === order.buyerId &&
+    !order.review;
+  const reviewTitle = currentUserId === order.buyerId ? "Ваш отзыв" : "Отзыв покупателя";
 
   return (
     <section className="grid gap-6 lg:grid-cols-[minmax(0,1.4fr)_360px] lg:items-start">
@@ -1007,6 +1083,112 @@ export function ActiveOrderView({ orderId }: ActiveOrderViewProps) {
           >
             {isCompleting ? "Подтверждаем получение..." : "Подтвердить получение товара"}
           </Button>
+        ) : null}
+
+        {reviewSuccess ? (
+          <div className="mt-6 rounded-[1.5rem] border border-emerald-500/15 bg-emerald-500/10 p-4 text-sm leading-7 text-emerald-200">
+            {reviewSuccess}
+          </div>
+        ) : null}
+
+        {reviewError ? (
+          <div className="mt-6 rounded-[1.5rem] border border-red-500/15 bg-red-500/10 p-4 text-sm leading-7 text-red-200">
+            {reviewError}
+          </div>
+        ) : null}
+
+        {order.review ? (
+          <div className="mt-6 rounded-[1.5rem] border border-amber-500/15 bg-amber-500/10 p-5">
+            <div className="flex flex-wrap items-start justify-between gap-4">
+              <div>
+                <p className="text-xs font-semibold tracking-[0.24em] uppercase text-amber-200/80">
+                  {reviewTitle}
+                </p>
+                <p className="mt-2 text-lg font-semibold text-white">
+                  Сделка оценена на {order.review.rating} из 5
+                </p>
+              </div>
+              <RatingStars value={order.review.rating} size="md" />
+            </div>
+
+            <p className="mt-3 text-sm text-zinc-400">
+              {formatReviewTime(order.review.createdAt)}
+            </p>
+
+            {order.review.comment ? (
+              <p className="mt-4 whitespace-pre-wrap text-sm leading-7 text-zinc-200">
+                {order.review.comment}
+              </p>
+            ) : (
+              <p className="mt-4 text-sm text-zinc-500">Комментарий не добавлен.</p>
+            )}
+          </div>
+        ) : canLeaveReview ? (
+          <form
+            onSubmit={handleSubmitReview}
+            className="mt-6 rounded-[1.5rem] border border-white/10 bg-white/5 p-5"
+          >
+            <div className="flex flex-wrap items-start justify-between gap-4">
+              <div>
+                <p className="text-xs font-semibold tracking-[0.24em] uppercase text-zinc-500">
+                  Ваш отзыв
+                </p>
+                <h3 className="mt-2 text-lg font-semibold text-white">
+                  Оцените завершенную сделку
+                </h3>
+                <p className="mt-2 text-sm leading-7 text-zinc-400">
+                  Отзыв увидят другие покупатели на карточке товара и в профиле продавца.
+                </p>
+              </div>
+
+              <RatingStars
+                value={reviewRating}
+                onChange={(value) => {
+                  setReviewRating(value);
+                  setReviewError("");
+                }}
+                size="lg"
+                disabled={isReviewPending}
+              />
+            </div>
+
+            <p className="mt-3 text-sm text-zinc-400">
+              {reviewRating > 0
+                ? `Оценка: ${reviewRating} из 5`
+                : "Выберите оценку от 1 до 5."}
+            </p>
+
+            <div className="mt-4">
+              <p className="text-xs font-semibold tracking-[0.24em] uppercase text-zinc-500">
+                Комментарий
+              </p>
+              <Textarea
+                value={reviewComment}
+                onChange={(event) => setReviewComment(event.target.value)}
+                maxLength={1000}
+                rows={4}
+                placeholder="Что понравилось в сделке? Комментарий необязателен."
+                disabled={isReviewPending}
+                className="mt-3 border-white/10 bg-white/5 text-zinc-100 placeholder:text-zinc-500 focus:border-orange-500/45 focus:bg-white/8"
+              />
+              <div className="mt-2 flex items-center justify-between gap-4 text-xs text-zinc-500">
+                <span>Комментарий необязателен, но помогает другим покупателям.</span>
+                <span>{reviewComment.length}/1000</span>
+              </div>
+            </div>
+
+            <Button
+              type="submit"
+              disabled={isReviewPending || reviewRating < 1}
+              className="mt-5 h-12 w-full rounded-[1.2rem] bg-orange-600 text-sm font-semibold text-white shadow-[0_18px_42px_rgba(234,88,12,0.35)] hover:bg-orange-500"
+            >
+              {isReviewPending ? "Публикуем отзыв..." : "Опубликовать отзыв"}
+            </Button>
+          </form>
+        ) : order.status === "COMPLETED" && currentUserId === order.sellerId ? (
+          <div className="mt-6 rounded-[1.5rem] border border-white/10 bg-white/5 p-4 text-sm leading-7 text-zinc-400">
+            Покупатель еще не оставил отзыв по этой сделке.
+          </div>
         ) : null}
 
         <div className="mt-6 rounded-[1.5rem] border border-white/10 bg-white/5 p-4 text-sm leading-7 text-zinc-300">

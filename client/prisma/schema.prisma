@@ -59,6 +59,8 @@ model User {
   buyerChatRooms   ChatRoom[]    @relation("BuyerChatRooms")
   sellerChatRooms  ChatRoom[]    @relation("SellerChatRooms")
   sentMessages     Message[]     @relation("MessageSender")
+  reviewsWritten   Review[]      @relation("ReviewAuthor")
+  reviewsReceived  Review[]      @relation("ReviewSeller")
   createdAt        DateTime      @default(now())
   updatedAt        DateTime      @updatedAt
 
@@ -122,6 +124,7 @@ model Order {
   seller       User          @relation("SellerOrders", fields: [sellerId], references: [id], onDelete: Restrict, onUpdate: Cascade)
   product      Product       @relation(fields: [productId], references: [id], onDelete: Restrict, onUpdate: Cascade)
   chatRoom     ChatRoom?
+  review       Review?
   transactions Transaction[]
   createdAt    DateTime      @default(now())
   updatedAt    DateTime      @updatedAt
@@ -131,6 +134,23 @@ model Order {
   @@index([productId])
   @@index([status])
   @@map("orders")
+}
+
+model Review {
+  id        String   @id @default(cuid())
+  orderId    String   @unique
+  authorId   String
+  sellerId   String
+  rating     Int
+  comment    String?
+  order      Order    @relation(fields: [orderId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+  author     User     @relation("ReviewAuthor", fields: [authorId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+  seller     User     @relation("ReviewSeller", fields: [sellerId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+  createdAt  DateTime @default(now())
+
+  @@index([authorId])
+  @@index([sellerId])
+  @@map("reviews")
 }
 
 model Transaction {
