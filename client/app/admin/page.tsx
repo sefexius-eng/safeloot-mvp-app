@@ -8,10 +8,9 @@ import {
   AdminWithdrawalActionButtons,
 } from "@/components/admin/admin-action-buttons";
 import {
-  AdminCensoredText,
-  AdminSafeModeProvider,
   AdminSafeModeToggle,
 } from "@/components/admin/admin-safe-mode";
+import CensoredText from "@/components/censored-text";
 import { PlatformRevenueCard } from "@/components/admin/platform-revenue-card";
 import { Badge } from "@/components/ui/badge";
 import {
@@ -278,9 +277,8 @@ export default async function AdminDashboardPage() {
   const canUseSafeMode = isAdminRole(currentUser.role);
 
   return (
-    <AdminSafeModeProvider>
-      <main className="mx-auto flex w-full max-w-[92rem] flex-col gap-8 px-4 py-10 sm:px-6 lg:px-8 lg:py-14">
-        <section className="overflow-hidden rounded-[2.5rem] border border-white/10 bg-[linear-gradient(145deg,rgba(249,115,22,0.14),rgba(15,23,42,0.88)_38%,rgba(14,165,233,0.12))] p-6 shadow-[0_32px_100px_rgba(0,0,0,0.34)] md:p-8 lg:p-10">
+    <main className="mx-auto flex w-full max-w-[92rem] flex-col gap-8 px-4 py-10 sm:px-6 lg:px-8 lg:py-14">
+      <section className="overflow-hidden rounded-[2.5rem] border border-white/10 bg-[linear-gradient(145deg,rgba(249,115,22,0.14),rgba(15,23,42,0.88)_38%,rgba(14,165,233,0.12))] p-6 shadow-[0_32px_100px_rgba(0,0,0,0.34)] md:p-8 lg:p-10">
         <div className="grid gap-8 lg:grid-cols-[minmax(0,1.5fr)_360px] lg:items-end">
           <div>
             <Badge variant="default">Admin Control Center</Badge>
@@ -442,7 +440,7 @@ export default async function AdminDashboardPage() {
                             <TableCell>
                               <div className="space-y-1">
                                 <p className="font-semibold text-white">
-                                  <AdminCensoredText text={formatUserName(user.email, user.name)} />
+                                  <CensoredText text={formatUserName(user.email, user.name)} />
                                 </p>
                                 <p className="text-xs uppercase tracking-[0.18em] text-zinc-500">
                                   ID: {user.id.slice(0, 10)}...
@@ -532,7 +530,7 @@ export default async function AdminDashboardPage() {
                               <TableCell>
                                 <div className="space-y-1">
                                   <p className="font-semibold text-white">
-                                    <AdminCensoredText text={product.title} />
+                                    <CensoredText text={product.title} />
                                   </p>
                                   <p className="text-sm text-zinc-400">{product.game.name}</p>
                                 </div>
@@ -540,7 +538,7 @@ export default async function AdminDashboardPage() {
                               <TableCell>
                                 <div className="space-y-1">
                                   <p className="text-zinc-200">
-                                    <AdminCensoredText
+                                    <CensoredText
                                       text={formatUserName(product.seller.email, product.seller.name)}
                                     />
                                   </p>
@@ -633,7 +631,7 @@ export default async function AdminDashboardPage() {
                               <TableCell>
                                 <div className="space-y-1">
                                   <p className="font-semibold text-white">
-                                    <AdminCensoredText text={order.product.title} />
+                                    <CensoredText text={order.product.title} />
                                   </p>
                                   <p className="text-sm text-zinc-400">
                                     {order.product.game.name} / {order.product.category.name}
@@ -643,7 +641,7 @@ export default async function AdminDashboardPage() {
                               <TableCell>
                                 <div className="space-y-1 text-zinc-300">
                                   <p>
-                                    <AdminCensoredText
+                                    <CensoredText
                                       text={formatUserName(order.buyer.email, order.buyer.name)}
                                     />
                                   </p>
@@ -653,7 +651,7 @@ export default async function AdminDashboardPage() {
                               <TableCell>
                                 <div className="space-y-1 text-zinc-300">
                                   <p>
-                                    <AdminCensoredText
+                                    <CensoredText
                                       text={formatUserName(order.seller.email, order.seller.name)}
                                     />
                                   </p>
@@ -725,16 +723,16 @@ export default async function AdminDashboardPage() {
                               </TableCell>
                               <TableCell>
                                 <p className="font-semibold text-white">
-                                  <AdminCensoredText text={order.product.title} />
+                                  <CensoredText text={order.product.title} />
                                 </p>
                               </TableCell>
                               <TableCell className="text-zinc-300">
-                                <AdminCensoredText
+                                <CensoredText
                                   text={formatUserName(order.buyer.email, order.buyer.name)}
                                 />
                               </TableCell>
                               <TableCell className="text-zinc-300">
-                                <AdminCensoredText
+                                <CensoredText
                                   text={formatUserName(order.seller.email, order.seller.name)}
                                 />
                               </TableCell>
@@ -802,7 +800,7 @@ export default async function AdminDashboardPage() {
                                 <TableCell>
                                   <div className="space-y-1">
                                     <p className="font-semibold text-white">
-                                      <AdminCensoredText
+                                      <CensoredText
                                         text={formatUserName(withdrawal.user.email, withdrawal.user.name)}
                                       />
                                     </p>
@@ -850,6 +848,5 @@ export default async function AdminDashboardPage() {
         </div>
       </div>
     </main>
-    </AdminSafeModeProvider>
   );
 }

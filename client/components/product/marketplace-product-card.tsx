@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 
+import CensoredText from "@/components/censored-text";
 import { SellerRatingBadge } from "@/components/reviews/seller-rating-badge";
 import { useCurrency } from "@/components/providers/currency-provider";
 import { UserAvatar } from "@/components/ui/user-avatar";
@@ -109,7 +110,7 @@ export function MarketplaceProductCard({ product }: MarketplaceProductCardProps)
 
             <div>
               <h3 className="text-xl font-semibold tracking-tight text-white transition group-hover:text-orange-200">
-                {product.title}
+                <CensoredText text={product.title} />
               </h3>
               <p className="mt-2 text-sm leading-6 text-zinc-400">
                 Игра: {product.game.name}
@@ -156,7 +157,7 @@ export function MarketplaceProductCard({ product }: MarketplaceProductCardProps)
               Продавец
             </p>
             <p className="truncate text-sm font-semibold text-white transition group-hover/seller:text-orange-300 group-hover/seller:underline">
-              {sellerDisplayName}
+              <CensoredText text={sellerDisplayName} />
             </p>
             <SellerRatingBadge
               summary={product.seller.reviewSummary}
