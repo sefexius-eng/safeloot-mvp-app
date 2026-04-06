@@ -583,18 +583,43 @@ export async function createOrder(input: {
     throw new Error("Вы не можете купить свой собственный товар");
   }
 
-  const order = await prisma.order.create({
-    data: {
-      buyerId,
-      sellerId: product.sellerId,
-      productId: product.id,
-      price: product.price,
-      status: OrderStatus.PENDING,
+  const order = await prisma.$transaction(
+    async (transactionClient) => {
+      const existingPendingOrder = await transactionClient.order.findFirst({
+        where: {
+          buyerId,
+          productId: product.id,
+          status: OrderStatus.PENDING,
+        },
+        select: {
+          id: true,
+        },
+        orderBy: {
+          createdAt: "desc",
+        },
+      });
+
+      if (existingPendingOrder) {
+        return existingPendingOrder;
+      }
+
+      return transactionClient.order.create({
+        data: {
+          buyerId,
+          sellerId: product.sellerId,
+          productId: product.id,
+          price: product.price,
+          status: OrderStatus.PENDING,
+        },
+        select: {
+          id: true,
+        },
+      });
     },
-    select: {
-      id: true,
+    {
+      isolationLevel: Prisma.TransactionIsolationLevel.Serializable,
     },
-  });
+  );
 
   return {
     orderId: order.id,
