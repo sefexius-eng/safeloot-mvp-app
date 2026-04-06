@@ -3,7 +3,7 @@ import { redirect } from "next/navigation";
 import { SellPageClient } from "@/components/sell/sell-page-client";
 import { getCurrentSessionUser } from "@/lib/access-control";
 import { getAuthSession } from "@/lib/auth";
-import { prisma } from "@/lib/prisma";
+import { listCatalogGamesForProductForms } from "@/lib/marketplace";
 
 export default async function SellPage() {
   const currentUser = await getCurrentSessionUser(await getAuthSession());
@@ -12,18 +12,7 @@ export default async function SellPage() {
     redirect("/");
   }
 
-  const games = await prisma.game.findMany({
-    include: {
-      categories: {
-        orderBy: {
-          name: "asc",
-        },
-      },
-    },
-    orderBy: {
-      name: "asc",
-    },
-  });
+  const games = await listCatalogGamesForProductForms();
 
   return <SellPageClient games={games} />;
 }

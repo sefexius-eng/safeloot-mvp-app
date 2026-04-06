@@ -3,8 +3,10 @@ import { redirect } from "next/navigation";
 import { EditProductForm } from "@/components/product/edit-product-form";
 import { getCurrentSessionUser } from "@/lib/access-control";
 import { getAuthSession } from "@/lib/auth";
-import { getProductById } from "@/lib/marketplace";
-import { prisma } from "@/lib/prisma";
+import {
+  getProductById,
+  listCatalogGamesForProductForms,
+} from "@/lib/marketplace";
 
 interface EditProductPageProps {
   params: Promise<{
@@ -26,18 +28,7 @@ export default async function EditProductPage({ params }: EditProductPageProps) 
   const { id } = await params;
   const [product, games] = await Promise.all([
     getProductById(id),
-    prisma.game.findMany({
-      include: {
-        categories: {
-          orderBy: {
-            name: "asc",
-          },
-        },
-      },
-      orderBy: {
-        name: "asc",
-      },
-    }),
+    listCatalogGamesForProductForms(),
   ]);
 
   if (!product) {

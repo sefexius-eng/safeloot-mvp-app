@@ -432,6 +432,69 @@ export async function listProducts() {
   return mapProductsWithSellerReviewSummary(products);
 }
 
+export async function listCatalogGamesForProductForms() {
+  const games = await prisma.game.findMany({
+    select: {
+      id: true,
+      name: true,
+      slug: true,
+    },
+    orderBy: {
+      name: "asc",
+    },
+  });
+
+  const categories = await prisma.category.findMany({
+    where: {
+      gameId: {
+        in: games.map((game) => game.id),
+      },
+    },
+    select: {
+      id: true,
+      name: true,
+      slug: true,
+      gameId: true,
+    },
+    orderBy: [
+      {
+        gameId: "asc",
+      },
+      {
+        name: "asc",
+      },
+    ],
+  });
+
+  const categoriesByGameId = categories.reduce<
+    Record<
+      string,
+      Array<{
+        id: string;
+        name: string;
+        slug: string;
+      }>
+    >
+  >((accumulator, category) => {
+    if (!accumulator[category.gameId]) {
+      accumulator[category.gameId] = [];
+    }
+
+    accumulator[category.gameId].push({
+      id: category.id,
+      name: category.name,
+      slug: category.slug,
+    });
+
+    return accumulator;
+  }, {});
+
+  return games.map((game) => ({
+    ...game,
+    categories: categoriesByGameId[game.id] ?? [],
+  }));
+}
+
 export async function getProductById(productId: string) {
   const normalizedProductId = normalizeText(productId);
 
