@@ -12,6 +12,7 @@ import {
   resolveDisputeToSeller,
 } from "@/app/actions/orders";
 import { createReview } from "@/app/actions/reviews";
+import CensoredText from "@/components/censored-text";
 import { RatingStars } from "@/components/reviews/rating-stars";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -1104,7 +1105,7 @@ export function ActiveOrderView({ orderId }: ActiveOrderViewProps) {
                   href={`/user/${interlocutor.id}`}
                   className="mt-1 block truncate text-xl font-semibold tracking-tight text-white transition hover:text-orange-300 hover:underline"
                 >
-                  {interlocutorDisplayName}
+                  <CensoredText text={interlocutorDisplayName} />
                 </Link>
                 <div className="mt-1 flex flex-wrap items-center gap-2 text-sm text-zinc-400">
                   <span>{interlocutorRole}</span>
@@ -1148,7 +1149,7 @@ export function ActiveOrderView({ orderId }: ActiveOrderViewProps) {
                         {role}
                       </p>
                       <p className="truncate text-sm font-semibold text-white">
-                        {getUserDisplayName(participant)}
+                        <CensoredText text={getUserDisplayName(participant)} />
                       </p>
                     </div>
                   </Link>
@@ -1232,7 +1233,7 @@ export function ActiveOrderView({ orderId }: ActiveOrderViewProps) {
                               : "text-zinc-400",
                         ].join(" ")}
                       >
-                        {authorLabel}
+                        <CensoredText text={authorLabel} />
                       </span>
 
                       <div
@@ -1247,7 +1248,7 @@ export function ActiveOrderView({ orderId }: ActiveOrderViewProps) {
                       >
                         {message.content ? (
                           <p className="whitespace-pre-wrap break-words text-sm leading-7">
-                            {message.content}
+                            <CensoredText text={message.content} />
                           </p>
                         ) : null}
 
@@ -1298,7 +1299,9 @@ export function ActiveOrderView({ orderId }: ActiveOrderViewProps) {
                     />
                   ) : null}
                   <div className="flex items-center gap-3">
-                    <span className="font-semibold text-sky-100">{typingDisplayName}</span>
+                    <span className="font-semibold text-sky-100">
+                      <CensoredText text={typingDisplayName} />
+                    </span>
                     <span>печатает</span>
                   </div>
                   <span className="inline-flex items-center gap-1">
@@ -1422,7 +1425,7 @@ export function ActiveOrderView({ orderId }: ActiveOrderViewProps) {
               Название
             </p>
             <p className="mt-3 text-lg font-semibold text-white">
-              {order.product.title}
+              <CensoredText text={order.product.title} />
             </p>
           </div>
 
@@ -1566,7 +1569,7 @@ export function ActiveOrderView({ orderId }: ActiveOrderViewProps) {
 
             {order.review.comment ? (
               <p className="mt-4 whitespace-pre-wrap text-sm leading-7 text-zinc-200">
-                {order.review.comment}
+                <CensoredText text={order.review.comment} />
               </p>
             ) : (
               <p className="mt-4 text-sm text-zinc-500">Комментарий не добавлен.</p>

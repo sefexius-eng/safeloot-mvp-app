@@ -1,6 +1,7 @@
 import Link from "next/link";
 
 import { getOrCreateConversation } from "@/app/actions/chat";
+import CensoredText from "@/components/censored-text";
 import { SellerRatingBadge } from "@/components/reviews/seller-rating-badge";
 import { BuyProductDialog } from "@/components/product/buy-product-dialog";
 import { UserAvatar } from "@/components/ui/user-avatar";
@@ -143,10 +144,10 @@ export default async function ProductPage({ params }: ProductPageProps) {
 
           <div className="mt-6 space-y-5">
             <h1 className="max-w-4xl text-3xl font-semibold tracking-tight text-white md:text-5xl md:leading-[1.05]">
-              {product.title}
+              <CensoredText text={product.title} />
             </h1>
             <p className="max-w-3xl text-base leading-8 text-zinc-300 md:text-lg">
-              {product.description}
+              <CensoredText text={product.description} />
             </p>
           </div>
 
@@ -228,7 +229,7 @@ export default async function ProductPage({ params }: ProductPageProps) {
                     />
                     <div className="min-w-0 flex-1">
                       <p className="truncate text-xl font-semibold text-white transition group-hover:text-orange-200 group-hover:underline">
-                        {sellerName}
+                        <CensoredText text={sellerName} />
                       </p>
                       <p className="mt-1 truncate text-sm text-zinc-400">{product.seller.email}</p>
                       <SellerRatingBadge

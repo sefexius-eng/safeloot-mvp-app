@@ -2,6 +2,7 @@ import Link from "next/link";
 import { OrderStatus, Prisma } from "@prisma/client";
 import { notFound } from "next/navigation";
 
+import CensoredText from "@/components/censored-text";
 import {
   MarketplaceProductCard,
   type MarketplaceProductCardData,
@@ -256,7 +257,7 @@ export default async function PublicUserPage({ params }: PublicUserPageProps) {
                 Публичный профиль продавца
               </p>
               <h1 className="mt-2 truncate text-3xl font-semibold tracking-tight text-white md:text-5xl">
-                {displayName}
+                <CensoredText text={displayName} />
               </h1>
               <p className="mt-2 truncate text-sm text-zinc-400">{seller.email}</p>
 
@@ -372,7 +373,7 @@ export default async function PublicUserPage({ params }: PublicUserPageProps) {
                       />
                       <div className="min-w-0">
                         <p className="truncate text-sm font-semibold text-white">
-                          {authorName}
+                          <CensoredText text={authorName} />
                         </p>
                         <p className="truncate text-xs uppercase tracking-[0.16em] text-zinc-500">
                           Покупатель
@@ -389,7 +390,9 @@ export default async function PublicUserPage({ params }: PublicUserPageProps) {
                   </div>
 
                   <div className="mt-4 rounded-[1.35rem] border border-white/10 bg-black/20 px-4 py-4 text-sm leading-7 text-zinc-200">
-                    {review.comment?.trim() || "Покупатель поставил оценку без текстового комментария."}
+                    <CensoredText
+                      text={review.comment?.trim() || "Покупатель поставил оценку без текстового комментария."}
+                    />
                   </div>
                 </article>
               );

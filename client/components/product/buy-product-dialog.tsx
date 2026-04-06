@@ -4,6 +4,7 @@ import { useRouter } from "next/navigation";
 import { useState } from "react";
 
 import { createPendingOrder } from "@/app/actions/orders";
+import CensoredText from "@/components/censored-text";
 import { useCurrency } from "@/components/providers/currency-provider";
 import { Button } from "@/components/ui/button";
 import {
@@ -76,7 +77,9 @@ export function BuyProductDialog({ product }: BuyProductDialogProps) {
           <p className="text-xs font-semibold uppercase tracking-[0.22em] text-zinc-500">
             Товар
           </p>
-          <p className="mt-2 text-lg font-semibold text-white">{product.title}</p>
+          <p className="mt-2 text-lg font-semibold text-white">
+            <CensoredText text={product.title} />
+          </p>
 
           <div className="mt-4 flex items-center justify-between gap-4 border-t border-white/10 pt-4">
             <span className="text-sm text-zinc-400">Сумма заказа</span>

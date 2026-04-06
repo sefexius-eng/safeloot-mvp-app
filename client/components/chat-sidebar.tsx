@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 
+import CensoredText from "@/components/censored-text";
 import { UserAvatar } from "@/components/ui/user-avatar";
 
 export interface ChatSidebarConversation {
@@ -87,17 +88,17 @@ export function ChatSidebar({ conversations }: ChatSidebarProps) {
                 <div className="min-w-0 flex-1">
                   <div className="flex items-center justify-between gap-3">
                     <p className="truncate text-sm font-semibold text-white">
-                      {displayName}
+                      <CensoredText text={displayName} />
                     </p>
                     <span className="shrink-0 text-[11px] uppercase tracking-[0.16em] text-gray-500">
                       {formatConversationTime(chat.lastMessage?.createdAt ?? chat.updatedAt)}
                     </span>
                   </div>
                   <p className="mt-0.5 truncate text-xs text-gray-500">
-                    {chat.product?.title ?? "Диалог без товара"}
+                    <CensoredText text={chat.product?.title ?? "Диалог без товара"} />
                   </p>
                   <p className="mt-1 truncate text-sm text-gray-400">
-                    {messagePreview}
+                    <CensoredText text={messagePreview} />
                   </p>
                 </div>
               </Link>

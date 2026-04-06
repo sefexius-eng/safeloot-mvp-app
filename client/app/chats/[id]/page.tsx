@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 
+import CensoredText from "@/components/censored-text";
 import { UserAvatar } from "@/components/ui/user-avatar";
 import { BuyProductDialog } from "@/components/product/buy-product-dialog";
 import { ConversationRoomView } from "@/components/chat/conversation-room-view";
@@ -105,10 +106,10 @@ export default async function ChatRoomPage({ params }: ChatPageProps) {
             />
             <div className="min-w-0">
               <p className="truncate text-lg font-semibold text-white">
-                {otherPartyName}
+                <CensoredText text={otherPartyName} />
               </p>
               <p className="truncate text-sm text-gray-400">
-                {conversation.product?.title ?? "Личный диалог"}
+                <CensoredText text={conversation.product?.title ?? "Личный диалог"} />
               </p>
             </div>
           </div>

@@ -7,6 +7,7 @@ import {
   markConversationMessagesAsRead,
   sendConversationMessage,
 } from "@/app/actions/chat";
+import CensoredText from "@/components/censored-text";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 
@@ -32,6 +33,8 @@ interface ConversationMessage {
   sender: {
     id: string;
     email: string;
+    name?: string | null;
+    image?: string | null;
   };
 }
 
@@ -542,6 +545,9 @@ export function ConversationRoomView({ conversationId }: ConversationRoomViewPro
           ) : (
             messages.map((message) => {
               const isOwnMessage = message.senderId === currentUserId;
+              const authorLabel = isOwnMessage
+                ? "Вы"
+                : message.sender.name?.trim() || message.sender.email;
 
               return (
                 <div
@@ -557,11 +563,11 @@ export function ConversationRoomView({ conversationId }: ConversationRoomViewPro
                     ].join(" ")}
                   >
                     <p className="text-xs uppercase tracking-[0.18em] text-zinc-500">
-                      {isOwnMessage ? "Вы" : message.sender.email}
+                      <CensoredText text={authorLabel} />
                     </p>
                     {message.text ? (
                       <p className="mt-2 whitespace-pre-wrap text-sm leading-7">
-                        {message.text}
+                        <CensoredText text={message.text} />
                       </p>
                     ) : null}
                     {message.imageUrl ? (
@@ -585,7 +591,9 @@ export function ConversationRoomView({ conversationId }: ConversationRoomViewPro
       <div className="shrink-0 border-t border-gray-800 bg-[#11151b] p-4">
         {remoteTypingUsers.length > 0 ? (
           <div className="mb-4 rounded-[1.25rem] border border-sky-500/15 bg-sky-500/8 px-4 py-3 text-sm text-sky-100">
-            {remoteTypingUsers.map((typingUser) => typingUser.email).join(", ")} печатает...
+            <CensoredText
+              text={`${remoteTypingUsers.map((typingUser) => typingUser.email).join(", ")} печатает...`}
+            />
           </div>
         ) : null}
 
