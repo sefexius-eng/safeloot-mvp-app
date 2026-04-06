@@ -1,43 +1,41 @@
 import { NextResponse } from "next/server";
 
-import { getApiBaseUrl } from "@/lib/api-base-url";
+import {
+  handleTripleAWebhook,
+  mapTripleAWebhookErrorToStatusCode,
+  type TripleAWebhookPayload,
+} from "@/lib/triplea-webhook";
 
 export async function POST(request: Request) {
   try {
     const rawBody = await request.text();
     const signature = request.headers.get("triplea-signature");
-    const contentType =
-      request.headers.get("content-type") ?? "application/json";
-
-    const response = await fetch(`${getApiBaseUrl()}/webhooks/triplea`, {
-      method: "POST",
-      headers: {
-        "Content-Type": contentType,
-        ...(signature
-          ? {
-              "Triplea-Signature": signature,
-            }
-          : {}),
-      },
-      body: rawBody,
-      cache: "no-store",
+    const payload = rawBody
+      ? (JSON.parse(rawBody) as TripleAWebhookPayload)
+      : ({} as TripleAWebhookPayload);
+    const result = await handleTripleAWebhook({
+      rawBody,
+      signature,
+      payload,
     });
 
-    const text = await response.text();
-    const upstreamContentType =
-      response.headers.get("content-type") ?? "application/json";
-
-    return new Response(text, {
-      status: response.status,
-      headers: {
-        "Content-Type": upstreamContentType,
-      },
+    return NextResponse.json({
+      received: true,
+      processed: result.processed,
+      transactionId: result.transactionId,
     });
   } catch (error) {
-    console.error("[TRIPLEA_WEBHOOK_PROXY_ERROR]", error);
+    console.error("[TRIPLEA_WEBHOOK_ERROR]", error);
+
+    if (error instanceof Error) {
+      return NextResponse.json(
+        { message: error.message },
+        { status: mapTripleAWebhookErrorToStatusCode(error.message) },
+      );
+    }
 
     return NextResponse.json(
-      { error: "Internal Server Error" },
+      { message: "Webhook processing failed." },
       { status: 500 },
     );
   }

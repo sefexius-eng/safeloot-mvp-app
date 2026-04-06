@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 
-import { getApiBaseUrl } from "@/lib/api-base-url";
+import { getProductById, mapMarketplaceErrorToStatusCode } from "@/lib/marketplace";
 
 export async function GET(
   _request: Request,
@@ -8,29 +8,25 @@ export async function GET(
 ) {
   try {
     const { id } = await context.params;
-    const response = await fetch(`${getApiBaseUrl()}/products/${id}`, {
-      method: "GET",
-      headers: {
-        Accept: "application/json",
-      },
-      cache: "no-store",
-    });
+    const product = await getProductById(id);
 
-    const text = await response.text();
-    const contentType =
-      response.headers.get("content-type") ?? "application/json";
+    if (!product) {
+      return NextResponse.json({ message: "Product not found." }, { status: 404 });
+    }
 
-    return new Response(text, {
-      status: response.status,
-      headers: {
-        "Content-Type": contentType,
-      },
-    });
+    return NextResponse.json(product);
   } catch (error) {
     console.error("[PRODUCT_DETAIL_PROXY_ERROR]", error);
 
+    if (error instanceof Error) {
+      return NextResponse.json(
+        { message: error.message },
+        { status: mapMarketplaceErrorToStatusCode(error.message) },
+      );
+    }
+
     return NextResponse.json(
-      { error: "Internal Server Error" },
+      { message: "Failed to load product." },
       { status: 500 },
     );
   }

@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 
-import { getApiBaseUrl } from "@/lib/api-base-url";
+import { confirmOrder, mapMarketplaceErrorToStatusCode } from "@/lib/marketplace";
 import { requireSessionUserId } from "@/lib/session-user";
 
 export async function POST(request: Request) {
@@ -14,31 +14,24 @@ export async function POST(request: Request) {
     const { userId } = sessionUser;
 
     const payload = await request.json();
-    const response = await fetch(`${getApiBaseUrl()}/orders/confirm`, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "X-User-Id": userId,
-      },
-      body: JSON.stringify(payload),
-      cache: "no-store",
+    const result = await confirmOrder({
+      orderId: payload?.orderId,
+      buyerId: userId,
     });
 
-    const text = await response.text();
-    const contentType =
-      response.headers.get("content-type") ?? "application/json";
-
-    return new Response(text, {
-      status: response.status,
-      headers: {
-        "Content-Type": contentType,
-      },
-    });
+    return NextResponse.json(result);
   } catch (error) {
     console.error("[ORDER_CONFIRM_PROXY_ERROR]", error);
 
+    if (error instanceof Error) {
+      return NextResponse.json(
+        { message: error.message },
+        { status: mapMarketplaceErrorToStatusCode(error.message) },
+      );
+    }
+
     return NextResponse.json(
-      { error: "Internal Server Error" },
+      { message: "Failed to confirm order." },
       { status: 500 },
     );
   }

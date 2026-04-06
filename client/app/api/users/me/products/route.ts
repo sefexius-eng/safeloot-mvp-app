@@ -1,6 +1,9 @@
 import { NextResponse } from "next/server";
 
-import { getApiBaseUrl } from "@/lib/api-base-url";
+import {
+  listProductsBySeller,
+  mapMarketplaceErrorToStatusCode,
+} from "@/lib/marketplace";
 import { requireSessionUserId } from "@/lib/session-user";
 
 export async function GET() {
@@ -13,30 +16,21 @@ export async function GET() {
 
     const { userId } = sessionUser;
 
-    const response = await fetch(`${getApiBaseUrl()}/users/me/products`, {
-      method: "GET",
-      headers: {
-        Accept: "application/json",
-        "X-User-Id": userId,
-      },
-      cache: "no-store",
-    });
+    const products = await listProductsBySeller(userId);
 
-    const text = await response.text();
-    const contentType =
-      response.headers.get("content-type") ?? "application/json";
-
-    return new Response(text, {
-      status: response.status,
-      headers: {
-        "Content-Type": contentType,
-      },
-    });
+    return NextResponse.json(products);
   } catch (error) {
     console.error("[USER_ME_PRODUCTS_PROXY_ERROR]", error);
 
+    if (error instanceof Error) {
+      return NextResponse.json(
+        { message: error.message },
+        { status: mapMarketplaceErrorToStatusCode(error.message) },
+      );
+    }
+
     return NextResponse.json(
-      { error: "Internal Server Error" },
+      { message: "Failed to load user products." },
       { status: 500 },
     );
   }

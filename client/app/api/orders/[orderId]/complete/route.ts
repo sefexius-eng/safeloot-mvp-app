@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 
-import { getApiBaseUrl } from "@/lib/api-base-url";
+import { completeOrder, mapMarketplaceErrorToStatusCode } from "@/lib/marketplace";
 import { requireSessionUserId } from "@/lib/session-user";
 
 export async function POST(
@@ -17,30 +17,24 @@ export async function POST(
     const { userId } = sessionUser;
 
     const { orderId } = await context.params;
-    const response = await fetch(`${getApiBaseUrl()}/orders/${orderId}/complete`, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "X-User-Id": userId,
-      },
-      cache: "no-store",
+    const result = await completeOrder({
+      orderId,
+      buyerId: userId,
     });
 
-    const text = await response.text();
-    const contentType =
-      response.headers.get("content-type") ?? "application/json";
-
-    return new Response(text, {
-      status: response.status,
-      headers: {
-        "Content-Type": contentType,
-      },
-    });
+    return NextResponse.json(result);
   } catch (error) {
     console.error("[ORDER_COMPLETE_PROXY_ERROR]", error);
 
+    if (error instanceof Error) {
+      return NextResponse.json(
+        { message: error.message },
+        { status: mapMarketplaceErrorToStatusCode(error.message) },
+      );
+    }
+
     return NextResponse.json(
-      { error: "Internal Server Error" },
+      { message: "Failed to complete order." },
       { status: 500 },
     );
   }

@@ -1,6 +1,6 @@
 import Link from "next/link";
 
-import { getApiBaseUrl } from "@/lib/api-base-url";
+import { prisma } from "@/lib/prisma";
 
 interface ProductCard {
   id: string;
@@ -17,15 +17,25 @@ interface ProductCard {
 
 async function getProducts(): Promise<ProductCard[]> {
   try {
-    const response = await fetch(`${getApiBaseUrl()}/products`, {
-      next: { revalidate: 60 },
+    const products = await prisma.product.findMany({
+      include: {
+        seller: {
+          select: {
+            id: true,
+            email: true,
+            rank: true,
+          },
+        },
+      },
+      orderBy: {
+        createdAt: "desc",
+      },
     });
 
-    if (!response.ok) {
-      throw new Error(`Failed to fetch products: ${response.status}`);
-    }
-
-    return (await response.json()) as ProductCard[];
+    return products.map((product) => ({
+      ...product,
+      price: product.price.toFixed(8),
+    }));
   } catch (error) {
     console.error("[HOME_PRODUCTS_ERROR]", error);
     return [];

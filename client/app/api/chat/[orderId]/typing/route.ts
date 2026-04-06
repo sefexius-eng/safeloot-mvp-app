@@ -1,6 +1,10 @@
 import { NextResponse } from "next/server";
 
-import { getApiBaseUrl } from "@/lib/api-base-url";
+import {
+  getChatTyping,
+  mapMarketplaceErrorToStatusCode,
+  setChatTyping,
+} from "@/lib/marketplace";
 import { requireSessionUserId } from "@/lib/session-user";
 
 export async function GET(
@@ -17,30 +21,21 @@ export async function GET(
     const { userId } = sessionUser;
 
     const { orderId } = await context.params;
-    const response = await fetch(`${getApiBaseUrl()}/chat/${orderId}/typing`, {
-      method: "GET",
-      headers: {
-        Accept: "application/json",
-        "X-User-Id": userId,
-      },
-      cache: "no-store",
-    });
+    const typingState = await getChatTyping(orderId, userId);
 
-    const text = await response.text();
-    const contentType =
-      response.headers.get("content-type") ?? "application/json";
-
-    return new Response(text, {
-      status: response.status,
-      headers: {
-        "Content-Type": contentType,
-      },
-    });
+    return NextResponse.json(typingState);
   } catch (error) {
     console.error("[CHAT_TYPING_PROXY_ERROR]", error);
 
+    if (error instanceof Error) {
+      return NextResponse.json(
+        { message: error.message },
+        { status: mapMarketplaceErrorToStatusCode(error.message) },
+      );
+    }
+
     return NextResponse.json(
-      { error: "Internal Server Error" },
+      { message: "Failed to load typing state." },
       { status: 500 },
     );
   }
@@ -61,34 +56,25 @@ export async function POST(
 
     const { orderId } = await context.params;
     const payload = await request.json();
-    const response = await fetch(`${getApiBaseUrl()}/chat/${orderId}/typing`, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "X-User-Id": userId,
-      },
-      body: JSON.stringify({
-        ...payload,
-        senderId: userId,
-      }),
-      cache: "no-store",
+    const typingState = await setChatTyping({
+      orderId,
+      senderId: userId,
+      isTyping: payload?.isTyping,
     });
 
-    const text = await response.text();
-    const contentType =
-      response.headers.get("content-type") ?? "application/json";
-
-    return new Response(text, {
-      status: response.status,
-      headers: {
-        "Content-Type": contentType,
-      },
-    });
+    return NextResponse.json(typingState);
   } catch (error) {
     console.error("[CHAT_TYPING_UPDATE_PROXY_ERROR]", error);
 
+    if (error instanceof Error) {
+      return NextResponse.json(
+        { message: error.message },
+        { status: mapMarketplaceErrorToStatusCode(error.message) },
+      );
+    }
+
     return NextResponse.json(
-      { error: "Internal Server Error" },
+      { message: "Failed to update typing state." },
       { status: 500 },
     );
   }

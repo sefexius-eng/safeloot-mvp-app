@@ -1,7 +1,7 @@
 import Link from "next/link";
 
 import { BuyProductDialog } from "@/components/product/buy-product-dialog";
-import { getApiBaseUrl } from "@/lib/api-base-url";
+import { prisma } from "@/lib/prisma";
 
 type SellerRank = "BRONZE" | "SILVER" | "GOLD";
 type ProductType = "ITEM" | "ACCOUNT" | "SERVICE";
@@ -28,19 +28,29 @@ interface ProductDetail {
 
 async function getProduct(id: string): Promise<ProductDetail | null> {
   try {
-    const response = await fetch(`${getApiBaseUrl()}/products/${id}`, {
-      next: { revalidate: 60 },
+    const product = await prisma.product.findUnique({
+      where: {
+        id,
+      },
+      include: {
+        seller: {
+          select: {
+            id: true,
+            email: true,
+            rank: true,
+          },
+        },
+      },
     });
 
-    if (response.status === 404) {
+    if (!product) {
       return null;
     }
 
-    if (!response.ok) {
-      throw new Error(`Failed to fetch product: ${response.status}`);
-    }
-
-    return (await response.json()) as ProductDetail;
+    return {
+      ...product,
+      price: product.price.toFixed(8),
+    };
   } catch (error) {
     console.error("[PRODUCT_DETAIL_ERROR]", error);
     return null;

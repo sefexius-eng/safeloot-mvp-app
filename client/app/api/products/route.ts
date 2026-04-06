@@ -1,7 +1,11 @@
 import { revalidatePath } from "next/cache";
 import { NextResponse } from "next/server";
 
-import { getApiBaseUrl } from "@/lib/api-base-url";
+import {
+  createProduct,
+  listProducts,
+  mapMarketplaceErrorToStatusCode,
+} from "@/lib/marketplace";
 import { requireSessionUserId } from "@/lib/session-user";
 
 interface CreateProductPayload {
@@ -13,38 +17,11 @@ interface CreateProductPayload {
   sellerId?: string;
 }
 
-async function proxyJsonResponse(response: Response) {
-  const text = await response.text();
-  const contentType =
-    response.headers.get("content-type") ?? "application/json";
-
-  return new Response(text, {
-    status: response.status,
-    headers: {
-      "Content-Type": contentType,
-    },
-  });
-}
-
 export async function GET() {
   try {
-    const response = await fetch(`${getApiBaseUrl()}/products`, {
-      method: "GET",
-      headers: {
-        Accept: "application/json",
-      },
-      cache: "no-store",
-    });
+    const products = await listProducts();
 
-    if (!response.ok) {
-      const text = await response.text();
-
-      throw new Error(
-        `Upstream product list failed with status ${response.status}: ${text}`,
-      );
-    }
-
-    return proxyJsonResponse(response);
+    return NextResponse.json(products);
   } catch (error) {
     console.error("[PRODUCT_LIST_ERROR]", error);
 
@@ -67,33 +44,26 @@ export async function POST(request: Request) {
 
     const payload = (await request.json()) as CreateProductPayload;
 
-    const response = await fetch(`${getApiBaseUrl()}/products`, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        ...payload,
-        sellerId: userId,
-      }),
+    const product = await createProduct({
+      ...payload,
+      sellerId: userId,
     });
-
-    if (!response.ok) {
-      const text = await response.text();
-
-      throw new Error(
-        `Upstream product creation failed with status ${response.status}: ${text}`,
-      );
-    }
 
     revalidatePath("/");
 
-    return proxyJsonResponse(response);
+    return NextResponse.json(product, { status: 201 });
   } catch (error) {
     console.error("[PRODUCT_CREATE_ERROR]", error);
 
+    if (error instanceof Error) {
+      return NextResponse.json(
+        { message: error.message },
+        { status: mapMarketplaceErrorToStatusCode(error.message) },
+      );
+    }
+
     return NextResponse.json(
-      { error: "Internal Server Error" },
+      { message: "Не удалось создать товар." },
       { status: 500 },
     );
   }
