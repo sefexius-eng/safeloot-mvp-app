@@ -51,6 +51,7 @@ model User {
   role             Role          @default(USER)
   isBanned         Boolean       @default(false)
   rank             SellerRank    @default(BRONZE)
+  lastSeen         DateTime      @default(now())
   holdBalance      Decimal       @default(0) @db.Decimal(36, 8)
   availableBalance Decimal       @default(0) @db.Decimal(36, 8)
   products         Product[]     @relation("SellerProducts")

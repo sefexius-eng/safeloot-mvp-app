@@ -83,6 +83,7 @@ async function getPublicSellerProfile(id: string) {
       email: true,
       name: true,
       image: true,
+      lastSeen: true,
       rank: true,
       createdAt: true,
       products: {
@@ -180,6 +181,7 @@ async function getPublicSellerProfile(id: string) {
           email: seller.email,
           name: seller.name,
           image: seller.image,
+          lastSeen: seller.lastSeen.toISOString(),
           rank: seller.rank,
           reviewSummary,
         },

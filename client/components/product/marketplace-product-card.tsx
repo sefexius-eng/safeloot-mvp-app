@@ -8,6 +8,7 @@ import { UserAvatar } from "@/components/ui/user-avatar";
 import type { SellerReviewSummary } from "@/lib/review-summary";
 
 type SellerRank = "BRONZE" | "SILVER" | "GOLD";
+const SELLER_ONLINE_WINDOW_MS = 15 * 60 * 1000;
 
 export interface MarketplaceProductCardData {
   id: string;
@@ -31,6 +32,7 @@ export interface MarketplaceProductCardData {
     email: string;
     name: string | null;
     image: string | null;
+    lastSeen: string | null;
     rank: SellerRank;
     reviewSummary: SellerReviewSummary;
   };
@@ -66,6 +68,20 @@ function getSellerDisplayName(seller: MarketplaceProductCardData["seller"]) {
   return seller.name?.trim() || seller.email;
 }
 
+function isSellerOnline(lastSeen?: string | null) {
+  if (!lastSeen) {
+    return false;
+  }
+
+  const lastSeenTime = new Date(lastSeen).getTime();
+
+  if (!Number.isFinite(lastSeenTime)) {
+    return false;
+  }
+
+  return Date.now() - lastSeenTime <= SELLER_ONLINE_WINDOW_MS;
+}
+
 interface MarketplaceProductCardProps {
   product: MarketplaceProductCardData;
 }
@@ -73,6 +89,7 @@ interface MarketplaceProductCardProps {
 export function MarketplaceProductCard({ product }: MarketplaceProductCardProps) {
   const { formatPrice } = useCurrency();
   const sellerDisplayName = getSellerDisplayName(product.seller);
+  const sellerIsOnline = isSellerOnline(product.seller.lastSeen);
 
   return (
     <article className="group rounded-[1.75rem] border border-white/10 bg-white/5 p-5 shadow-[0_14px_36px_rgba(0,0,0,0.18)] transition hover:-translate-y-1 hover:border-orange-500/30 hover:shadow-[0_20px_46px_rgba(0,0,0,0.26)]">
@@ -116,13 +133,24 @@ export function MarketplaceProductCard({ product }: MarketplaceProductCardProps)
           href={`/user/${product.seller.id}`}
           className="group/seller flex min-w-0 flex-row items-center gap-3"
         >
-          <UserAvatar
-            src={product.seller.image}
-            name={sellerDisplayName}
-            email={product.seller.email}
-            className="h-12 w-12 shrink-0 border-transparent bg-zinc-900/80"
-            imageClassName="rounded-full border border-gray-700/50 object-cover"
-          />
+          <div className="relative shrink-0">
+            <UserAvatar
+              src={product.seller.image}
+              name={sellerDisplayName}
+              email={product.seller.email}
+              className="h-12 w-12 shrink-0 border-transparent bg-zinc-900/80"
+              imageClassName="rounded-full border border-gray-700/50 object-cover"
+            />
+            {sellerIsOnline ? (
+              <span
+                aria-label="Продавец онлайн"
+                title="Продавец онлайн"
+                className="absolute -bottom-0.5 -right-0.5 inline-flex h-4 w-4 items-center justify-center rounded-full border border-zinc-950 bg-emerald-500 text-[8px] text-emerald-950 shadow-[0_6px_18px_rgba(16,185,129,0.45)]"
+              >
+                ●
+              </span>
+            ) : null}
+          </div>
           <div className="min-w-0 self-center">
             <p className="text-[11px] font-semibold tracking-[0.18em] uppercase text-zinc-500">
               Продавец

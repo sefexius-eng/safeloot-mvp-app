@@ -21,6 +21,7 @@ import { UserAvatar } from "@/components/ui/user-avatar";
 import catalogSeedData from "@/lib/catalog-seed-data.json";
 
 const BALANCE_REFRESH_EVENT = "safeloot:balances-refresh";
+const LAST_SEEN_UPDATE_INTERVAL_MS = 5 * 60 * 1000;
 const PROFILE_REFRESH_INTERVAL_MS = 5000;
 const SEARCH_DEBOUNCE_MS = 250;
 const POPULAR_GAMES = catalogSeedData.popularGames;
@@ -39,6 +40,7 @@ interface CurrentUser {
   image: string | null;
   role: string;
   rank: string;
+  lastSeen: string;
   availableBalance: string;
   holdBalance: string;
   createdAt: string;
@@ -136,6 +138,32 @@ export function SiteHeader() {
       window.clearInterval(intervalId);
     };
   }, [refreshToken, status, session?.user?.id]);
+
+  useEffect(() => {
+    if (status !== "authenticated") {
+      return undefined;
+    }
+
+    async function updateLastSeen() {
+      try {
+        await fetch("/api/users/me/last-seen", {
+          method: "POST",
+          cache: "no-store",
+        });
+      } catch {
+        // Quiet heartbeat; ignore transient network failures.
+      }
+    }
+
+    void updateLastSeen();
+    const intervalId = window.setInterval(() => {
+      void updateLastSeen();
+    }, LAST_SEEN_UPDATE_INTERVAL_MS);
+
+    return () => {
+      window.clearInterval(intervalId);
+    };
+  }, [status, session?.user?.id]);
 
   useEffect(() => {
     if (!query.trim()) {

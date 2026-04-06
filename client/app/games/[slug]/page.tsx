@@ -1,7 +1,9 @@
 import type { Metadata } from "next";
+import { Prisma } from "@prisma/client";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 
+import { CatalogFilters } from "@/components/catalog-filters";
 import {
   MarketplaceProductCard,
   type MarketplaceProductCardData,
@@ -18,10 +20,63 @@ interface GameCatalogPageProps {
   }>;
   searchParams: Promise<{
     category?: string;
+    sort?: string;
+    minPrice?: string;
+    maxPrice?: string;
+    online?: string;
   }>;
 }
 
-async function getGameCatalog(slug: string, categorySlug?: string) {
+const SELLER_ONLINE_WINDOW_MS = 15 * 60 * 1000;
+
+function normalizeSearchText(value?: string) {
+  return value?.trim() ?? "";
+}
+
+function parsePriceFilter(value?: string) {
+  const normalizedValue = normalizeSearchText(value);
+
+  if (!normalizedValue) {
+    return null;
+  }
+
+  const numericValue = Number(normalizedValue);
+
+  if (!Number.isFinite(numericValue) || numericValue < 0) {
+    return null;
+  }
+
+  return new Prisma.Decimal(numericValue.toString());
+}
+
+function getProductOrderBy(sort?: string) {
+  if (sort === "price_asc") {
+    return {
+      price: "asc" as const,
+    };
+  }
+
+  if (sort === "price_desc") {
+    return {
+      price: "desc" as const,
+    };
+  }
+
+  return {
+    createdAt: "desc" as const,
+  };
+}
+
+async function getGameCatalog(
+  slug: string,
+  search: {
+    category?: string;
+    sort?: string;
+    minPrice?: string;
+    maxPrice?: string;
+    online?: string;
+  },
+) {
   const game = await prisma.game.findUnique({
     where: {
       slug,
@@ -40,7 +95,11 @@ async function getGameCatalog(slug: string, categorySlug?: string) {
   }
 
   const activeCategory =
-    game.categories.find((category) => category.slug === categorySlug) ?? null;
+    game.categories.find((category) => category.slug === search.category) ?? null;
+
+  const minPrice = parsePriceFilter(search.minPrice);
+  const maxPrice = parsePriceFilter(search.maxPrice);
+  const isOnlineOnly = search.online === "true";
 
   const products = await prisma.product.findMany({
     where: {
@@ -48,6 +107,23 @@ async function getGameCatalog(slug: string, categorySlug?: string) {
       ...(activeCategory
         ? {
             categoryId: activeCategory.id,
+          }
+        : {}),
+      ...(minPrice || maxPrice
+        ? {
+            price: {
+              ...(minPrice ? { gte: minPrice } : {}),
+              ...(maxPrice ? { lte: maxPrice } : {}),
+            },
+          }
+        : {}),
+      ...(isOnlineOnly
+        ? {
+            seller: {
+              lastSeen: {
+                gte: new Date(Date.now() - SELLER_ONLINE_WINDOW_MS),
+              },
+            },
           }
         : {}),
     },
@@ -60,13 +136,12 @@ async function getGameCatalog(slug: string, categorySlug?: string) {
           email: true,
           name: true,
           image: true,
+          lastSeen: true,
           rank: true,
         },
       },
     },
-    orderBy: {
-      createdAt: "desc",
-    },
+    orderBy: getProductOrderBy(search.sort),
   });
 
   const reviewSummaryMap = await getSellerReviewSummaryMap(
@@ -81,6 +156,7 @@ async function getGameCatalog(slug: string, categorySlug?: string) {
       price: product.price.toFixed(8),
       seller: {
         ...product.seller,
+        lastSeen: product.seller.lastSeen.toISOString(),
         reviewSummary: getSellerReviewSummary(reviewSummaryMap, product.seller.id),
       },
     })) satisfies MarketplaceProductCardData[],
@@ -115,11 +191,41 @@ export default async function GameCatalogPage({
   searchParams,
 }: GameCatalogPageProps) {
   const { slug } = await params;
-  const { category } = await searchParams;
-  const catalog = await getGameCatalog(slug, category);
+  const resolvedSearchParams = await searchParams;
+  const catalog = await getGameCatalog(slug, resolvedSearchParams);
 
   if (!catalog) {
     notFound();
+  }
+
+  const gameSlug = catalog.game.slug;
+
+  function buildCategoryHref(categorySlug?: string) {
+    const nextParams = new URLSearchParams();
+
+    if (categorySlug) {
+      nextParams.set("category", categorySlug);
+    }
+
+    if (resolvedSearchParams.sort && resolvedSearchParams.sort !== "newest") {
+      nextParams.set("sort", resolvedSearchParams.sort);
+    }
+
+    if (resolvedSearchParams.minPrice) {
+      nextParams.set("minPrice", resolvedSearchParams.minPrice);
+    }
+
+    if (resolvedSearchParams.maxPrice) {
+      nextParams.set("maxPrice", resolvedSearchParams.maxPrice);
+    }
+
+    if (resolvedSearchParams.online === "true") {
+      nextParams.set("online", "true");
+    }
+
+    const nextQuery = nextParams.toString();
+
+    return nextQuery ? `/games/${gameSlug}?${nextQuery}` : `/games/${gameSlug}`;
   }
 
   return (
@@ -137,7 +243,7 @@ export default async function GameCatalogPage({
 
         <div className="mt-6 flex flex-wrap gap-3 overflow-x-auto pb-1">
           <Link
-            href={`/games/${catalog.game.slug}`}
+            href={buildCategoryHref()}
             className={[
               "inline-flex h-11 items-center justify-center rounded-2xl border px-5 text-sm font-semibold transition",
               !catalog.activeCategorySlug
@@ -151,7 +257,7 @@ export default async function GameCatalogPage({
           {catalog.game.categories.map((categoryItem) => (
             <Link
               key={categoryItem.id}
-              href={`/games/${catalog.game.slug}?category=${categoryItem.slug}`}
+              href={buildCategoryHref(categoryItem.slug)}
               className={[
                 "inline-flex h-11 items-center justify-center rounded-2xl border px-5 text-sm font-semibold transition",
                 catalog.activeCategorySlug === categoryItem.slug
@@ -166,6 +272,8 @@ export default async function GameCatalogPage({
       </section>
 
       <section className="space-y-6">
+        <CatalogFilters />
+
         <div className="flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
           <div>
             <p className="text-sm font-semibold tracking-[0.24em] uppercase text-zinc-500">

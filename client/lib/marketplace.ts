@@ -190,6 +190,7 @@ async function mapProductsWithSellerReviewSummary<
     price: Prisma.Decimal;
     seller: {
       id: string;
+      lastSeen?: Date | string | null;
     };
   },
 >(products: T[]) {
@@ -202,7 +203,34 @@ async function mapProductsWithSellerReviewSummary<
     price: formatMoney(product.price),
     seller: {
       ...product.seller,
+      ...("lastSeen" in product.seller
+        ? {
+            lastSeen:
+              product.seller.lastSeen instanceof Date
+                ? product.seller.lastSeen.toISOString()
+                : (product.seller.lastSeen ?? null),
+          }
+        : {}),
       reviewSummary: getSellerReviewSummary(reviewSummaryMap, product.seller.id),
+    },
+  }));
+}
+
+function normalizeMappedProductsSellerLastSeen<
+  T extends {
+    seller: {
+      lastSeen: Date | string | null;
+    };
+  },
+>(products: T[]) {
+  return products.map((product) => ({
+    ...product,
+    seller: {
+      ...product.seller,
+      lastSeen:
+        product.seller.lastSeen instanceof Date
+          ? product.seller.lastSeen.toISOString()
+          : (product.seller.lastSeen ?? null),
     },
   }));
 }
@@ -420,6 +448,7 @@ export async function listProducts() {
           email: true,
           name: true,
           image: true,
+          lastSeen: true,
           rank: true,
         },
       },
@@ -429,7 +458,9 @@ export async function listProducts() {
     },
   });
 
-  return mapProductsWithSellerReviewSummary(products);
+  const mappedProducts = await mapProductsWithSellerReviewSummary(products);
+
+  return normalizeMappedProductsSellerLastSeen(mappedProducts);
 }
 
 export async function listCatalogGamesForProductForms() {
@@ -529,6 +560,7 @@ export async function getProductById(productId: string) {
           email: true,
           name: true,
           image: true,
+          lastSeen: true,
           rank: true,
         },
       },
@@ -539,7 +571,9 @@ export async function getProductById(productId: string) {
     return null;
   }
 
-  const [mappedProduct] = await mapProductsWithSellerReviewSummary([product]);
+  const [mappedProduct] = normalizeMappedProductsSellerLastSeen(
+    await mapProductsWithSellerReviewSummary([product]),
+  );
 
   return mappedProduct ?? null;
 }
@@ -625,6 +659,7 @@ export async function createProduct(input: {
           email: true,
           name: true,
           image: true,
+          lastSeen: true,
           rank: true,
         },
       },
@@ -826,6 +861,7 @@ export async function getUserById(userId: string) {
       image: true,
       role: true,
       rank: true,
+      lastSeen: true,
       availableBalance: true,
       holdBalance: true,
       createdAt: true,
@@ -841,6 +877,7 @@ export async function getUserById(userId: string) {
   return {
     ...user,
     name: user.name ?? user.email.split("@")[0],
+    lastSeen: user.lastSeen.toISOString(),
     availableBalance: formatMoney(user.availableBalance),
     holdBalance: formatMoney(user.holdBalance),
     reviewSummary,
