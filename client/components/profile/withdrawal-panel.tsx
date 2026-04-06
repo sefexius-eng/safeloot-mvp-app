@@ -48,7 +48,12 @@ export function WithdrawalPanel({
   onOpenChange,
 }: WithdrawalPanelProps) {
   const router = useRouter();
-  const { formatPrice } = useCurrency();
+  const {
+    currency,
+    currentRate: exchangeRate,
+    currencySymbol,
+    formatPrice,
+  } = useCurrency();
   const [internalIsModalOpen, setInternalIsModalOpen] = useState(false);
   const [amount, setAmount] = useState("");
   const [method, setMethod] = useState<string>(WITHDRAWAL_METHOD_OPTIONS[0].value);
@@ -58,8 +63,12 @@ export function WithdrawalPanel({
   const [isPending, startTransition] = useTransition();
   const availableBalanceValue = useMemo(() => Number(availableBalance), [availableBalance]);
   const amountValue = Number(amount);
+  const localAvailableBalance = useMemo(
+    () => availableBalanceValue * exchangeRate,
+    [availableBalanceValue, exchangeRate],
+  );
   const isAmountValid = Number.isFinite(amountValue) && amountValue > 0;
-  const exceedsBalance = isAmountValid && amountValue > availableBalanceValue;
+  const exceedsBalance = isAmountValid && amountValue > localAvailableBalance;
   const modalOpen = isModalOpen ?? internalIsModalOpen;
 
   function setModalOpen(nextOpen: boolean) {
@@ -88,12 +97,14 @@ export function WithdrawalPanel({
     setSuccessMessage("");
 
     if (!isAmountValid) {
-      setErrorMessage("Введите корректную сумму вывода.");
+      setErrorMessage(`Введите корректную сумму вывода в ${currencySymbol}.`);
       return;
     }
 
     if (exceedsBalance) {
-      setErrorMessage("Сумма вывода не должна превышать доступный баланс.");
+      setErrorMessage(
+        `Сумма вывода не должна превышать доступный баланс: ${formatPrice(availableBalance)}.`,
+      );
       return;
     }
 
@@ -102,8 +113,15 @@ export function WithdrawalPanel({
       return;
     }
 
+    if (!Number.isFinite(exchangeRate) || exchangeRate <= 0) {
+      setErrorMessage("Не удалось определить курс выбранной валюты.");
+      return;
+    }
+
+    const amountInUsdt = amountValue / exchangeRate;
+
     startTransition(() => {
-      void requestWithdrawal(amountValue, method, details)
+      void requestWithdrawal(amountInUsdt, method, details)
         .then((result) => {
           if (!result.ok) {
             setErrorMessage(result.message ?? "Не удалось создать заявку на вывод.");
@@ -130,6 +148,10 @@ export function WithdrawalPanel({
     method === "Банковская карта"
       ? "Введите номер карты или IBAN"
       : "Введите адрес кошелька TRC20";
+  const amountPlaceholder =
+    currency === "UAH"
+      ? `Например, 400 ${currencySymbol}`
+      : `Например, 125.50 ${currencySymbol}`;
 
   return (
     <section className="rounded-[2rem] border border-white/10 bg-zinc-900/80 p-6 shadow-[0_24px_80px_rgba(0,0,0,0.28)] backdrop-blur md:p-8">
@@ -187,12 +209,12 @@ export function WithdrawalPanel({
               <Input
                 type="number"
                 inputMode="decimal"
-                step="0.00000001"
+                step="0.01"
                 min="0"
-                max={availableBalance}
+                max={String(localAvailableBalance)}
                 value={amount}
                 onChange={(event) => setAmount(event.target.value)}
-                placeholder="Например, 125.50"
+                placeholder={amountPlaceholder}
                 className="mt-3 border-white/10 bg-white/5 text-zinc-100 placeholder:text-zinc-500 focus:border-orange-500/45 focus:bg-white/8"
                 disabled={isPending}
               />
@@ -235,7 +257,7 @@ export function WithdrawalPanel({
 
             {exceedsBalance ? (
               <div className="rounded-[1.25rem] border border-red-500/15 bg-red-500/10 p-4 text-sm leading-7 text-red-200">
-                Сумма вывода не должна превышать доступный баланс.
+                Сумма вывода не должна превышать доступный баланс: {formatPrice(availableBalance)}.
               </div>
             ) : null}
 
