@@ -129,7 +129,7 @@ export function SellPageClient({ games }: SellPageClientProps) {
             </FormField>
 
             <div className="grid gap-5 md:grid-cols-2">
-              <FormField label="Цена в USDT">
+              <FormField label="Цена в базовой валюте (USDT / USD)">
                 <Input
                   type="number"
                   min="0"
@@ -142,7 +142,7 @@ export function SellPageClient({ games }: SellPageClientProps) {
                       price: event.target.value,
                     }))
                   }
-                  placeholder="15.50"
+                  placeholder="0.00"
                   required
                 />
               </FormField>

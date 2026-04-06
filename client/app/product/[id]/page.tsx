@@ -2,6 +2,7 @@ import Link from "next/link";
 
 import { BuyProductDialog } from "@/components/product/buy-product-dialog";
 import { UserAvatar } from "@/components/ui/user-avatar";
+import { FormattedPrice } from "@/components/ui/formatted-price";
 import { prisma } from "@/lib/prisma";
 
 type SellerRank = "BRONZE" | "SILVER" | "GOLD";
@@ -203,7 +204,7 @@ export default async function ProductPage({ params }: ProductPageProps) {
                 Цена сделки
               </p>
               <p className="mt-3 text-4xl font-semibold tracking-tight text-white">
-                {product.price} USDT
+                <FormattedPrice amount={product.price} />
               </p>
             </div>
 

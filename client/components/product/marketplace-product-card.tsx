@@ -1,5 +1,8 @@
+"use client";
+
 import Link from "next/link";
 
+import { useCurrency } from "@/components/providers/currency-provider";
 import { UserAvatar } from "@/components/ui/user-avatar";
 
 type SellerRank = "BRONZE" | "SILVER" | "GOLD";
@@ -64,6 +67,8 @@ interface MarketplaceProductCardProps {
 }
 
 export function MarketplaceProductCard({ product }: MarketplaceProductCardProps) {
+  const { formatPrice } = useCurrency();
+
   return (
     <Link
       href={`/product/${product.id}`}
@@ -97,7 +102,7 @@ export function MarketplaceProductCard({ product }: MarketplaceProductCardProps)
             Цена
           </p>
           <p className="mt-1 text-lg font-semibold tracking-tight">
-            {product.price} USDT
+            {formatPrice(product.price)}
           </p>
         </div>
       </div>

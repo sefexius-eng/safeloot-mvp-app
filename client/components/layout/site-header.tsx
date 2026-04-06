@@ -7,6 +7,8 @@ import { useEffect, useRef, useState } from "react";
 import { signOut, useSession } from "next-auth/react";
 
 import { searchGames } from "@/app/actions/search";
+import { useCurrency } from "@/components/providers/currency-provider";
+import { Select } from "@/components/ui/select";
 import catalogSeedData from "@/lib/catalog-seed-data.json";
 
 const BALANCE_REFRESH_EVENT = "safeloot:balances-refresh";
@@ -49,6 +51,7 @@ function formatBalance(value: string) {
 export function SiteHeader() {
   const router = useRouter();
   const { data: session, status } = useSession();
+  const { currencies, currency, setCurrency } = useCurrency();
   const [user, setUser] = useState<CurrentUser | null>(null);
   const [refreshToken, setRefreshToken] = useState(0);
   const [query, setQuery] = useState("");
@@ -329,6 +332,21 @@ export function SiteHeader() {
                   <span className="font-medium text-white">Холд:</span>{" "}
                   {formatBalance(user?.holdBalance ?? "0")}
                   <span className="ml-1 text-zinc-500">USDT</span>
+                </div>
+
+                <div className="min-w-[118px]">
+                  <Select
+                    aria-label="Выбор валюты"
+                    value={currency}
+                    onChange={(event) => setCurrency(event.target.value as typeof currency)}
+                    className="h-11 rounded-2xl border-white/10 bg-white/5 pr-10 text-sm font-semibold text-zinc-100 shadow-[0_12px_28px_rgba(0,0,0,0.22)] focus:border-orange-500/40 focus:bg-white/8"
+                  >
+                    {currencies.map((item) => (
+                      <option key={item.code} value={item.code} className="text-neutral-950">
+                        {item.code}
+                      </option>
+                    ))}
+                  </Select>
                 </div>
 
                 {isBanned ? (

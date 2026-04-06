@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 
+import { useCurrency } from "@/components/providers/currency-provider";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -27,6 +28,7 @@ interface CreateOrderResponse {
 }
 
 export function BuyProductDialog({ product }: BuyProductDialogProps) {
+  const { formatPrice } = useCurrency();
   const [isLoading, setIsLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState("");
 
@@ -93,7 +95,7 @@ export function BuyProductDialog({ product }: BuyProductDialogProps) {
           <div className="mt-4 flex items-center justify-between gap-4 border-t border-white/10 pt-4">
             <span className="text-sm text-zinc-400">Сумма заказа</span>
             <span className="text-xl font-semibold tracking-tight text-white">
-              {product.price}
+              {formatPrice(product.price)}
             </span>
           </div>
         </div>
