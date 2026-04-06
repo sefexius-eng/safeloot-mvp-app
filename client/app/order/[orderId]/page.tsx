@@ -1,4 +1,8 @@
+import { redirect } from "next/navigation";
+
 import { ActiveOrderView } from "@/components/order/active-order-view";
+import { getCurrentSessionUser } from "@/lib/access-control";
+import { getAuthSession } from "@/lib/auth";
 
 interface OrderPageProps {
   params: Promise<{
@@ -7,6 +11,12 @@ interface OrderPageProps {
 }
 
 export default async function OrderPage({ params }: OrderPageProps) {
+  const currentUser = await getCurrentSessionUser(await getAuthSession());
+
+  if (currentUser?.isBanned) {
+    redirect("/");
+  }
+
   const { orderId } = await params;
 
   return (

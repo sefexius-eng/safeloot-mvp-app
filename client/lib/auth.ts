@@ -4,6 +4,7 @@ import type { NextAuthOptions } from "next-auth";
 import { getServerSession } from "next-auth";
 import CredentialsProvider from "next-auth/providers/credentials";
 
+import { BANNED_AUTH_ERROR } from "@/lib/access-control";
 import { prisma } from "@/lib/prisma";
 
 export const authOptions: NextAuthOptions = {
@@ -50,6 +51,10 @@ export const authOptions: NextAuthOptions = {
 
         if (!isPasswordValid) {
           return null;
+        }
+
+        if (user.isBanned) {
+          throw new Error(BANNED_AUTH_ERROR);
         }
 
         return {

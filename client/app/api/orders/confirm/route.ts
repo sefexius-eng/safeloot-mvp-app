@@ -1,11 +1,11 @@
 import { NextResponse } from "next/server";
 
 import { confirmOrder, mapMarketplaceErrorToStatusCode } from "@/lib/marketplace";
-import { requireSessionUserId } from "@/lib/session-user";
+import { requireActiveSessionUserId } from "@/lib/session-user";
 
 export async function POST(request: Request) {
   try {
-    const sessionUser = await requireSessionUserId();
+    const sessionUser = await requireActiveSessionUserId();
 
     if ("response" in sessionUser) {
       return sessionUser.response;

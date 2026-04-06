@@ -34,6 +34,7 @@ export function SiteHeader() {
   const { data: session, status } = useSession();
   const [user, setUser] = useState<CurrentUser | null>(null);
   const [refreshToken, setRefreshToken] = useState(0);
+  const isBanned = Boolean(session?.user?.isBanned);
 
   useEffect(() => {
     function handleBalanceRefresh() {
@@ -168,12 +169,29 @@ export function SiteHeader() {
                   <span className="ml-1 text-zinc-500">USDT</span>
                 </div>
 
-                <Link
-                  href="/sell"
-                  className="sell-link inline-flex h-11 items-center justify-center rounded-2xl bg-orange-600 px-5 text-sm font-semibold shadow-[0_16px_40px_rgba(249,115,22,0.32)] transition hover:-translate-y-0.5 hover:bg-orange-500"
-                >
-                  Продать
-                </Link>
+                {isBanned ? (
+                  <div className="inline-flex h-11 items-center justify-center rounded-2xl border border-red-500/20 bg-red-500/10 px-5 text-sm font-semibold text-red-100 shadow-[0_12px_28px_rgba(0,0,0,0.22)]">
+                    Аккаунт заблокирован
+                  </div>
+                ) : (
+                  <>
+                    <Link
+                      href="/sell"
+                      className="sell-link inline-flex h-11 items-center justify-center rounded-2xl bg-orange-600 px-5 text-sm font-semibold shadow-[0_16px_40px_rgba(249,115,22,0.32)] transition hover:-translate-y-0.5 hover:bg-orange-500"
+                    >
+                      Продать
+                    </Link>
+
+                    {session?.user?.role === "ADMIN" ? (
+                      <Link
+                        href="/admin"
+                        className="inline-flex h-11 items-center justify-center rounded-2xl border border-sky-400/20 bg-sky-500/10 px-5 text-sm font-semibold text-sky-100 shadow-[0_16px_40px_rgba(2,132,199,0.16)] transition hover:-translate-y-0.5 hover:bg-sky-500/20"
+                      >
+                        Админ-панель
+                      </Link>
+                    ) : null}
+                  </>
+                )}
 
                 <button
                   type="button"

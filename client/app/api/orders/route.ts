@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 
 import { createOrder, mapMarketplaceErrorToStatusCode } from "@/lib/marketplace";
-import { requireSessionUserId } from "@/lib/session-user";
+import { requireActiveSessionUserId } from "@/lib/session-user";
 
 interface CreateOrderPayload {
   productId?: string;
@@ -9,7 +9,7 @@ interface CreateOrderPayload {
 
 export async function POST(request: Request) {
   try {
-    const sessionUser = await requireSessionUserId();
+    const sessionUser = await requireActiveSessionUserId();
 
     if ("response" in sessionUser) {
       return sessionUser.response;

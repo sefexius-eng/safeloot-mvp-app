@@ -7,6 +7,22 @@ import { FormEvent, useState } from "react";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import {
+  BANNED_AUTH_ERROR,
+  BANNED_USER_MESSAGE,
+} from "@/lib/access-control";
+
+function getAuthErrorMessage(errorCode?: string | null) {
+  if (errorCode === BANNED_AUTH_ERROR) {
+    return BANNED_USER_MESSAGE;
+  }
+
+  if (errorCode === "CredentialsSignin") {
+    return "Неверный email или пароль.";
+  }
+
+  return "";
+}
 
 export function LoginForm() {
   const router = useRouter();
@@ -15,6 +31,7 @@ export function LoginForm() {
   const [password, setPassword] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [errorMessage, setErrorMessage] = useState("");
+  const authErrorMessage = getAuthErrorMessage(searchParams.get("error"));
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -32,7 +49,9 @@ export function LoginForm() {
       });
 
       if (!result || result.error) {
-        throw new Error("Неверный email или пароль.");
+        throw new Error(
+          getAuthErrorMessage(result?.error) || "Неверный email или пароль.",
+        );
       }
 
       router.push(result.url ?? callbackUrl);
@@ -85,9 +104,9 @@ export function LoginForm() {
           />
         </label>
 
-        {errorMessage ? (
+        {errorMessage || authErrorMessage ? (
           <div className="rounded-[1.25rem] border border-red-500/15 bg-red-500/10 p-4 text-sm leading-7 text-red-200">
-            {errorMessage}
+            {errorMessage || authErrorMessage}
           </div>
         ) : null}
 

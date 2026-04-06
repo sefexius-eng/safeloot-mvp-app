@@ -1,6 +1,9 @@
 import Link from "next/link";
+import { redirect } from "next/navigation";
 
 import { MockPaymentButton } from "@/components/payment/mock-payment-button";
+import { getCurrentSessionUser } from "@/lib/access-control";
+import { getAuthSession } from "@/lib/auth";
 
 interface PaymentMockPageProps {
   searchParams: Promise<{
@@ -11,6 +14,12 @@ interface PaymentMockPageProps {
 export default async function PaymentMockPage({
   searchParams,
 }: PaymentMockPageProps) {
+  const currentUser = await getCurrentSessionUser(await getAuthSession());
+
+  if (currentUser?.isBanned) {
+    redirect("/");
+  }
+
   const { orderId } = await searchParams;
 
   return (

@@ -1,9 +1,11 @@
 import type { Metadata } from "next";
-import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 
+import {
+  AdminDeleteProductButton,
+  AdminToggleBanButton,
+} from "@/components/admin/admin-action-buttons";
 import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
 import {
   Card,
   CardContent,
@@ -19,9 +21,12 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import {
+  getCurrentSessionUser,
+  hasActiveAdminAccess,
+} from "@/lib/access-control";
 import { getAuthSession } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
-import { cn } from "@/lib/utils";
 
 export const dynamic = "force-dynamic";
 
@@ -29,49 +34,6 @@ export const metadata: Metadata = {
   title: "Admin Dashboard | SafeLoot Market",
   description: "Панель управления администратора маркетплейса SafeLoot.",
 };
-
-async function deleteProductAction(formData: FormData) {
-  "use server";
-
-  const session = await getAuthSession();
-
-  if (session?.user?.role !== "ADMIN") {
-    redirect("/");
-  }
-
-  const productId = formData.get("productId")?.toString().trim() ?? "";
-
-  if (!productId) {
-    redirect("/admin");
-  }
-
-  const product = await prisma.product.findUnique({
-    where: {
-      id: productId,
-    },
-    select: {
-      _count: {
-        select: {
-          orders: true,
-        },
-      },
-    },
-  });
-
-  if (!product || product._count.orders > 0) {
-    redirect("/admin");
-  }
-
-  await prisma.product.delete({
-    where: {
-      id: productId,
-    },
-  });
-
-  revalidatePath("/");
-  revalidatePath("/admin");
-  redirect("/admin");
-}
 
 function formatUserName(email: string) {
   const localPart = email.split("@")[0]?.trim() ?? "";
@@ -112,7 +74,7 @@ function getBanStatusLabel(isBanned: boolean) {
   return isBanned ? "Заблокирован" : "Активен";
 }
 
-function getProductStatusMeta(status?: string) {
+function getOrderStatusMeta(status?: string) {
   switch (status) {
     case "PENDING":
       return {
@@ -154,12 +116,13 @@ function getProductStatusMeta(status?: string) {
 
 export default async function AdminDashboardPage() {
   const session = await getAuthSession();
+  const currentUser = await getCurrentSessionUser(session);
 
-  if (session?.user?.role !== "ADMIN") {
+  if (!hasActiveAdminAccess(currentUser)) {
     redirect("/");
   }
 
-  const [users, products] = await Promise.all([
+  const [users, products, orders] = await Promise.all([
     prisma.user.findMany({
       select: {
         id: true,
@@ -205,12 +168,25 @@ export default async function AdminDashboardPage() {
         createdAt: "desc",
       },
     }),
+    prisma.order.findMany({
+      include: {
+        product: true,
+        buyer: true,
+        seller: true,
+      },
+      orderBy: {
+        createdAt: "desc",
+      },
+    }),
   ]);
 
   const adminCount = users.filter((user) => user.role === "ADMIN").length;
   const bannedCount = users.filter((user) => user.isBanned).length;
   const productsInOrdersCount = products.filter(
     (product) => product._count.orders > 0,
+  ).length;
+  const activeOrdersCount = orders.filter(
+    (order) => order.status !== "COMPLETED" && order.status !== "CANCELLED",
   ).length;
 
   return (
@@ -228,7 +204,7 @@ export default async function AdminDashboardPage() {
 
             <div className="mt-6 flex flex-wrap items-center gap-3 text-sm text-zinc-300">
               <span className="rounded-full border border-white/10 bg-white/5 px-4 py-2">
-                Администратор: <span className="font-semibold text-white">{session.user.email}</span>
+                Администратор: <span className="font-semibold text-white">{session?.user?.email ?? "неизвестно"}</span>
               </span>
               <span className="rounded-full border border-white/10 bg-white/5 px-4 py-2">
                 Доступ подтвержден по роли <span className="font-semibold text-white">ADMIN</span>
@@ -258,11 +234,22 @@ export default async function AdminDashboardPage() {
               </Card>
               <Card className="bg-black/20 shadow-none sm:col-span-2 lg:col-span-2">
                 <CardHeader className="gap-1 p-5">
-                  <CardDescription>Товары в каталоге</CardDescription>
-                  <CardTitle className="text-2xl">{products.length}</CardTitle>
-                  <p className="text-xs uppercase tracking-[0.18em] text-zinc-500">
-                    В сделках: {productsInOrdersCount}
-                  </p>
+                  <div className="grid gap-3 sm:grid-cols-2">
+                    <div>
+                      <CardDescription>Товары в каталоге</CardDescription>
+                      <CardTitle className="text-2xl">{products.length}</CardTitle>
+                      <p className="text-xs uppercase tracking-[0.18em] text-zinc-500">
+                        В сделках: {productsInOrdersCount}
+                      </p>
+                    </div>
+                    <div>
+                      <CardDescription>Сделки</CardDescription>
+                      <CardTitle className="text-2xl">{orders.length}</CardTitle>
+                      <p className="text-xs uppercase tracking-[0.18em] text-zinc-500">
+                        Активные: {activeOrdersCount}
+                      </p>
+                    </div>
+                  </div>
                 </CardHeader>
               </Card>
             </div>
@@ -292,8 +279,15 @@ export default async function AdminDashboardPage() {
                 <span>Товары</span>
                 <Badge variant="secondary">{products.length}</Badge>
               </a>
+              <a
+                href="#orders"
+                className="flex items-center justify-between rounded-[1.25rem] border border-white/10 bg-white/5 px-4 py-3 text-sm font-semibold text-zinc-100 transition hover:bg-white/10"
+              >
+                <span>Сделки</span>
+                <Badge variant="secondary">{orders.length}</Badge>
+              </a>
               <div className="rounded-[1.5rem] border border-sky-500/15 bg-sky-500/5 p-4 text-sm leading-7 text-zinc-300">
-                Кнопка бана добавлена как UI-заготовка. Удаление товара доступно только для позиций без заказов.
+                Блокировка пользователей и удаление товаров уже подключены через server actions с автоматическим обновлением панели.
               </div>
             </CardContent>
           </Card>
@@ -367,12 +361,10 @@ export default async function AdminDashboardPage() {
                               </Badge>
                             </TableCell>
                             <TableCell className="text-right">
-                              <Button
-                                disabled
-                                className="h-10 rounded-xl bg-zinc-800 text-zinc-500 shadow-none hover:translate-y-0 hover:bg-zinc-800"
-                              >
-                                Забанить
-                              </Button>
+                              <AdminToggleBanButton
+                                userId={user.id}
+                                currentStatus={user.isBanned}
+                              />
                             </TableCell>
                           </TableRow>
                         ))}
@@ -412,7 +404,7 @@ export default async function AdminDashboardPage() {
                       <TableBody>
                         {products.map((product) => {
                           const latestOrderStatus = product.orders[0]?.status;
-                          const statusMeta = getProductStatusMeta(latestOrderStatus);
+                          const statusMeta = getOrderStatusMeta(latestOrderStatus);
                           const canDelete = product._count.orders === 0;
 
                           return (
@@ -448,21 +440,82 @@ export default async function AdminDashboardPage() {
                                 </div>
                               </TableCell>
                               <TableCell className="text-right">
-                                <form action={deleteProductAction} className="inline-flex">
-                                  <input type="hidden" name="productId" value={product.id} />
-                                  <Button
-                                    type="submit"
-                                    disabled={!canDelete}
-                                    className={cn(
-                                      "h-10 rounded-xl px-4 shadow-none",
-                                      canDelete
-                                        ? "bg-rose-600 text-white hover:bg-rose-500"
-                                        : "bg-zinc-800 text-zinc-500 hover:translate-y-0 hover:bg-zinc-800",
-                                    )}
-                                  >
-                                    Удалить
-                                  </Button>
-                                </form>
+                                <AdminDeleteProductButton
+                                  productId={product.id}
+                                  canDelete={canDelete}
+                                />
+                              </TableCell>
+                            </TableRow>
+                          );
+                        })}
+                      </TableBody>
+                    </Table>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          </section>
+
+          <section id="orders" className="scroll-mt-24">
+            <Card>
+              <CardHeader className="border-b border-white/10">
+                <div className="flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
+                  <div>
+                    <CardDescription>Order Monitoring</CardDescription>
+                    <CardTitle>Сделки</CardTitle>
+                  </div>
+                  <div className="flex flex-wrap gap-2">
+                    <Badge variant="info">Всего: {orders.length}</Badge>
+                    <Badge variant={activeOrdersCount > 0 ? "warning" : "success"}>
+                      Активные: {activeOrdersCount}
+                    </Badge>
+                  </div>
+                </div>
+              </CardHeader>
+              <CardContent className="pt-6">
+                <div className="overflow-hidden rounded-[1.5rem] border border-white/10 bg-black/10">
+                  <div className="overflow-x-auto">
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead>ID заказа</TableHead>
+                          <TableHead>Товар</TableHead>
+                          <TableHead>Покупатель</TableHead>
+                          <TableHead>Продавец</TableHead>
+                          <TableHead>Статус заказа</TableHead>
+                          <TableHead className="text-right">Цена</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {orders.map((order) => {
+                          const statusMeta = getOrderStatusMeta(order.status);
+
+                          return (
+                            <TableRow key={order.id}>
+                              <TableCell>
+                                <div className="space-y-1">
+                                  <p className="font-mono text-xs text-zinc-300">{order.id}</p>
+                                  <p className="text-xs uppercase tracking-[0.18em] text-zinc-500">
+                                    {new Intl.DateTimeFormat("ru-RU", {
+                                      dateStyle: "medium",
+                                      timeStyle: "short",
+                                    }).format(order.createdAt)}
+                                  </p>
+                                </div>
+                              </TableCell>
+                              <TableCell>
+                                <div className="space-y-1">
+                                  <p className="font-semibold text-white">{order.product.title}</p>
+                                  <p className="text-sm text-zinc-400">{order.product.gameId}</p>
+                                </div>
+                              </TableCell>
+                              <TableCell className="text-zinc-300">{order.buyer.email}</TableCell>
+                              <TableCell className="text-zinc-300">{order.seller.email}</TableCell>
+                              <TableCell>
+                                <Badge variant={statusMeta.variant}>{statusMeta.label}</Badge>
+                              </TableCell>
+                              <TableCell className="text-right font-semibold text-white">
+                                {formatAmount(order.price)} USDT
                               </TableCell>
                             </TableRow>
                           );

@@ -5,14 +5,14 @@ import {
   getChatMessages,
   mapMarketplaceErrorToStatusCode,
 } from "@/lib/marketplace";
-import { requireSessionUserId } from "@/lib/session-user";
+import { requireActiveSessionUserId } from "@/lib/session-user";
 
 export async function GET(
   _request: Request,
   context: { params: Promise<{ orderId: string }> },
 ) {
   try {
-    const sessionUser = await requireSessionUserId();
+    const sessionUser = await requireActiveSessionUserId();
 
     if ("response" in sessionUser) {
       return sessionUser.response;
@@ -46,7 +46,7 @@ export async function POST(
   context: { params: Promise<{ orderId: string }> },
 ) {
   try {
-    const sessionUser = await requireSessionUserId();
+    const sessionUser = await requireActiveSessionUserId();
 
     if ("response" in sessionUser) {
       return sessionUser.response;
