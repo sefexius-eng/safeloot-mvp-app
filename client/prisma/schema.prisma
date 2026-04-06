@@ -10,6 +10,7 @@ datasource db {
 enum Role {
   USER
   ADMIN
+  SUPER_ADMIN
 }
 
 enum SellerRank {
@@ -52,14 +53,15 @@ model User {
   isBanned         Boolean       @default(false)
   rank             SellerRank    @default(BRONZE)
   lastSeen         DateTime      @default(now())
+  platformRevenue  Float         @default(0)
   holdBalance      Decimal       @default(0) @db.Decimal(36, 8)
   availableBalance Decimal       @default(0) @db.Decimal(36, 8)
   products         Product[]     @relation("SellerProducts")
   buyerOrders      Order[]       @relation("BuyerOrders")
   sellerOrders     Order[]       @relation("SellerOrders")
   transactions     Transaction[]
-  buyerChatRooms   ChatRoom[]    @relation("BuyerChatRooms")
-  sellerChatRooms  ChatRoom[]    @relation("SellerChatRooms")
+  buyerConversations Conversation[] @relation("BuyerConversations")
+  sellerConversations Conversation[] @relation("SellerConversations")
   sentMessages     Message[]     @relation("MessageSender")
   reviewsWritten   Review[]      @relation("ReviewAuthor")
   reviewsReceived  Review[]      @relation("ReviewSeller")
@@ -108,6 +110,7 @@ model Product {
   game        Game      @relation(fields: [gameId], references: [id], onDelete: Restrict, onUpdate: Cascade)
   category    Category  @relation(fields: [categoryId], references: [id], onDelete: Restrict, onUpdate: Cascade)
   orders      Order[]
+  conversations Conversation[]
   createdAt   DateTime  @default(now())
   updatedAt   DateTime  @updatedAt
 
@@ -124,11 +127,11 @@ model Order {
   productId    String
   price        Decimal       @db.Decimal(36, 8)
   platformFee  Decimal       @default(0) @db.Decimal(36, 8)
+  commission   Float         @default(0)
   status       OrderStatus   @default(PENDING)
   buyer        User          @relation("BuyerOrders", fields: [buyerId], references: [id], onDelete: Restrict, onUpdate: Cascade)
   seller       User          @relation("SellerOrders", fields: [sellerId], references: [id], onDelete: Restrict, onUpdate: Cascade)
   product      Product       @relation(fields: [productId], references: [id], onDelete: Restrict, onUpdate: Cascade)
-  chatRoom     ChatRoom?
   review       Review?
   transactions Transaction[]
   createdAt    DateTime      @default(now())
@@ -195,36 +198,37 @@ model Withdrawal {
   @@map("withdrawals")
 }
 
-model ChatRoom {
+model Conversation {
   id        String    @id @default(cuid())
-  orderId   String    @unique
   buyerId   String
   sellerId  String
-  order     Order     @relation(fields: [orderId], references: [id], onDelete: Cascade, onUpdate: Cascade)
-  buyer     User      @relation("BuyerChatRooms", fields: [buyerId], references: [id], onDelete: Restrict, onUpdate: Cascade)
-  seller    User      @relation("SellerChatRooms", fields: [sellerId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+  productId String?
+  buyer     User      @relation("BuyerConversations", fields: [buyerId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+  seller    User      @relation("SellerConversations", fields: [sellerId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+  product   Product?  @relation(fields: [productId], references: [id], onDelete: SetNull, onUpdate: Cascade)
   messages  Message[]
   createdAt DateTime  @default(now())
   updatedAt DateTime  @updatedAt
 
   @@index([buyerId])
   @@index([sellerId])
-  @@map("chat_rooms")
+  @@index([productId])
+  @@map("conversations")
 }
 
 model Message {
-  id         String   @id @default(cuid())
-  chatRoomId String
-  senderId   String
-  content    String
-  imageUrl   String?
-  isRead     Boolean  @default(false)
-  chatRoom   ChatRoom @relation(fields: [chatRoomId], references: [id], onDelete: Cascade, onUpdate: Cascade)
-  sender     User     @relation("MessageSender", fields: [senderId], references: [id], onDelete: Restrict, onUpdate: Cascade)
-  createdAt  DateTime @default(now())
-  updatedAt  DateTime @updatedAt
+  id             String       @id @default(cuid())
+  conversationId String
+  senderId       String
+  text           String
+  imageUrl       String?
+  isRead         Boolean      @default(false)
+  conversation   Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+  sender         User         @relation("MessageSender", fields: [senderId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
 
-  @@index([chatRoomId])
+  @@index([conversationId])
   @@index([senderId])
   @@map("messages")
 }

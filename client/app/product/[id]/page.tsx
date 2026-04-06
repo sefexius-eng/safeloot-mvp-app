@@ -1,9 +1,12 @@
 import Link from "next/link";
 
+import { getOrCreateConversation } from "@/app/actions/chat";
 import { SellerRatingBadge } from "@/components/reviews/seller-rating-badge";
 import { BuyProductDialog } from "@/components/product/buy-product-dialog";
 import { UserAvatar } from "@/components/ui/user-avatar";
 import { FormattedPrice } from "@/components/ui/formatted-price";
+import { getCurrentSessionUser } from "@/lib/access-control";
+import { getAuthSession } from "@/lib/auth";
 import { getProductById } from "@/lib/marketplace";
 import type { SellerReviewSummary } from "@/lib/review-summary";
 
@@ -90,6 +93,7 @@ function getGalleryGridClassName(imageCount: number) {
 }
 
 export default async function ProductPage({ params }: ProductPageProps) {
+  const currentUser = await getCurrentSessionUser(await getAuthSession());
   const { id } = await params;
   const product = await getProduct(id);
 
@@ -122,6 +126,7 @@ export default async function ProductPage({ params }: ProductPageProps) {
   const sellerName = product.seller.name?.trim() || product.seller.email;
   const rankStyle = rankStyles[product.seller.rank];
   const categoryLabel = product.category.name;
+  const canStartConversation = currentUser?.id !== product.seller.id;
 
   return (
     <main className="mx-auto flex w-full max-w-7xl flex-col gap-8 px-4 py-10 sm:px-6 lg:px-8 lg:py-14">
@@ -246,13 +251,26 @@ export default async function ProductPage({ params }: ProductPageProps) {
               </div>
             </div>
 
-            <BuyProductDialog
-              product={{
-                id: product.id,
-                title: product.title,
-                price: product.price,
-              }}
-            />
+            <div className="grid gap-3 sm:grid-cols-2">
+              <BuyProductDialog
+                product={{
+                  id: product.id,
+                  title: product.title,
+                  price: product.price,
+                }}
+              />
+
+              {canStartConversation ? (
+                <form action={getOrCreateConversation.bind(null, product.id, product.seller.id)}>
+                  <button
+                    type="submit"
+                    className="inline-flex h-14 w-full items-center justify-center rounded-[1.35rem] border border-sky-400/20 bg-sky-500/10 px-6 text-base font-semibold text-sky-100 shadow-[0_18px_42px_rgba(2,132,199,0.18)] transition hover:bg-sky-500/20"
+                  >
+                    Написать продавцу
+                  </button>
+                </form>
+              ) : null}
+            </div>
 
             <div className="rounded-[1.5rem] border border-white/10 bg-white/6 p-4">
               <p className="text-sm font-semibold text-white">

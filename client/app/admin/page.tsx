@@ -7,6 +7,7 @@ import {
   AdminToggleBanButton,
   AdminWithdrawalActionButtons,
 } from "@/components/admin/admin-action-buttons";
+import { PlatformRevenueCard } from "@/components/admin/platform-revenue-card";
 import { Badge } from "@/components/ui/badge";
 import {
   Card,
@@ -72,7 +73,7 @@ function formatAmount(value: unknown) {
 }
 
 function getRoleBadgeVariant(role: string) {
-  return role === "ADMIN" ? "info" : "secondary";
+  return role === "ADMIN" || role === "SUPER_ADMIN" ? "info" : "secondary";
 }
 
 function getBanBadgeVariant(isBanned: boolean) {
@@ -252,7 +253,9 @@ export default async function AdminDashboardPage() {
     }),
   ]);
 
-  const adminCount = users.filter((user) => user.role === "ADMIN").length;
+  const adminCount = users.filter(
+    (user) => user.role === "ADMIN" || user.role === "SUPER_ADMIN",
+  ).length;
   const bannedCount = users.filter((user) => user.isBanned).length;
   const productsInOrdersCount = products.filter(
     (product) => product._count.orders > 0,
@@ -284,12 +287,13 @@ export default async function AdminDashboardPage() {
                 Администратор: <span className="font-semibold text-white">{session?.user?.email ?? "неизвестно"}</span>
               </span>
               <span className="rounded-full border border-white/10 bg-white/5 px-4 py-2">
-                Доступ подтвержден по роли <span className="font-semibold text-white">ADMIN</span>
+                Доступ подтвержден по роли <span className="font-semibold text-white">ADMIN / SUPER_ADMIN</span>
               </span>
             </div>
           </div>
 
           <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-1">
+            <PlatformRevenueCard revenue={session?.user?.platformRevenue ?? 0} />
             <Card className="bg-black/20 shadow-none">
               <CardHeader className="gap-1 p-5">
                 <CardDescription>Пользователи</CardDescription>

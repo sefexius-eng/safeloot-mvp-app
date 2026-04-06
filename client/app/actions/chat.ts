@@ -1,8 +1,16 @@
 "use server";
 
+import { redirect } from "next/navigation";
+
 import { BANNED_USER_MESSAGE, getCurrentSessionUser } from "@/lib/access-control";
 import { getAuthSession } from "@/lib/auth";
-import { createChatMessage, markChatMessagesAsRead } from "@/lib/marketplace";
+import {
+  createChatMessage,
+  createConversationMessage,
+  getOrCreateConversation as getOrCreateConversationRecord,
+  markChatMessagesAsRead,
+  markConversationMessagesAsRead as markConversationMessagesAsReadRecord,
+} from "@/lib/marketplace";
 
 async function requireActiveChatUserId() {
   const session = await getAuthSession();
@@ -17,6 +25,32 @@ async function requireActiveChatUserId() {
   }
 
   return currentUser.id;
+}
+
+async function requireActiveChatUser() {
+  const session = await getAuthSession();
+  const currentUser = await getCurrentSessionUser(session);
+
+  if (!currentUser) {
+    redirect("/login");
+  }
+
+  if (currentUser.isBanned) {
+    throw new Error(BANNED_USER_MESSAGE);
+  }
+
+  return currentUser;
+}
+
+export async function getOrCreateConversation(productId: string, sellerId: string) {
+  const currentUser = await requireActiveChatUser();
+  const result = await getOrCreateConversationRecord({
+    buyerId: currentUser.id,
+    sellerId,
+    productId,
+  });
+
+  redirect(`/chats/${result.conversationId}`);
 }
 
 export async function sendMessage(
@@ -39,6 +73,30 @@ export async function markMessagesAsRead(chatRoomId: string) {
 
   return markChatMessagesAsRead({
     chatRoomId,
+    userId,
+  });
+}
+
+export async function sendConversationMessage(
+  conversationId: string,
+  text?: string,
+  imageBase64?: string | null,
+) {
+  const userId = await requireActiveChatUserId();
+
+  return createConversationMessage({
+    conversationId,
+    senderId: userId,
+    text,
+    imageBase64,
+  });
+}
+
+export async function markConversationMessagesAsRead(conversationId: string) {
+  const userId = await requireActiveChatUserId();
+
+  return markConversationMessagesAsReadRecord({
+    conversationId,
     userId,
   });
 }

@@ -42,6 +42,7 @@ export const authOptions: NextAuthOptions = {
             password: true,
             role: true,
             isBanned: true,
+            platformRevenue: true,
           },
         });
 
@@ -66,6 +67,7 @@ export const authOptions: NextAuthOptions = {
           image: user.image,
           role: user.role,
           isBanned: user.isBanned,
+          platformRevenue: user.platformRevenue,
         };
       },
     }),
@@ -77,6 +79,7 @@ export const authOptions: NextAuthOptions = {
         token.email = user.email;
         token.name = user.name;
         token.picture = user.image ?? null;
+        token.platformRevenue = user.platformRevenue ?? 0;
       }
 
       const userId =
@@ -98,6 +101,7 @@ export const authOptions: NextAuthOptions = {
           image: true,
           role: true,
           isBanned: true,
+          platformRevenue: true,
         },
       });
 
@@ -107,6 +111,7 @@ export const authOptions: NextAuthOptions = {
         token.picture = dbUser.image ?? null;
         token.role = dbUser.role;
         token.isBanned = dbUser.isBanned;
+        token.platformRevenue = dbUser.platformRevenue;
       }
 
       return token;
@@ -123,6 +128,8 @@ export const authOptions: NextAuthOptions = {
           typeof token.picture === "string" ? token.picture : null;
         session.user.role = (token.role as Role | undefined) ?? "USER";
         session.user.isBanned = Boolean(token.isBanned);
+        session.user.platformRevenue =
+          typeof token.platformRevenue === "number" ? token.platformRevenue : 0;
       }
 
       return session;

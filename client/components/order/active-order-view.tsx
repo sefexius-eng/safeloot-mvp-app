@@ -95,7 +95,7 @@ interface CompleteOrderResponse {
   transactionId: string;
   status: OrderStatus;
   platformFee: string;
-  sellerHoldAmount: string;
+  sellerNetAmount?: string;
 }
 
 interface ActiveOrderViewProps {
@@ -270,6 +270,7 @@ export function ActiveOrderView({ orderId }: ActiveOrderViewProps) {
   const previousMessageCountRef = useRef(0);
   const currentUserId = session?.user?.id ?? "";
   const currentUserRole = session?.user?.role ?? "USER";
+  const isCurrentUserSeller = order?.sellerId === currentUserId;
 
   useEffect(() => {
     previousMessageCountRef.current = 0;
@@ -487,7 +488,7 @@ export function ActiveOrderView({ orderId }: ActiveOrderViewProps) {
     let isMounted = true;
 
     const isSpectator =
-      currentUserRole === "ADMIN" &&
+      (currentUserRole === "ADMIN" || currentUserRole === "SUPER_ADMIN") &&
       currentUserId !== order?.buyerId &&
       currentUserId !== order?.sellerId;
 
@@ -761,7 +762,7 @@ export function ActiveOrderView({ orderId }: ActiveOrderViewProps) {
             }
           : currentOrder,
       );
-      setCompleteMessage("Сделка завершена. Средства отправлены продавцу в holdBalance.");
+      setCompleteMessage("Сделка завершена. Средства зачислены продавцу на доступный баланс.");
       window.dispatchEvent(new Event(BALANCE_REFRESH_EVENT));
       router.refresh();
     } catch (error) {
@@ -968,7 +969,7 @@ export function ActiveOrderView({ orderId }: ActiveOrderViewProps) {
   const isParticipant =
     currentUserId === order.buyerId || currentUserId === order.sellerId;
   const isSpectator =
-    currentUserRole === "ADMIN" &&
+    (currentUserRole === "ADMIN" || currentUserRole === "SUPER_ADMIN") &&
     currentUserId !== order.buyerId &&
     currentUserId !== order.sellerId;
   const canOpenDispute =
@@ -1248,6 +1249,11 @@ export function ActiveOrderView({ orderId }: ActiveOrderViewProps) {
             <p className="mt-3 text-lg font-semibold text-white">
               {formatAmount(order.price)}
             </p>
+            {isCurrentUserSeller ? (
+              <p className="mt-3 text-sm text-emerald-300">
+                К зачислению: {(Number(order.price) * 0.95).toFixed(2)} (Комиссия 5%)
+              </p>
+            ) : null}
           </div>
 
           <div className="rounded-[1.5rem] border border-white/10 bg-white/5 p-4">

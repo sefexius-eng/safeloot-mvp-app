@@ -14,7 +14,8 @@ import {
 } from "@/lib/review-summary";
 
 const MONEY_SCALE = 8;
-const PLATFORM_FEE_RATE = new Prisma.Decimal("0.05");
+const COMMISSION_RATE = 0.05;
+const COMMISSION_RATE_DECIMAL = new Prisma.Decimal(COMMISSION_RATE.toString());
 const TYPING_TTL_MS = 5000;
 const MAX_MESSAGE_IMAGE_BASE64_LENGTH = 2_000_000;
 const MAX_PRODUCT_TITLE_LENGTH = 60;
@@ -36,6 +37,86 @@ function stripHtmlTags(value: string) {
 
 function sanitizeProductText(value?: string) {
   return normalizeText(stripHtmlTags(normalizeText(value)));
+}
+
+function calculateCommissionBreakdown(amount: Prisma.Decimal) {
+  const fee = amount
+    .mul(COMMISSION_RATE_DECIMAL)
+    .toDecimalPlaces(MONEY_SCALE, Prisma.Decimal.ROUND_HALF_UP);
+  const sellerPayout = amount
+    .sub(fee)
+    .toDecimalPlaces(MONEY_SCALE, Prisma.Decimal.ROUND_HALF_UP);
+
+  return {
+    fee,
+    sellerPayout,
+    feeAsNumber: Number(fee.toFixed(MONEY_SCALE)),
+  };
+}
+
+async function getPlatformAdminAccount(transactionClient: Prisma.TransactionClient) {
+  const superAdminUser = await transactionClient.user.findFirst({
+    where: {
+      role: Role.SUPER_ADMIN,
+    },
+    select: {
+      id: true,
+      holdBalance: true,
+    },
+    orderBy: {
+      createdAt: "asc",
+    },
+  });
+
+  if (superAdminUser) {
+    return superAdminUser;
+  }
+
+  const fallbackAdmin = await transactionClient.user.findFirst({
+    where: {
+      role: Role.ADMIN,
+    },
+    select: {
+      id: true,
+    },
+    orderBy: {
+      createdAt: "asc",
+    },
+  });
+
+  if (!fallbackAdmin) {
+    throw new Error("Не найден SUPER_ADMIN для учёта комиссии платформы.");
+  }
+
+  return transactionClient.user.update({
+    where: {
+      id: fallbackAdmin.id,
+    },
+    data: {
+      role: Role.SUPER_ADMIN,
+    },
+    select: {
+      id: true,
+      holdBalance: true,
+    },
+  });
+}
+
+async function findCompletedEscrowHoldTransaction(
+  transactionClient: Prisma.TransactionClient,
+  input: { orderId: string; adminUserId: string },
+) {
+  return transactionClient.transaction.findFirst({
+    where: {
+      orderId: input.orderId,
+      userId: input.adminUserId,
+      type: TransactionType.ESCROW_HOLD,
+      status: TransactionStatus.COMPLETED,
+    },
+    select: {
+      id: true,
+    },
+  });
 }
 
 function validateProductTextFields(input: {
@@ -248,7 +329,7 @@ function canAdminAccessDisputedOrder(
   role: string | null | undefined,
   status: OrderStatus,
 ) {
-  return role === "ADMIN" && status === OrderStatus.DISPUTED;
+  return (role === "ADMIN" || role === "SUPER_ADMIN") && status === OrderStatus.DISPUTED;
 }
 
 function ensureOrderAccess(
@@ -294,28 +375,31 @@ function ensurePendingCheckoutAccess<
   return order;
 }
 
-function ensureChatParticipant(
+function ensureConversationParticipant(
   userId: string,
-  chatRoom: { buyerId: string; sellerId: string },
+  conversation: { buyerId: string; sellerId: string },
 ) {
-  if (userId !== chatRoom.buyerId && userId !== chatRoom.sellerId) {
+  if (userId !== conversation.buyerId && userId !== conversation.sellerId) {
     throw new Error("Only order participants can access this chat.");
   }
 }
 
-function ensureChatAccess(
+function ensureConversationAccess(
   userId: string,
-  chatRoom: {
+  conversation: {
     buyerId: string;
     sellerId: string;
-    order: { status: OrderStatus };
+    latestOrder?: { status: OrderStatus } | null;
   },
   role?: string,
+  statusOverride?: OrderStatus,
 ) {
+  const accessStatus = statusOverride ?? conversation.latestOrder?.status;
+
   if (
-    userId === chatRoom.buyerId ||
-    userId === chatRoom.sellerId ||
-    canAdminAccessDisputedOrder(role, chatRoom.order.status)
+    userId === conversation.buyerId ||
+    userId === conversation.sellerId ||
+    (accessStatus ? canAdminAccessDisputedOrder(role, accessStatus) : false)
   ) {
     return;
   }
@@ -323,49 +407,49 @@ function ensureChatAccess(
   throw new Error("Only order participants can access this chat.");
 }
 
-function setTypingState(orderId: string, senderId: string, isTyping: boolean) {
-  const currentOrderTyping =
-    chatTypingState.get(orderId) ?? new Map<string, number>();
+function setTypingState(conversationId: string, senderId: string, isTyping: boolean) {
+  const currentConversationTyping =
+    chatTypingState.get(conversationId) ?? new Map<string, number>();
 
   if (isTyping) {
-    currentOrderTyping.set(senderId, Date.now());
-    chatTypingState.set(orderId, currentOrderTyping);
+    currentConversationTyping.set(senderId, Date.now());
+    chatTypingState.set(conversationId, currentConversationTyping);
     return;
   }
 
-  currentOrderTyping.delete(senderId);
+  currentConversationTyping.delete(senderId);
 
-  if (currentOrderTyping.size === 0) {
-    chatTypingState.delete(orderId);
+  if (currentConversationTyping.size === 0) {
+    chatTypingState.delete(conversationId);
     return;
   }
 
-  chatTypingState.set(orderId, currentOrderTyping);
+  chatTypingState.set(conversationId, currentConversationTyping);
 }
 
-function getTypingUsers(chatRoom: {
-  orderId: string;
+function getTypingUsers(conversation: {
+  id: string;
   buyerId: string;
   sellerId: string;
   buyer: { email: string };
   seller: { email: string };
 }) {
   const now = Date.now();
-  const currentOrderTyping =
-    chatTypingState.get(chatRoom.orderId) ?? new Map<string, number>();
+  const currentConversationTyping =
+    chatTypingState.get(conversation.id) ?? new Map<string, number>();
 
-  for (const [senderId, lastTypedAt] of currentOrderTyping.entries()) {
+  for (const [senderId, lastTypedAt] of currentConversationTyping.entries()) {
     if (now - lastTypedAt > TYPING_TTL_MS) {
-      currentOrderTyping.delete(senderId);
+      currentConversationTyping.delete(senderId);
     }
   }
 
-  if (currentOrderTyping.size === 0) {
-    chatTypingState.delete(chatRoom.orderId);
+  if (currentConversationTyping.size === 0) {
+    chatTypingState.delete(conversation.id);
     return [];
   }
 
-  chatTypingState.set(chatRoom.orderId, currentOrderTyping);
+  chatTypingState.set(conversation.id, currentConversationTyping);
 
   const typingUsers: Array<{
     senderId: string;
@@ -373,19 +457,19 @@ function getTypingUsers(chatRoom: {
     email: string;
   }> = [];
 
-  if (currentOrderTyping.has(chatRoom.buyerId)) {
+  if (currentConversationTyping.has(conversation.buyerId)) {
     typingUsers.push({
-      senderId: chatRoom.buyerId,
+      senderId: conversation.buyerId,
       role: "BUYER",
-      email: chatRoom.buyer.email,
+      email: conversation.buyer.email,
     });
   }
 
-  if (currentOrderTyping.has(chatRoom.sellerId)) {
+  if (currentConversationTyping.has(conversation.sellerId)) {
     typingUsers.push({
-      senderId: chatRoom.sellerId,
+      senderId: conversation.sellerId,
       role: "SELLER",
-      email: chatRoom.seller.email,
+      email: conversation.seller.email,
     });
   }
 
@@ -862,6 +946,7 @@ export async function getUserById(userId: string) {
       role: true,
       rank: true,
       lastSeen: true,
+      platformRevenue: true,
       availableBalance: true,
       holdBalance: true,
       createdAt: true,
@@ -878,6 +963,7 @@ export async function getUserById(userId: string) {
     ...user,
     name: user.name ?? user.email.split("@")[0],
     lastSeen: user.lastSeen.toISOString(),
+    platformRevenue: user.platformRevenue,
     availableBalance: formatMoney(user.availableBalance),
     holdBalance: formatMoney(user.holdBalance),
     reviewSummary,
@@ -1085,11 +1171,6 @@ export async function getOrderById(
       price: true,
       platformFee: true,
       status: true,
-      chatRoom: {
-        select: {
-          id: true,
-        },
-      },
       review: {
         select: {
           id: true,
@@ -1121,7 +1202,7 @@ export async function getOrderById(
     price: formatMoney(order.price),
     platformFee: formatMoney(order.platformFee),
     status: order.status,
-    chatRoomId: order.chatRoom?.id ?? null,
+    chatRoomId: null,
     review: order.review
       ? {
           ...order.review,
@@ -1152,6 +1233,7 @@ export async function confirmOrder(input: { orderId?: string; buyerId: string })
           id: true,
           buyerId: true,
           sellerId: true,
+          price: true,
           status: true,
         },
       });
@@ -1176,25 +1258,33 @@ export async function confirmOrder(input: { orderId?: string; buyerId: string })
         throw new Error(`Order ${orderId} could not be confirmed.`);
       }
 
-      await transactionClient.chatRoom.upsert({
+      const platformAdmin = await getPlatformAdminAccount(transactionClient);
+
+      await transactionClient.user.update({
         where: {
-          orderId: checkoutOrder.id,
+          id: platformAdmin.id,
         },
-        update: {
-          buyerId: checkoutOrder.buyerId,
-          sellerId: checkoutOrder.sellerId,
+        data: {
+          holdBalance: {
+            increment: checkoutOrder.price,
+          },
         },
-        create: {
+      });
+
+      await transactionClient.transaction.create({
+        data: {
+          userId: platformAdmin.id,
           orderId: checkoutOrder.id,
-          buyerId: checkoutOrder.buyerId,
-          sellerId: checkoutOrder.sellerId,
+          amount: checkoutOrder.price,
+          type: TransactionType.ESCROW_HOLD,
+          status: TransactionStatus.COMPLETED,
         },
       });
 
       await createUserNotification(transactionClient, {
         userId: checkoutOrder.sellerId,
         title: "Новый заказ!",
-        message: "У вас купили товар. Перейдите в чат.",
+        message: "У вас купили товар. Перейдите к сделке.",
         link: `/orders/${checkoutOrder.id}`,
       });
 
@@ -1248,12 +1338,17 @@ export async function completeOrder(input: { orderId: string; buyerId: string })
         );
       }
 
-      const platformFee = order.price
-        .mul(PLATFORM_FEE_RATE)
-        .toDecimalPlaces(MONEY_SCALE, Prisma.Decimal.ROUND_HALF_UP);
-      const sellerHoldAmount = order.price
-        .sub(platformFee)
-        .toDecimalPlaces(MONEY_SCALE, Prisma.Decimal.ROUND_HALF_UP);
+      const { fee, sellerPayout, feeAsNumber } = calculateCommissionBreakdown(
+        order.price,
+      );
+      const platformAdmin = await getPlatformAdminAccount(transactionClient);
+      const escrowHoldTransaction = await findCompletedEscrowHoldTransaction(
+        transactionClient,
+        {
+          orderId: order.id,
+          adminUserId: platformAdmin.id,
+        },
+      );
 
       const updatedOrder = await transactionClient.order.updateMany({
         where: {
@@ -1262,7 +1357,8 @@ export async function completeOrder(input: { orderId: string; buyerId: string })
         },
         data: {
           status: OrderStatus.COMPLETED,
-          platformFee,
+          platformFee: fee,
+          commission: feeAsNumber,
         },
       });
 
@@ -1270,13 +1366,40 @@ export async function completeOrder(input: { orderId: string; buyerId: string })
         throw new Error(`Order ${orderId} could not be completed.`);
       }
 
+      if (escrowHoldTransaction) {
+        await transactionClient.user.update({
+          where: {
+            id: platformAdmin.id,
+          },
+          data: {
+            holdBalance: {
+              decrement: order.price,
+            },
+            platformRevenue: {
+              increment: feeAsNumber,
+            },
+          },
+        });
+      } else {
+        await transactionClient.user.update({
+          where: {
+            id: platformAdmin.id,
+          },
+          data: {
+            platformRevenue: {
+              increment: feeAsNumber,
+            },
+          },
+        });
+      }
+
       await transactionClient.user.update({
         where: {
           id: order.sellerId,
         },
         data: {
-          holdBalance: {
-            increment: sellerHoldAmount,
+          availableBalance: {
+            increment: sellerPayout,
           },
         },
       });
@@ -1285,7 +1408,7 @@ export async function completeOrder(input: { orderId: string; buyerId: string })
         data: {
           userId: order.sellerId,
           orderId: order.id,
-          amount: sellerHoldAmount,
+          amount: sellerPayout,
           type: TransactionType.ESCROW_RELEASE,
           status: TransactionStatus.COMPLETED,
         },
@@ -1298,8 +1421,8 @@ export async function completeOrder(input: { orderId: string; buyerId: string })
         orderId: order.id,
         transactionId: transaction.id,
         status: OrderStatus.COMPLETED,
-        platformFee: formatMoney(platformFee),
-        sellerHoldAmount: formatMoney(sellerHoldAmount),
+        platformFee: formatMoney(fee),
+        sellerNetAmount: formatMoney(sellerPayout),
       };
     },
     {
@@ -1410,6 +1533,14 @@ export async function resolveOrderDisputeToBuyer(input: { orderId: string }) {
         MONEY_SCALE,
         Prisma.Decimal.ROUND_HALF_UP,
       );
+      const platformAdmin = await getPlatformAdminAccount(transactionClient);
+      const escrowHoldTransaction = await findCompletedEscrowHoldTransaction(
+        transactionClient,
+        {
+          orderId: order.id,
+          adminUserId: platformAdmin.id,
+        },
+      );
 
       const updatedOrder = await transactionClient.order.updateMany({
         where: {
@@ -1419,11 +1550,25 @@ export async function resolveOrderDisputeToBuyer(input: { orderId: string }) {
         data: {
           status: OrderStatus.REFUNDED,
           platformFee: new Prisma.Decimal(0),
+          commission: 0,
         },
       });
 
       if (updatedOrder.count !== 1) {
         throw new Error(`Order ${orderId} could not be resolved to buyer.`);
+      }
+
+      if (escrowHoldTransaction) {
+        await transactionClient.user.update({
+          where: {
+            id: platformAdmin.id,
+          },
+          data: {
+            holdBalance: {
+              decrement: refundAmount,
+            },
+          },
+        });
       }
 
       await transactionClient.user.update({
@@ -1478,12 +1623,17 @@ export async function resolveOrderDisputeToSeller(input: { orderId: string }) {
         );
       }
 
-      const platformFee = order.price
-        .mul(PLATFORM_FEE_RATE)
-        .toDecimalPlaces(MONEY_SCALE, Prisma.Decimal.ROUND_HALF_UP);
-      const sellerNetAmount = order.price
-        .sub(platformFee)
-        .toDecimalPlaces(MONEY_SCALE, Prisma.Decimal.ROUND_HALF_UP);
+      const { fee, sellerPayout, feeAsNumber } = calculateCommissionBreakdown(
+        order.price,
+      );
+      const platformAdmin = await getPlatformAdminAccount(transactionClient);
+      const escrowHoldTransaction = await findCompletedEscrowHoldTransaction(
+        transactionClient,
+        {
+          orderId: order.id,
+          adminUserId: platformAdmin.id,
+        },
+      );
 
       const updatedOrder = await transactionClient.order.updateMany({
         where: {
@@ -1492,12 +1642,40 @@ export async function resolveOrderDisputeToSeller(input: { orderId: string }) {
         },
         data: {
           status: OrderStatus.COMPLETED,
-          platformFee,
+          platformFee: fee,
+          commission: feeAsNumber,
         },
       });
 
       if (updatedOrder.count !== 1) {
         throw new Error(`Order ${orderId} could not be resolved to seller.`);
+      }
+
+      if (escrowHoldTransaction) {
+        await transactionClient.user.update({
+          where: {
+            id: platformAdmin.id,
+          },
+          data: {
+            holdBalance: {
+              decrement: order.price,
+            },
+            platformRevenue: {
+              increment: feeAsNumber,
+            },
+          },
+        });
+      } else {
+        await transactionClient.user.update({
+          where: {
+            id: platformAdmin.id,
+          },
+          data: {
+            platformRevenue: {
+              increment: feeAsNumber,
+            },
+          },
+        });
       }
 
       await transactionClient.user.update({
@@ -1506,7 +1684,7 @@ export async function resolveOrderDisputeToSeller(input: { orderId: string }) {
         },
         data: {
           availableBalance: {
-            increment: sellerNetAmount,
+            increment: sellerPayout,
           },
         },
       });
@@ -1515,7 +1693,7 @@ export async function resolveOrderDisputeToSeller(input: { orderId: string }) {
         data: {
           userId: order.sellerId,
           orderId: order.id,
-          amount: sellerNetAmount,
+          amount: sellerPayout,
           type: TransactionType.ESCROW_RELEASE,
           status: TransactionStatus.COMPLETED,
         },
@@ -1524,8 +1702,8 @@ export async function resolveOrderDisputeToSeller(input: { orderId: string }) {
       return {
         orderId: order.id,
         status: OrderStatus.COMPLETED,
-        platformFee: formatMoney(platformFee),
-        sellerNetAmount: formatMoney(sellerNetAmount),
+        platformFee: formatMoney(fee),
+        sellerNetAmount: formatMoney(sellerPayout),
       };
     },
     {
@@ -1534,21 +1712,16 @@ export async function resolveOrderDisputeToSeller(input: { orderId: string }) {
   );
 }
 
-async function getChatRoomContext(orderId: string) {
-  return prisma.chatRoom.findUnique({
+async function getConversationContextById(conversationId: string) {
+  return prisma.conversation.findUnique({
     where: {
-      orderId,
+      id: conversationId,
     },
     select: {
       id: true,
-      orderId: true,
       buyerId: true,
       sellerId: true,
-      order: {
-        select: {
-          status: true,
-        },
-      },
+      productId: true,
       buyer: {
         select: {
           email: true,
@@ -1559,76 +1732,384 @@ async function getChatRoomContext(orderId: string) {
           email: true,
         },
       },
+      product: {
+        select: {
+          id: true,
+          title: true,
+          price: true,
+        },
+      },
+      createdAt: true,
+      updatedAt: true,
     },
   });
 }
 
-async function getChatRoomContextById(chatRoomId: string) {
-  return prisma.chatRoom.findUnique({
+async function getLatestConversationOrder(conversation: {
+  buyerId: string;
+  sellerId: string;
+  productId: string | null;
+}) {
+  if (!conversation.productId) {
+    return null;
+  }
+
+  return prisma.order.findFirst({
     where: {
-      id: chatRoomId,
+      buyerId: conversation.buyerId,
+      sellerId: conversation.sellerId,
+      productId: conversation.productId,
     },
     select: {
       id: true,
-      orderId: true,
-      buyerId: true,
-      sellerId: true,
-      order: {
-        select: {
-          status: true,
-        },
-      },
-      buyer: {
-        select: {
-          email: true,
-        },
-      },
-      seller: {
-        select: {
-          email: true,
-        },
-      },
+      status: true,
+      price: true,
+      createdAt: true,
+    },
+    orderBy: {
+      createdAt: "desc",
     },
   });
 }
 
-export async function getChatMessages(
-  orderId: string,
-  userId: string,
-  role?: string,
-) {
+async function getConversationContextWithOrder(conversationId: string) {
+  const conversation = await getConversationContextById(conversationId);
+
+  if (!conversation) {
+    return null;
+  }
+
+  const latestOrder = await getLatestConversationOrder(conversation);
+
+  return {
+    ...conversation,
+    latestOrder,
+  };
+}
+
+async function getOrCreateConversationRecord(input: {
+  buyerId: string;
+  sellerId: string;
+  productId?: string | null;
+}) {
+  const buyerId = normalizeText(input.buyerId);
+  const sellerId = normalizeText(input.sellerId);
+  const productId = normalizeOptionalText(input.productId);
+
+  if (!buyerId) {
+    throw new Error("buyerId is required.");
+  }
+
+  if (!sellerId) {
+    throw new Error("sellerId is required.");
+  }
+
+  if (buyerId === sellerId) {
+    throw new Error("Нельзя начать диалог с самим собой.");
+  }
+
+  return prisma.$transaction(
+    async (transactionClient) => {
+      if (productId) {
+        const product = await transactionClient.product.findUnique({
+          where: {
+            id: productId,
+          },
+          select: {
+            id: true,
+            sellerId: true,
+          },
+        });
+
+        if (!product) {
+          throw new Error(`Product with id ${productId} was not found.`);
+        }
+
+        if (product.sellerId !== sellerId) {
+          throw new Error("Товар не принадлежит указанному продавцу.");
+        }
+      }
+
+      const existingConversation = await transactionClient.conversation.findFirst({
+        where: {
+          buyerId,
+          sellerId,
+          productId: productId ?? null,
+        },
+        select: {
+          id: true,
+        },
+        orderBy: {
+          createdAt: "desc",
+        },
+      });
+
+      if (existingConversation) {
+        return existingConversation;
+      }
+
+      return transactionClient.conversation.create({
+        data: {
+          buyerId,
+          sellerId,
+          productId: productId ?? null,
+        },
+        select: {
+          id: true,
+        },
+      });
+    },
+    {
+      isolationLevel: Prisma.TransactionIsolationLevel.Serializable,
+    },
+  );
+}
+
+async function getOrCreateConversationByOrder(orderId: string) {
   const normalizedOrderId = normalizeText(orderId);
-  const normalizedUserId = normalizeText(userId);
 
   if (!normalizedOrderId) {
     throw new Error("orderId is required.");
+  }
+
+  const order = await prisma.order.findUnique({
+    where: {
+      id: normalizedOrderId,
+    },
+    select: {
+      id: true,
+      buyerId: true,
+      sellerId: true,
+      productId: true,
+      status: true,
+    },
+  });
+
+  if (!order) {
+    throw new Error(`Order with id ${normalizedOrderId} was not found.`);
+  }
+
+  const conversation = await getOrCreateConversationRecord({
+    buyerId: order.buyerId,
+    sellerId: order.sellerId,
+    productId: order.productId,
+  });
+
+  return {
+    ...conversation,
+    order,
+  };
+}
+
+export async function getOrCreateConversation(input: {
+  buyerId: string;
+  sellerId: string;
+  productId?: string | null;
+}) {
+  const conversation = await getOrCreateConversationRecord(input);
+
+  return {
+    conversationId: conversation.id,
+  };
+}
+
+export async function listConversationsByUser(userId: string) {
+  const normalizedUserId = normalizeText(userId);
+
+  if (!normalizedUserId) {
+    throw new Error("userId is required.");
+  }
+
+  const conversations = await prisma.conversation.findMany({
+    where: {
+      OR: [
+        {
+          buyerId: normalizedUserId,
+        },
+        {
+          sellerId: normalizedUserId,
+        },
+      ],
+    },
+    select: {
+      id: true,
+      buyerId: true,
+      sellerId: true,
+      productId: true,
+      createdAt: true,
+      updatedAt: true,
+      buyer: {
+        select: {
+          id: true,
+          email: true,
+          name: true,
+          image: true,
+        },
+      },
+      seller: {
+        select: {
+          id: true,
+          email: true,
+          name: true,
+          image: true,
+        },
+      },
+      product: {
+        select: {
+          id: true,
+          title: true,
+          price: true,
+        },
+      },
+      messages: {
+        orderBy: {
+          createdAt: "desc",
+        },
+        take: 1,
+        select: {
+          id: true,
+          text: true,
+          imageUrl: true,
+          createdAt: true,
+          senderId: true,
+        },
+      },
+    },
+    orderBy: {
+      updatedAt: "desc",
+    },
+  });
+
+  return conversations.map((conversation) => {
+    const isBuyer = conversation.buyerId === normalizedUserId;
+    const otherParty = isBuyer ? conversation.seller : conversation.buyer;
+    const lastMessage = conversation.messages[0] ?? null;
+
+    return {
+      id: conversation.id,
+      createdAt: conversation.createdAt.toISOString(),
+      updatedAt: conversation.updatedAt.toISOString(),
+      otherParty: {
+        id: otherParty.id,
+        email: otherParty.email,
+        name: otherParty.name,
+        image: otherParty.image,
+      },
+      product: conversation.product
+        ? {
+            id: conversation.product.id,
+            title: conversation.product.title,
+            price: formatMoney(conversation.product.price),
+          }
+        : null,
+      lastMessage: lastMessage
+        ? {
+            id: lastMessage.id,
+            text: lastMessage.text,
+            hasImage: Boolean(lastMessage.imageUrl),
+            createdAt: lastMessage.createdAt.toISOString(),
+            senderId: lastMessage.senderId,
+          }
+        : null,
+    };
+  });
+}
+
+export async function getConversationRoom(conversationId: string, userId: string) {
+  const normalizedConversationId = normalizeText(conversationId);
+  const normalizedUserId = normalizeText(userId);
+
+  if (!normalizedConversationId) {
+    throw new Error("conversationId is required.");
   }
 
   if (!normalizedUserId) {
     throw new Error("userId is required.");
   }
 
-  const chatRoom = await prisma.chatRoom.findUnique({
+  const conversation = await getConversationContextWithOrder(normalizedConversationId);
+
+  if (!conversation) {
+    throw new Error(`Conversation with id ${normalizedConversationId} was not found.`);
+  }
+
+  ensureConversationAccess(normalizedUserId, conversation);
+
+  return {
+    id: conversation.id,
+    buyerId: conversation.buyerId,
+    sellerId: conversation.sellerId,
+    product: conversation.product
+      ? {
+          id: conversation.product.id,
+          title: conversation.product.title,
+          price: formatMoney(conversation.product.price),
+        }
+      : null,
+    otherParty: normalizedUserId === conversation.buyerId
+      ? {
+          role: "SELLER" as const,
+          email: conversation.seller.email,
+        }
+      : {
+          role: "BUYER" as const,
+          email: conversation.buyer.email,
+        },
+    latestOrder: conversation.latestOrder
+      ? {
+          id: conversation.latestOrder.id,
+          status: conversation.latestOrder.status,
+          price: formatMoney(conversation.latestOrder.price),
+          createdAt: conversation.latestOrder.createdAt.toISOString(),
+        }
+      : null,
+    createdAt: conversation.createdAt.toISOString(),
+    updatedAt: conversation.updatedAt.toISOString(),
+  };
+}
+
+export async function getConversationMessages(
+  conversationId: string,
+  userId: string,
+  role?: string,
+) {
+  const normalizedConversationId = normalizeText(conversationId);
+  const normalizedUserId = normalizeText(userId);
+
+  if (!normalizedConversationId) {
+    throw new Error("conversationId is required.");
+  }
+
+  if (!normalizedUserId) {
+    throw new Error("userId is required.");
+  }
+
+  const conversation = await prisma.conversation.findUnique({
     where: {
-      orderId: normalizedOrderId,
+      id: normalizedConversationId,
     },
     select: {
       id: true,
-      orderId: true,
       buyerId: true,
       sellerId: true,
-      order: {
+      buyer: {
         select: {
-          status: true,
+          email: true,
         },
       },
+      seller: {
+        select: {
+          email: true,
+        },
+      },
+      productId: true,
       messages: {
         orderBy: {
           createdAt: "asc",
         },
         select: {
           id: true,
-          content: true,
+          text: true,
           imageUrl: true,
           isRead: true,
           senderId: true,
@@ -1645,40 +2126,47 @@ export async function getChatMessages(
     },
   });
 
-  if (!chatRoom) {
-    throw new Error(`Chat for order ${normalizedOrderId} was not found.`);
+  if (!conversation) {
+    throw new Error(`Conversation with id ${normalizedConversationId} was not found.`);
   }
 
-  ensureChatAccess(normalizedUserId, chatRoom, role);
+  const latestOrder = await getLatestConversationOrder(conversation);
+  ensureConversationAccess(normalizedUserId, {
+    ...conversation,
+    latestOrder,
+  }, role);
 
   return {
-    orderId: chatRoom.orderId,
-    chatRoomId: chatRoom.id,
-    messages: chatRoom.messages,
+    conversationId: conversation.id,
+    messages: conversation.messages.map((message) => ({
+      ...message,
+      createdAt: message.createdAt.toISOString(),
+      updatedAt: message.updatedAt.toISOString(),
+    })),
   };
 }
 
-export async function createChatMessage(input: {
-  orderId: string;
+export async function createConversationMessage(input: {
+  conversationId: string;
   senderId: string;
-  content?: string;
+  text?: string;
   imageBase64?: string | null;
 }) {
-  const orderId = normalizeText(input.orderId);
+  const conversationId = normalizeText(input.conversationId);
   const senderId = normalizeText(input.senderId);
-  const content = normalizeText(input.content);
+  const text = normalizeText(input.text);
   const imageBase64 = normalizeOptionalText(input.imageBase64);
 
-  if (!orderId) {
-    throw new Error("orderId is required.");
+  if (!conversationId) {
+    throw new Error("conversationId is required.");
   }
 
   if (!senderId) {
     throw new Error("senderId is required.");
   }
 
-  if (!content && !imageBase64) {
-    throw new Error("content or imageBase64 is required.");
+  if (!text && !imageBase64) {
+    throw new Error("text or imageBase64 is required.");
   }
 
   if (imageBase64 && !imageBase64.startsWith("data:image/webp;base64,")) {
@@ -1689,39 +2177,48 @@ export async function createChatMessage(input: {
     throw new Error("imageBase64 is too large.");
   }
 
-  const chatRoom = await prisma.chatRoom.findUnique({
+  const conversation = await prisma.conversation.findUnique({
     where: {
-      orderId,
+      id: conversationId,
     },
     select: {
       id: true,
-      orderId: true,
       buyerId: true,
       sellerId: true,
+      buyer: {
+        select: {
+          email: true,
+        },
+      },
+      seller: {
+        select: {
+          email: true,
+        },
+      },
     },
   });
 
-  if (!chatRoom) {
-    throw new Error(`Chat for order ${orderId} was not found.`);
+  if (!conversation) {
+    throw new Error(`Conversation with id ${conversationId} was not found.`);
   }
 
-  ensureChatParticipant(senderId, chatRoom);
-  setTypingState(orderId, senderId, false);
+  ensureConversationParticipant(senderId, conversation);
+  setTypingState(conversationId, senderId, false);
 
-  const recipientId = senderId === chatRoom.buyerId ? chatRoom.sellerId : chatRoom.buyerId;
+  const recipientId = senderId === conversation.buyerId ? conversation.sellerId : conversation.buyerId;
 
   const message = await prisma.$transaction(
     async (transactionClient) => {
       const createdMessage = await transactionClient.message.create({
         data: {
-          chatRoomId: chatRoom.id,
+          conversationId: conversation.id,
           senderId,
-          content,
+          text,
           imageUrl: imageBase64,
         },
         select: {
           id: true,
-          content: true,
+          text: true,
           imageUrl: true,
           isRead: true,
           senderId: true,
@@ -1736,11 +2233,20 @@ export async function createChatMessage(input: {
         },
       });
 
+      await transactionClient.conversation.update({
+        where: {
+          id: conversation.id,
+        },
+        data: {
+          updatedAt: new Date(),
+        },
+      });
+
       await createUserNotification(transactionClient, {
         userId: recipientId,
         title: "Новое сообщение",
-        message: "Вам написали в чате сделки",
-        link: `/orders/${chatRoom.orderId}`,
+        message: "Вам написали в личном диалоге.",
+        link: `/chats/${conversation.id}`,
       });
 
       return createdMessage;
@@ -1751,38 +2257,41 @@ export async function createChatMessage(input: {
   );
 
   return {
-    orderId: chatRoom.orderId,
-    chatRoomId: chatRoom.id,
-    message,
+    conversationId: conversation.id,
+    message: {
+      ...message,
+      createdAt: message.createdAt.toISOString(),
+      updatedAt: message.updatedAt.toISOString(),
+    },
   };
 }
 
-export async function markChatMessagesAsRead(input: {
-  chatRoomId: string;
+export async function markConversationMessagesAsRead(input: {
+  conversationId: string;
   userId: string;
 }) {
-  const chatRoomId = normalizeText(input.chatRoomId);
+  const conversationId = normalizeText(input.conversationId);
   const userId = normalizeText(input.userId);
 
-  if (!chatRoomId) {
-    throw new Error("chatRoomId is required.");
+  if (!conversationId) {
+    throw new Error("conversationId is required.");
   }
 
   if (!userId) {
     throw new Error("userId is required.");
   }
 
-  const chatRoom = await getChatRoomContextById(chatRoomId);
+  const conversation = await getConversationContextById(conversationId);
 
-  if (!chatRoom) {
-    throw new Error(`Chat room ${chatRoomId} was not found.`);
+  if (!conversation) {
+    throw new Error(`Conversation ${conversationId} was not found.`);
   }
 
-  ensureChatParticipant(userId, chatRoom);
+  ensureConversationParticipant(userId, conversation);
 
   const updatedMessages = await prisma.message.updateMany({
     where: {
-      chatRoomId,
+      conversationId,
       senderId: {
         not: userId,
       },
@@ -1794,9 +2303,182 @@ export async function markChatMessagesAsRead(input: {
   });
 
   return {
-    chatRoomId: chatRoom.id,
-    orderId: chatRoom.orderId,
+    conversationId: conversation.id,
     updatedCount: updatedMessages.count,
+  };
+}
+
+export async function getConversationTyping(
+  conversationId: string,
+  userId: string,
+  role?: string,
+) {
+  const normalizedConversationId = normalizeText(conversationId);
+  const normalizedUserId = normalizeText(userId);
+
+  if (!normalizedConversationId) {
+    throw new Error("conversationId is required.");
+  }
+
+  if (!normalizedUserId) {
+    throw new Error("userId is required.");
+  }
+
+  const conversation = await getConversationContextWithOrder(normalizedConversationId);
+
+  if (!conversation) {
+    throw new Error(`Conversation with id ${normalizedConversationId} was not found.`);
+  }
+
+  ensureConversationAccess(normalizedUserId, conversation, role);
+
+  return {
+    conversationId: conversation.id,
+    typingUsers: getTypingUsers(conversation),
+  };
+}
+
+export async function setConversationTyping(input: {
+  conversationId: string;
+  senderId: string;
+  isTyping?: boolean;
+}) {
+  const conversationId = normalizeText(input.conversationId);
+  const senderId = normalizeText(input.senderId);
+
+  if (!conversationId) {
+    throw new Error("conversationId is required.");
+  }
+
+  if (!senderId) {
+    throw new Error("senderId is required.");
+  }
+
+  const conversation = await getConversationContextById(conversationId);
+
+  if (!conversation) {
+    throw new Error(`Conversation with id ${conversationId} was not found.`);
+  }
+
+  ensureConversationParticipant(senderId, conversation);
+  setTypingState(conversationId, senderId, Boolean(input.isTyping));
+
+  return {
+    conversationId: conversation.id,
+    typingUsers: getTypingUsers(conversation),
+  };
+}
+
+export async function getChatMessages(
+  orderId: string,
+  userId: string,
+  role?: string,
+) {
+  const { id: conversationId, order } = await getOrCreateConversationByOrder(orderId);
+  const normalizedUserId = normalizeText(userId);
+
+  if (!normalizedUserId) {
+    throw new Error("userId is required.");
+  }
+
+  const conversationRecord = await prisma.conversation.findUnique({
+    where: {
+      id: conversationId,
+    },
+    select: {
+      id: true,
+      buyerId: true,
+      sellerId: true,
+      messages: {
+        orderBy: {
+          createdAt: "asc",
+        },
+        select: {
+          id: true,
+          text: true,
+          imageUrl: true,
+          isRead: true,
+          senderId: true,
+          createdAt: true,
+          updatedAt: true,
+          sender: {
+            select: {
+              id: true,
+              email: true,
+            },
+          },
+        },
+      },
+    },
+  });
+
+  if (!conversationRecord) {
+    throw new Error(`Conversation with id ${conversationId} was not found.`);
+  }
+
+  ensureConversationAccess(normalizedUserId, conversationRecord, role, order.status);
+
+  return {
+    orderId: order.id,
+    chatRoomId: conversationRecord.id,
+    messages: conversationRecord.messages.map((message) => ({
+      id: message.id,
+      content: message.text,
+      imageUrl: message.imageUrl,
+      isRead: message.isRead,
+      senderId: message.senderId,
+      createdAt: message.createdAt.toISOString(),
+      updatedAt: message.updatedAt.toISOString(),
+      sender: message.sender,
+    })),
+  };
+}
+
+export async function createChatMessage(input: {
+  orderId: string;
+  senderId: string;
+  content?: string;
+  imageBase64?: string | null;
+}) {
+  const { id: conversationId, order } = await getOrCreateConversationByOrder(input.orderId);
+  const result = await createConversationMessage({
+    conversationId,
+    senderId: input.senderId,
+    text: input.content,
+    imageBase64: input.imageBase64,
+  });
+
+  return {
+    orderId: order.id,
+    chatRoomId: result.conversationId,
+    message: result.message
+      ? {
+          id: result.message.id,
+          content: result.message.text,
+          imageUrl: result.message.imageUrl,
+          isRead: result.message.isRead,
+          senderId: result.message.senderId,
+          createdAt: result.message.createdAt,
+          updatedAt: result.message.updatedAt,
+          sender: result.message.sender,
+        }
+      : null,
+  };
+}
+
+export async function markChatMessagesAsRead(input: {
+  chatRoomId: string;
+  userId: string;
+}) {
+  const result = await markConversationMessagesAsRead({
+    conversationId: input.chatRoomId,
+    userId: input.userId,
+  });
+
+  return {
+    chatRoomId: result.conversationId,
+    orderId: null,
+    updatedCount: result.updatedCount,
   };
 }
 
@@ -1805,28 +2487,24 @@ export async function getChatTyping(
   userId: string,
   role?: string,
 ) {
-  const normalizedOrderId = normalizeText(orderId);
+  const { id: conversationId, order } = await getOrCreateConversationByOrder(orderId);
   const normalizedUserId = normalizeText(userId);
-
-  if (!normalizedOrderId) {
-    throw new Error("orderId is required.");
-  }
 
   if (!normalizedUserId) {
     throw new Error("userId is required.");
   }
 
-  const chatRoom = await getChatRoomContext(normalizedOrderId);
+  const conversation = await getConversationContextById(conversationId);
 
-  if (!chatRoom) {
-    throw new Error(`Chat for order ${normalizedOrderId} was not found.`);
+  if (!conversation) {
+    throw new Error(`Conversation with id ${conversationId} was not found.`);
   }
 
-  ensureChatAccess(normalizedUserId, chatRoom, role);
+  ensureConversationAccess(normalizedUserId, conversation, role, order.status);
 
   return {
-    orderId: chatRoom.orderId,
-    typingUsers: getTypingUsers(chatRoom),
+    orderId: order.id,
+    typingUsers: getTypingUsers(conversation),
   };
 }
 
@@ -1835,28 +2513,15 @@ export async function setChatTyping(input: {
   senderId: string;
   isTyping?: boolean;
 }) {
-  const orderId = normalizeText(input.orderId);
-  const senderId = normalizeText(input.senderId);
-
-  if (!orderId) {
-    throw new Error("orderId is required.");
-  }
-
-  if (!senderId) {
-    throw new Error("senderId is required.");
-  }
-
-  const chatRoom = await getChatRoomContext(orderId);
-
-  if (!chatRoom) {
-    throw new Error(`Chat for order ${orderId} was not found.`);
-  }
-
-  ensureChatParticipant(senderId, chatRoom);
-  setTypingState(orderId, senderId, Boolean(input.isTyping));
+  const { id: conversationId, order } = await getOrCreateConversationByOrder(input.orderId);
+  const result = await setConversationTyping({
+    conversationId,
+    senderId: input.senderId,
+    isTyping: input.isTyping,
+  });
 
   return {
-    orderId: chatRoom.orderId,
-    typingUsers: getTypingUsers(chatRoom),
+    orderId: order.id,
+    typingUsers: result.typingUsers,
   };
 }

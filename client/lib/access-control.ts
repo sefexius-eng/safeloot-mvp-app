@@ -13,6 +13,10 @@ export interface CurrentSessionUser {
   isBanned: boolean;
 }
 
+export function isAdminRole(role: Role | null | undefined) {
+  return role === "ADMIN" || role === "SUPER_ADMIN";
+}
+
 export function getSessionUserId(session: Session | null) {
   return session?.user?.id?.trim() ?? "";
 }
@@ -39,5 +43,5 @@ export async function getCurrentSessionUser(
 }
 
 export function hasActiveAdminAccess(user: CurrentSessionUser | null) {
-  return Boolean(user && user.role === "ADMIN" && !user.isBanned);
+  return Boolean(user && isAdminRole(user.role) && !user.isBanned);
 }

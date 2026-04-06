@@ -405,7 +405,13 @@ export function SiteHeader() {
                   </Select>
                 </div>
 
-                <NotificationsBell />
+                <Link
+                  href="/chats"
+                  aria-label="Открыть диалоги"
+                  className="relative inline-flex h-10 w-10 items-center justify-center rounded-xl border border-white/10 bg-white/5 text-lg text-zinc-100 shadow-[0_12px_28px_rgba(0,0,0,0.22)] transition hover:bg-white/10"
+                >
+                  <span aria-hidden="true">💬</span>
+                </Link>
 
                 {isBanned ? (
                   <div className="inline-flex h-10 items-center justify-center rounded-xl border border-red-500/20 bg-red-500/10 px-4 text-sm font-semibold text-red-100 shadow-[0_12px_28px_rgba(0,0,0,0.22)]">
@@ -420,7 +426,7 @@ export function SiteHeader() {
                       Продать
                     </Link>
 
-                    {session?.user?.role === "ADMIN" ? (
+                    {session?.user?.role === "ADMIN" || session?.user?.role === "SUPER_ADMIN" ? (
                       <Link
                         href="/admin"
                         className="inline-flex h-10 items-center justify-center rounded-xl border border-sky-400/20 bg-sky-500/10 px-4 text-sm font-semibold text-sky-100 shadow-[0_16px_40px_rgba(2,132,199,0.16)] transition hover:-translate-y-0.5 hover:bg-sky-500/20"
@@ -463,6 +469,10 @@ export function SiteHeader() {
                     <DropdownMenuItem asChild>
                       <Link href="/profile/settings">Настройки профиля</Link>
                     </DropdownMenuItem>
+                    <DropdownMenuSeparator className="my-1 h-px bg-white/10" />
+                    <div className="px-2 py-2">
+                      <NotificationsBell mode="panel" />
+                    </div>
                     <DropdownMenuSeparator className="my-1 h-px bg-white/10" />
                     <DropdownMenuItem
                       onSelect={(event) => {
