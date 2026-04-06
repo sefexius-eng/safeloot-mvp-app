@@ -1163,14 +1163,25 @@ export async function getOrderById(
 
   const order = await prisma.order.findUnique({
     where: { id: normalizedOrderId },
-    select: {
-      id: true,
-      buyerId: true,
-      sellerId: true,
-      productId: true,
-      price: true,
-      platformFee: true,
-      status: true,
+    include: {
+      buyer: {
+        select: {
+          id: true,
+          email: true,
+          name: true,
+          image: true,
+          lastSeen: true,
+        },
+      },
+      seller: {
+        select: {
+          id: true,
+          email: true,
+          name: true,
+          image: true,
+          lastSeen: true,
+        },
+      },
       review: {
         select: {
           id: true,
@@ -1209,6 +1220,14 @@ export async function getOrderById(
           createdAt: order.review.createdAt.toISOString(),
         }
       : null,
+    buyer: {
+      ...order.buyer,
+      lastSeen: order.buyer.lastSeen.toISOString(),
+    },
+    seller: {
+      ...order.seller,
+      lastSeen: order.seller.lastSeen.toISOString(),
+    },
     product: order.product,
   };
 }
@@ -2127,6 +2146,8 @@ export async function getConversationMessages(
             select: {
               id: true,
               email: true,
+              name: true,
+              image: true,
             },
           },
         },
@@ -2236,6 +2257,8 @@ export async function createConversationMessage(input: {
             select: {
               id: true,
               email: true,
+              name: true,
+              image: true,
             },
           },
         },
@@ -2413,6 +2436,8 @@ export async function getChatMessages(
             select: {
               id: true,
               email: true,
+              name: true,
+              image: true,
             },
           },
         },

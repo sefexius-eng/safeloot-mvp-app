@@ -16,10 +16,13 @@ import { RatingStars } from "@/components/reviews/rating-stars";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
+import { UserAvatar } from "@/components/ui/user-avatar";
 
 const CHAT_POLL_INTERVAL_MS = 3000;
+const ORDER_REFRESH_INTERVAL_MS = 30000;
 const TYPING_POLL_INTERVAL_MS = 1500;
 const TYPING_IDLE_TIMEOUT_MS = 1800;
+const INTERLOCUTOR_ONLINE_WINDOW_MS = 5 * 60 * 1000;
 const BALANCE_REFRESH_EVENT = "safeloot:balances-refresh";
 const MAX_CHAT_IMAGE_WIDTH = 800;
 const CHAT_IMAGE_QUALITY = 0.7;
@@ -28,6 +31,17 @@ const ACCEPTED_CHAT_IMAGE_TYPES = new Set([
   "image/png",
   "image/webp",
 ]);
+
+interface ChatUserIdentity {
+  id: string;
+  email: string;
+  name: string | null;
+  image: string | null;
+}
+
+interface OrderParticipant extends ChatUserIdentity {
+  lastSeen: string;
+}
 
 type OrderStatus =
   | "PENDING"
@@ -57,6 +71,8 @@ interface OrderDetail {
     comment: string | null;
     createdAt: string;
   } | null;
+  buyer: OrderParticipant;
+  seller: OrderParticipant;
 }
 
 interface ChatMessage {
@@ -67,10 +83,7 @@ interface ChatMessage {
   senderId: string;
   createdAt: string;
   updatedAt: string;
-  sender: {
-    id: string;
-    email: string;
-  };
+  sender: ChatUserIdentity;
 }
 
 interface ChatResponse {
@@ -172,6 +185,39 @@ function formatReviewTime(value: string) {
   }).format(new Date(value));
 }
 
+function getUserDisplayName(user: { name?: string | null; email: string }) {
+  return user.name?.trim() || user.email.split("@")[0] || "Пользователь";
+}
+
+function isUserOnline(lastSeen?: string | null) {
+  if (!lastSeen) {
+    return false;
+  }
+
+  const lastSeenTime = new Date(lastSeen).getTime();
+
+  return (
+    Number.isFinite(lastSeenTime) &&
+    lastSeenTime > Date.now() - INTERLOCUTOR_ONLINE_WINDOW_MS
+  );
+}
+
+function getOrderParticipantById(order: OrderDetail, userId: string) {
+  if (userId === order.buyerId) {
+    return order.buyer;
+  }
+
+  if (userId === order.sellerId) {
+    return order.seller;
+  }
+
+  return null;
+}
+
+function resolveMessageAuthor(order: OrderDetail, message: ChatMessage) {
+  return getOrderParticipantById(order, message.senderId) ?? message.sender;
+}
+
 function readFileAsDataUrl(file: Blob) {
   return new Promise<string>((resolve, reject) => {
     const reader = new FileReader();
@@ -269,7 +315,7 @@ export function ActiveOrderView({ orderId }: ActiveOrderViewProps) {
   const hasActiveTypingRef = useRef(false);
   const previousMessageCountRef = useRef(0);
   const currentUserId = session?.user?.id ?? "";
-  const currentUserRole = session?.user?.role ?? "USER";
+  const currentUserAccountRole = session?.user?.role ?? "USER";
   const isCurrentUserSeller = order?.sellerId === currentUserId;
 
   useEffect(() => {
@@ -334,9 +380,13 @@ export function ActiveOrderView({ orderId }: ActiveOrderViewProps) {
     }
 
     void loadOrder();
+    const intervalId = window.setInterval(() => {
+      void loadOrder();
+    }, ORDER_REFRESH_INTERVAL_MS);
 
     return () => {
       isMounted = false;
+      window.clearInterval(intervalId);
     };
   }, [orderId, sessionStatus]);
 
@@ -488,7 +538,8 @@ export function ActiveOrderView({ orderId }: ActiveOrderViewProps) {
     let isMounted = true;
 
     const isSpectator =
-      (currentUserRole === "ADMIN" || currentUserRole === "SUPER_ADMIN") &&
+      (currentUserAccountRole === "ADMIN" ||
+        currentUserAccountRole === "SUPER_ADMIN") &&
       currentUserId !== order?.buyerId &&
       currentUserId !== order?.sellerId;
 
@@ -537,7 +588,7 @@ export function ActiveOrderView({ orderId }: ActiveOrderViewProps) {
   }, [
     chatRoomId,
     currentUserId,
-    currentUserRole,
+    currentUserAccountRole,
     messages,
     order,
   ]);
@@ -963,15 +1014,47 @@ export function ActiveOrderView({ orderId }: ActiveOrderViewProps) {
   const remoteTypingUsers = typingUsers.filter(
     (typingUser) => typingUser.senderId !== currentUserId,
   );
-  const sellerIsTyping = remoteTypingUsers.some(
-    (typingUser) => typingUser.role === "SELLER",
-  );
-  const isParticipant =
-    currentUserId === order.buyerId || currentUserId === order.sellerId;
+  const isBuyer = currentUserId === order.buyerId;
+  const isSeller = currentUserId === order.sellerId;
+  const isParticipant = isBuyer || isSeller;
+  const currentParticipant = isBuyer
+    ? order.buyer
+    : isSeller
+      ? order.seller
+      : null;
+  const interlocutor = isBuyer ? order.seller : isSeller ? order.buyer : null;
+  const currentUserDealRole = isBuyer
+    ? "Покупатель"
+    : isSeller
+      ? "Продавец"
+      : "Арбитр";
+  const interlocutorRole = isBuyer
+    ? "Продавец"
+    : isSeller
+      ? "Покупатель"
+      : null;
+  const interlocutorDisplayName = interlocutor
+    ? getUserDisplayName(interlocutor)
+    : "";
+  const interlocutorIsOnline = interlocutor
+    ? isUserOnline(interlocutor.lastSeen)
+    : false;
+  const emptyStateTargetLabel = interlocutorRole?.toLowerCase() ?? "участнику сделки";
+  const currentUserDisplayName = currentParticipant
+    ? getUserDisplayName(currentParticipant)
+    : session?.user?.name?.trim() || "Вы";
+  const remoteTypingUser = remoteTypingUsers[0] ?? null;
+  const typingParticipant = remoteTypingUser
+    ? getOrderParticipantById(order, remoteTypingUser.senderId)
+    : null;
+  const typingDisplayName = typingParticipant
+    ? getUserDisplayName(typingParticipant)
+    : "Собеседник";
+  const isRemoteTyping = remoteTypingUsers.length > 0;
   const isSpectator =
-    (currentUserRole === "ADMIN" || currentUserRole === "SUPER_ADMIN") &&
-    currentUserId !== order.buyerId &&
-    currentUserId !== order.sellerId;
+    (currentUserAccountRole === "ADMIN" ||
+      currentUserAccountRole === "SUPER_ADMIN") &&
+    !isParticipant;
   const canOpenDispute =
     isParticipant && (order.status === "PAID" || order.status === "DELIVERED");
   const canCompleteOrder =
@@ -989,24 +1072,93 @@ export function ActiveOrderView({ orderId }: ActiveOrderViewProps) {
     <section className="grid gap-6 lg:grid-cols-[minmax(0,1.4fr)_360px] lg:items-start">
       <div className="rounded-[2rem] border border-white/10 bg-zinc-900/80 p-5 shadow-[0_24px_80px_rgba(0,0,0,0.28)] backdrop-blur md:p-6">
         <div className="flex items-center justify-between gap-4 border-b border-white/10 pb-4">
-          <div>
-            <p className="text-sm font-semibold tracking-[0.24em] uppercase text-zinc-500">
-              Чат сделки
-            </p>
-            <h2 className="mt-2 text-2xl font-semibold tracking-tight text-white">
-              Переписка по заказу
-            </h2>
-            <div className="mt-3 flex flex-wrap gap-2">
-              <span className="rounded-full border border-orange-500/20 bg-orange-500/10 px-3 py-1 text-[11px] font-semibold tracking-[0.2em] uppercase text-orange-200">
-                Покупатель
-              </span>
-              <span className="rounded-full border border-sky-500/20 bg-sky-500/10 px-3 py-1 text-[11px] font-semibold tracking-[0.2em] uppercase text-sky-200">
-                Продавец
-              </span>
+          {interlocutor ? (
+            <div className="flex min-w-0 items-center gap-3">
+              <div className="relative shrink-0">
+                <UserAvatar
+                  src={interlocutor.image}
+                  name={interlocutorDisplayName}
+                  email={interlocutor.email}
+                  className="h-10 w-10 shrink-0 border-white/10 bg-zinc-800/80"
+                  imageClassName="rounded-full object-cover"
+                />
+                <span
+                  aria-label={interlocutorIsOnline ? "Собеседник онлайн" : "Собеседник не в сети"}
+                  title={interlocutorIsOnline ? "Собеседник онлайн" : "Собеседник не в сети"}
+                  className={[
+                    "absolute -bottom-0.5 -right-0.5 inline-flex h-3.5 w-3.5 items-center justify-center rounded-full border border-zinc-950 text-[8px]",
+                    interlocutorIsOnline
+                      ? "bg-emerald-500 text-emerald-950"
+                      : "bg-zinc-600 text-zinc-200",
+                  ].join(" ")}
+                >
+                  ●
+                </span>
+              </div>
+
+              <div className="min-w-0">
+                <p className="text-sm font-semibold tracking-[0.24em] uppercase text-zinc-500">
+                  Чат сделки
+                </p>
+                <Link
+                  href={`/user/${interlocutor.id}`}
+                  className="mt-1 block truncate text-xl font-semibold tracking-tight text-white transition hover:text-orange-300 hover:underline"
+                >
+                  {interlocutorDisplayName}
+                </Link>
+                <div className="mt-1 flex flex-wrap items-center gap-2 text-sm text-zinc-400">
+                  <span>{interlocutorRole}</span>
+                  <span className="h-1 w-1 rounded-full bg-zinc-600" />
+                  <span className="inline-flex items-center gap-1.5">
+                    <span
+                      className={[
+                        "h-2 w-2 rounded-full",
+                        interlocutorIsOnline ? "bg-emerald-400" : "bg-zinc-500",
+                      ].join(" ")}
+                    />
+                    {interlocutorIsOnline ? "Онлайн" : "Не в сети"}
+                  </span>
+                </div>
+              </div>
             </div>
-          </div>
-          <span className="rounded-full border border-emerald-500/20 bg-emerald-500/10 px-3 py-1.5 text-xs font-semibold tracking-[0.2em] uppercase text-emerald-200">
-            online
+          ) : (
+            <div className="min-w-0">
+              <p className="text-sm font-semibold tracking-[0.24em] uppercase text-zinc-500">
+                Чат сделки
+              </p>
+              <div className="mt-3 flex flex-wrap gap-4">
+                {[
+                  { participant: order.buyer, role: "Покупатель" },
+                  { participant: order.seller, role: "Продавец" },
+                ].map(({ participant, role }) => (
+                  <Link
+                    key={participant.id}
+                    href={`/user/${participant.id}`}
+                    className="flex min-w-0 items-center gap-3 rounded-2xl border border-white/10 bg-white/5 px-3 py-2 transition hover:bg-white/10"
+                  >
+                    <UserAvatar
+                      src={participant.image}
+                      name={getUserDisplayName(participant)}
+                      email={participant.email}
+                      className="h-10 w-10 shrink-0 border-white/10 bg-zinc-800/80"
+                      imageClassName="rounded-full object-cover"
+                    />
+                    <div className="min-w-0">
+                      <p className="text-xs font-semibold tracking-[0.18em] uppercase text-zinc-500">
+                        {role}
+                      </p>
+                      <p className="truncate text-sm font-semibold text-white">
+                        {getUserDisplayName(participant)}
+                      </p>
+                    </div>
+                  </Link>
+                ))}
+              </div>
+            </div>
+          )}
+
+          <span className="rounded-full border border-white/10 bg-white/5 px-3 py-1.5 text-xs font-semibold tracking-[0.18em] uppercase text-zinc-200">
+            {isParticipant ? `Вы • ${currentUserDealRole}` : "Наблюдатель"}
           </span>
         </div>
 
@@ -1026,7 +1178,7 @@ export function ActiveOrderView({ orderId }: ActiveOrderViewProps) {
 
           {!isChatLoading && messages.length === 0 ? (
             <div className="flex h-full items-center justify-center text-center text-sm leading-7 text-zinc-500">
-              Чат активирован. Напишите первое сообщение продавцу, чтобы начать сделку.
+              Чат активирован. Напишите первое сообщение {emptyStateTargetLabel}, чтобы начать общение.
             </div>
           ) : null}
 
@@ -1034,10 +1186,17 @@ export function ActiveOrderView({ orderId }: ActiveOrderViewProps) {
             {messages.map((message) => {
               const isOwnMessage = message.senderId === currentUserId;
               const isSellerMessage = message.senderId === order.sellerId;
-              const roleLabel = isSellerMessage ? "Продавец" : "Покупатель";
-              const authorLabel = isOwnMessage
-                ? "Вы"
-                : message.sender.email.split("@")[0] || message.sender.email;
+              const author = resolveMessageAuthor(order, message);
+              const authorLabel = isOwnMessage ? "Вы" : getUserDisplayName(author);
+              const authorAvatar = isOwnMessage
+                ? currentParticipant?.image ?? session?.user?.image ?? author.image
+                : author.image;
+              const authorName = isOwnMessage
+                ? currentUserDisplayName
+                : getUserDisplayName(author);
+              const authorEmail = isOwnMessage
+                ? currentParticipant?.email ?? session?.user?.email ?? author.email
+                : author.email;
 
               return (
                 <div
@@ -1045,78 +1204,103 @@ export function ActiveOrderView({ orderId }: ActiveOrderViewProps) {
                   className={`flex ${isOwnMessage ? "justify-end" : "justify-start"}`}
                 >
                   <div
-                    className={[
-                      "max-w-[85%] rounded-[1.35rem] border px-4 py-3 shadow-[0_12px_30px_rgba(0,0,0,0.18)]",
-                      isOwnMessage
-                        ? "border-orange-400/25 bg-orange-600 text-white"
-                        : isSellerMessage
-                          ? "border-sky-500/20 bg-sky-500/8 text-zinc-100"
-                          : "border-white/10 bg-white/6 text-zinc-100",
-                    ].join(" ")}
+                    className={`flex max-w-[92%] items-end gap-3 ${isOwnMessage ? "flex-row-reverse" : ""}`}
                   >
-                    <div className="flex flex-wrap items-center gap-2 text-xs">
+                    <UserAvatar
+                      src={authorAvatar}
+                      name={authorName}
+                      email={authorEmail}
+                      className={[
+                        "h-8 w-8 shrink-0 border-white/10",
+                        isOwnMessage
+                          ? "bg-orange-500/10 text-orange-100"
+                          : isSellerMessage
+                            ? "bg-sky-500/10 text-sky-200"
+                            : "bg-zinc-800/80 text-zinc-300",
+                      ].join(" ")}
+                      imageClassName="rounded-full object-cover"
+                    />
+
+                    <div className={`flex min-w-0 flex-col ${isOwnMessage ? "items-end" : "items-start"}`}>
                       <span
                         className={[
-                          "rounded-full px-2.5 py-1 font-semibold tracking-[0.18em] uppercase",
+                          "mb-1 px-1 text-xs font-semibold",
                           isOwnMessage
-                            ? "bg-white/12 text-orange-100"
+                            ? "text-orange-100/85"
                             : isSellerMessage
-                              ? "bg-sky-500/14 text-sky-200"
-                              : "bg-white/8 text-zinc-300",
+                              ? "text-sky-200"
+                              : "text-zinc-400",
                         ].join(" ")}
                       >
-                        {roleLabel}
-                      </span>
-                      <span className={isOwnMessage ? "text-orange-100/85" : "text-zinc-300"}>
                         {authorLabel}
                       </span>
-                    </div>
 
-                    {message.content ? (
-                      <p className="mt-2 whitespace-pre-wrap break-words text-sm leading-7">
-                        {message.content}
-                      </p>
-                    ) : null}
-
-                    {message.imageUrl ? (
-                      <a
-                        href={message.imageUrl}
-                        target="_blank"
-                        rel="noreferrer"
-                        className="mt-3 block overflow-hidden rounded-[1rem] border border-white/10 bg-black/15"
+                      <div
+                        className={[
+                          "max-w-full rounded-[1.35rem] border px-4 py-3 shadow-[0_12px_30px_rgba(0,0,0,0.18)]",
+                          isOwnMessage
+                            ? "border-orange-400/25 bg-orange-600 text-white"
+                            : isSellerMessage
+                              ? "border-sky-500/20 bg-sky-500/8 text-zinc-100"
+                              : "border-white/10 bg-white/6 text-zinc-100",
+                        ].join(" ")}
                       >
-                        <img
-                          src={message.imageUrl}
-                          alt="Скриншот из чата"
-                          className="max-h-[360px] w-auto max-w-full object-cover"
-                        />
-                      </a>
-                    ) : null}
+                        {message.content ? (
+                          <p className="whitespace-pre-wrap break-words text-sm leading-7">
+                            {message.content}
+                          </p>
+                        ) : null}
 
-                    <div className="mt-3 flex items-center justify-end gap-2 text-xs">
-                      <span className={isOwnMessage ? "text-orange-100/70" : isSellerMessage ? "text-sky-200/70" : "text-zinc-500"}>
-                        {formatMessageTime(message.createdAt)}
-                      </span>
-                      {isOwnMessage ? (
-                        <span
-                          className={message.isRead ? "font-semibold text-sky-300" : "font-semibold text-orange-100/80"}
-                        >
-                          {message.isRead ? "✓✓" : "✓"}
-                        </span>
-                      ) : null}
+                        {message.imageUrl ? (
+                          <a
+                            href={message.imageUrl}
+                            target="_blank"
+                            rel="noreferrer"
+                            className={message.content ? "mt-3 block overflow-hidden rounded-[1rem] border border-white/10 bg-black/15" : "block overflow-hidden rounded-[1rem] border border-white/10 bg-black/15"}
+                          >
+                            <img
+                              src={message.imageUrl}
+                              alt="Скриншот из чата"
+                              className="max-h-[360px] w-auto max-w-full object-cover"
+                            />
+                          </a>
+                        ) : null}
+
+                        <div className="mt-3 flex items-center justify-end gap-2 text-xs">
+                          <span className={isOwnMessage ? "text-orange-100/70" : isSellerMessage ? "text-sky-200/70" : "text-zinc-500"}>
+                            {formatMessageTime(message.createdAt)}
+                          </span>
+                          {isOwnMessage ? (
+                            <span
+                              className={message.isRead ? "font-semibold text-sky-300" : "font-semibold text-orange-100/80"}
+                            >
+                              {message.isRead ? "✓✓" : "✓"}
+                            </span>
+                          ) : null}
+                        </div>
+                      </div>
                     </div>
                   </div>
                 </div>
               );
             })}
 
-            {sellerIsTyping ? (
+            {isRemoteTyping ? (
               <div className="flex justify-start">
                 <div className="inline-flex items-center gap-3 rounded-[1.35rem] border border-sky-500/20 bg-sky-500/8 px-4 py-3 text-sm text-sky-100 shadow-[0_12px_30px_rgba(0,0,0,0.18)]">
-                  <span className="rounded-full bg-sky-500/14 px-2.5 py-1 text-[11px] font-semibold tracking-[0.18em] uppercase text-sky-200">
-                    Продавец
-                  </span>
-                  <span>печатает</span>
+                  {typingParticipant ? (
+                    <UserAvatar
+                      src={typingParticipant.image}
+                      name={typingDisplayName}
+                      email={typingParticipant.email}
+                      className="h-8 w-8 shrink-0 border-sky-500/20 bg-sky-500/10 text-sky-200"
+                      imageClassName="rounded-full object-cover"
+                    />
+                  ) : null}
+                  <div className="flex items-center gap-3">
+                    <span className="font-semibold text-sky-100">{typingDisplayName}</span>
+                    <span>печатает</span>
+                  </div>
                   <span className="inline-flex items-center gap-1">
                     <span className="h-2 w-2 rounded-full bg-sky-300 animate-pulse" />
                     <span className="h-2 w-2 rounded-full bg-sky-300 animate-pulse [animation-delay:150ms]" />
