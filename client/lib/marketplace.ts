@@ -325,6 +325,8 @@ export async function listProductsBySeller(userId: string) {
         select: {
           id: true,
           email: true,
+          name: true,
+          image: true,
           rank: true,
         },
       },

@@ -1,5 +1,6 @@
 import Link from "next/link";
 
+import { UserAvatar } from "@/components/ui/user-avatar";
 import { prisma } from "@/lib/prisma";
 
 interface ProductCard {
@@ -11,6 +12,8 @@ interface ProductCard {
   seller: {
     id: string;
     email: string;
+    name: string | null;
+    image: string | null;
     rank: "BRONZE" | "SILVER" | "GOLD";
   };
 }
@@ -23,6 +26,8 @@ async function getProducts(): Promise<ProductCard[]> {
           select: {
             id: true,
             email: true,
+            name: true,
+            image: true,
             rank: true,
           },
         },
@@ -79,6 +84,10 @@ function getRankClassName(rank: ProductCard["seller"]["rank"]) {
     default:
       return "border-black/8 bg-black/4 text-neutral-700";
   }
+}
+
+function getSellerDisplayName(seller: ProductCard["seller"]) {
+  return seller.name?.trim() || seller.email;
 }
 
 export default async function Home() {
@@ -260,9 +269,24 @@ export default async function Home() {
                   </div>
                 </div>
 
-                <div className="mt-6 flex items-center justify-between border-t border-white/10 pt-4 text-sm text-zinc-400">
-                  <span>Продавец: {product.seller.email}</span>
-                  <span className="font-medium text-white group-hover:text-orange-400">
+                <div className="mt-6 flex items-center justify-between gap-4 border-t border-white/10 pt-4">
+                  <div className="flex min-w-0 items-center gap-3">
+                    <UserAvatar
+                      src={product.seller.image}
+                      name={getSellerDisplayName(product.seller)}
+                      email={product.seller.email}
+                      className="h-6 w-6 shrink-0"
+                    />
+                    <div className="min-w-0">
+                      <p className="text-[11px] font-semibold tracking-[0.18em] uppercase text-zinc-500">
+                        Продавец
+                      </p>
+                      <p className="truncate text-sm font-semibold text-white">
+                        {getSellerDisplayName(product.seller)}
+                      </p>
+                    </div>
+                  </div>
+                  <span className="shrink-0 text-sm font-medium text-white group-hover:text-orange-400">
                     Открыть карточку
                   </span>
                 </div>

@@ -5,6 +5,8 @@ import Link from "next/link";
 import { useEffect, useState } from "react";
 import { useSession } from "next-auth/react";
 
+import { UserAvatar } from "@/components/ui/user-avatar";
+
 type ProductType = "ITEM" | "ACCOUNT" | "SERVICE";
 
 interface CurrentUser {
@@ -26,6 +28,13 @@ interface ProductItem {
   price: string;
   gameId: string;
   sellerId: string;
+  seller: {
+    id: string;
+    email: string;
+    name: string | null;
+    image: string | null;
+    rank: string;
+  };
   type: ProductType;
   createdAt: string;
   updatedAt: string;
@@ -294,33 +303,50 @@ export function ProfileDashboard() {
           </div>
         ) : (
           <div className="mt-6 overflow-hidden rounded-[1.5rem] border border-white/10">
-            <div className="grid grid-cols-[minmax(0,1.5fr)_120px_130px_120px] gap-4 border-b border-white/10 bg-white/5 px-5 py-4 text-xs font-semibold tracking-[0.2em] uppercase text-zinc-500">
+            <div className="grid grid-cols-[minmax(0,1.4fr)_120px_130px_minmax(160px,1fr)_120px] gap-4 border-b border-white/10 bg-white/5 px-5 py-4 text-xs font-semibold tracking-[0.2em] uppercase text-zinc-500">
               <span>Товар</span>
               <span>Игра</span>
               <span>Тип</span>
+              <span>Продавец</span>
               <span>Цена</span>
             </div>
 
             <div className="divide-y divide-white/10">
-              {products.map((product) => (
-                <Link
-                  key={product.id}
-                  href={`/product/${product.id}`}
-                  className="grid grid-cols-[minmax(0,1.5fr)_120px_130px_120px] gap-4 px-5 py-4 transition hover:bg-white/5"
-                >
-                  <div className="min-w-0">
-                    <p className="truncate text-sm font-semibold text-white">
-                      {product.title}
-                    </p>
-                    <p className="mt-1 truncate text-sm text-zinc-500">
-                      #{product.id}
-                    </p>
-                  </div>
-                  <span className="text-sm text-zinc-300">{product.gameId}</span>
-                  <span className="text-sm text-zinc-300">{getProductTypeLabel(product.type)}</span>
-                  <span className="text-sm font-semibold text-white">{formatBalance(product.price)}</span>
-                </Link>
-              ))}
+              {products.map((product) => {
+                const sellerDisplayName =
+                  product.seller.name?.trim() || product.seller.email;
+
+                return (
+                  <Link
+                    key={product.id}
+                    href={`/product/${product.id}`}
+                    className="grid grid-cols-[minmax(0,1.4fr)_120px_130px_minmax(160px,1fr)_120px] gap-4 px-5 py-4 transition hover:bg-white/5"
+                  >
+                    <div className="min-w-0">
+                      <p className="truncate text-sm font-semibold text-white">
+                        {product.title}
+                      </p>
+                      <p className="mt-1 truncate text-sm text-zinc-500">
+                        #{product.id}
+                      </p>
+                    </div>
+                    <span className="text-sm text-zinc-300">{product.gameId}</span>
+                    <span className="text-sm text-zinc-300">{getProductTypeLabel(product.type)}</span>
+                    <div className="flex min-w-0 items-center gap-3">
+                      <UserAvatar
+                        src={product.seller.image}
+                        name={sellerDisplayName}
+                        email={product.seller.email}
+                        className="h-6 w-6 shrink-0"
+                      />
+                      <span className="truncate text-sm font-medium text-zinc-200">
+                        {sellerDisplayName}
+                      </span>
+                    </div>
+                    <span className="text-sm font-semibold text-white">{formatBalance(product.price)}</span>
+                  </Link>
+                );
+              })}
             </div>
           </div>
         )}

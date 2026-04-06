@@ -1,6 +1,7 @@
 import Link from "next/link";
 
 import { BuyProductDialog } from "@/components/product/buy-product-dialog";
+import { UserAvatar } from "@/components/ui/user-avatar";
 import { prisma } from "@/lib/prisma";
 
 type SellerRank = "BRONZE" | "SILVER" | "GOLD";
@@ -22,6 +23,8 @@ interface ProductDetail {
   seller: {
     id: string;
     email: string;
+    name: string | null;
+    image: string | null;
     rank: SellerRank;
   };
 }
@@ -37,6 +40,8 @@ async function getProduct(id: string): Promise<ProductDetail | null> {
           select: {
             id: true,
             email: true,
+            name: true,
+            image: true,
             rank: true,
           },
         },
@@ -125,7 +130,7 @@ export default async function ProductPage({ params }: ProductPageProps) {
     );
   }
 
-  const sellerName = product.seller.email.split("@")[0] || product.seller.email;
+  const sellerName = product.seller.name?.trim() || product.seller.email;
   const rankStyle = rankStyles[product.seller.rank];
   const categoryLabel = getTypeLabel(product.type);
 
@@ -194,12 +199,18 @@ export default async function ProductPage({ params }: ProductPageProps) {
               <p className="text-xs tracking-[0.24em] uppercase text-zinc-500">
                 Продавец
               </p>
-              <div className="mt-4 flex items-start justify-between gap-3">
-                <div>
-                  <p className="text-lg font-semibold text-white">
+              <div className="mt-4 flex items-start gap-4">
+                <UserAvatar
+                  src={product.seller.image}
+                  name={sellerName}
+                  email={product.seller.email}
+                  className="h-12 w-12 shrink-0"
+                />
+                <div className="min-w-0 flex-1">
+                  <p className="truncate text-xl font-semibold text-white">
                     {sellerName}
                   </p>
-                  <p className="mt-1 text-sm text-zinc-400">{product.seller.email}</p>
+                  <p className="mt-1 truncate text-sm text-zinc-400">{product.seller.email}</p>
                   <div
                     className={`mt-3 inline-flex items-center gap-2 rounded-full border px-3 py-1.5 text-sm font-medium ${rankStyle.badgeClassName}`}
                   >
