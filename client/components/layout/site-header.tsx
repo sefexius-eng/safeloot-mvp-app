@@ -2,11 +2,22 @@
 
 import Image from "next/image";
 import Link from "next/link";
-import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
+import { useEffect, useRef, useState } from "react";
 import { signOut, useSession } from "next-auth/react";
+
+import { searchGames } from "@/app/actions/search";
 
 const BALANCE_REFRESH_EVENT = "safeloot:balances-refresh";
 const PROFILE_REFRESH_INTERVAL_MS = 5000;
+const SEARCH_DEBOUNCE_MS = 250;
+
+interface SearchGameResult {
+  id: string;
+  name: string;
+  slug: string;
+  imageUrl: string | null;
+}
 
 interface CurrentUser {
   id: string;
@@ -34,9 +45,15 @@ function formatBalance(value: string) {
 }
 
 export function SiteHeader() {
+  const router = useRouter();
   const { data: session, status } = useSession();
   const [user, setUser] = useState<CurrentUser | null>(null);
   const [refreshToken, setRefreshToken] = useState(0);
+  const [query, setQuery] = useState("");
+  const [results, setResults] = useState<SearchGameResult[]>([]);
+  const [isSearchOpen, setIsSearchOpen] = useState(false);
+  const [isSearching, setIsSearching] = useState(false);
+  const searchContainerRef = useRef<HTMLDivElement | null>(null);
   const isBanned = Boolean(session?.user?.isBanned);
 
   useEffect(() => {
@@ -108,6 +125,69 @@ export function SiteHeader() {
     };
   }, [refreshToken, status, session?.user?.id]);
 
+  useEffect(() => {
+    if (!query.trim()) {
+      setResults([]);
+      setIsSearching(false);
+      return;
+    }
+
+    let isActive = true;
+    const timeoutId = window.setTimeout(async () => {
+      try {
+        setIsSearching(true);
+        const nextResults = await searchGames(query);
+
+        if (isActive) {
+          setResults(nextResults);
+          setIsSearchOpen(true);
+        }
+      } catch {
+        if (isActive) {
+          setResults([]);
+        }
+      } finally {
+        if (isActive) {
+          setIsSearching(false);
+        }
+      }
+    }, SEARCH_DEBOUNCE_MS);
+
+    return () => {
+      isActive = false;
+      window.clearTimeout(timeoutId);
+    };
+  }, [query]);
+
+  useEffect(() => {
+    function handleClickOutside(event: MouseEvent) {
+      if (!searchContainerRef.current?.contains(event.target as Node)) {
+        setIsSearchOpen(false);
+      }
+    }
+
+    document.addEventListener("mousedown", handleClickOutside);
+
+    return () => {
+      document.removeEventListener("mousedown", handleClickOutside);
+    };
+  }, []);
+
+  function handleSelectGame(game: SearchGameResult) {
+    setQuery(game.name);
+    setResults([]);
+    setIsSearchOpen(false);
+    router.push(`/games/${game.slug}`);
+  }
+
+  function handleSearchSubmit(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+
+    if (results[0]) {
+      handleSelectGame(results[0]);
+    }
+  }
+
   const displayName =
     user?.name?.trim() ||
     session?.user?.name?.trim() ||
@@ -134,30 +214,79 @@ export function SiteHeader() {
           </Link>
         </div>
 
-        <form className="flex-1 lg:max-w-2xl">
-          <label className="relative block">
-            <span className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-4 text-zinc-500">
-              <svg
-                aria-hidden="true"
-                viewBox="0 0 24 24"
-                className="h-5 w-5"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="1.8"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-              >
-                <circle cx="11" cy="11" r="7" />
-                <path d="m20 20-3.5-3.5" />
-              </svg>
-            </span>
-            <input
-              type="search"
-              name="search"
-              placeholder="Поиск по играм, товарам и услугам"
-              className="h-12 w-full rounded-2xl border border-white/10 bg-white/5 pl-12 pr-4 text-sm text-zinc-100 shadow-[0_12px_30px_rgba(0,0,0,0.22)] outline-none transition placeholder:text-zinc-500 focus:border-orange-500/40 focus:bg-white/8 focus:ring-4 focus:ring-orange-500/10"
-            />
-          </label>
+        <form className="flex-1 lg:max-w-2xl" onSubmit={handleSearchSubmit}>
+          <div ref={searchContainerRef} className="relative">
+            <label className="relative block">
+              <span className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-4 text-zinc-500">
+                <svg
+                  aria-hidden="true"
+                  viewBox="0 0 24 24"
+                  className="h-5 w-5"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="1.8"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                >
+                  <circle cx="11" cy="11" r="7" />
+                  <path d="m20 20-3.5-3.5" />
+                </svg>
+              </span>
+              <input
+                type="search"
+                name="search"
+                value={query}
+                onChange={(event) => {
+                  setQuery(event.target.value);
+                  setIsSearchOpen(true);
+                }}
+                onFocus={() => {
+                  if (query.trim()) {
+                    setIsSearchOpen(true);
+                  }
+                }}
+                placeholder="Поиск по играм, товарам и услугам"
+                className="h-12 w-full rounded-2xl border border-white/10 bg-white/5 pl-12 pr-4 text-sm text-zinc-100 shadow-[0_12px_30px_rgba(0,0,0,0.22)] outline-none transition placeholder:text-zinc-500 focus:border-orange-500/40 focus:bg-white/8 focus:ring-4 focus:ring-orange-500/10"
+              />
+            </label>
+
+            {isSearchOpen && query.trim() ? (
+              <div className="absolute top-[calc(100%+0.6rem)] z-50 w-full overflow-hidden rounded-[1.5rem] border border-white/10 bg-[rgba(9,9,11,0.96)] shadow-[0_24px_80px_rgba(0,0,0,0.34)] backdrop-blur-xl">
+                {isSearching ? (
+                  <div className="px-4 py-3 text-sm text-zinc-400">
+                    Ищем игры...
+                  </div>
+                ) : results.length > 0 ? (
+                  <div className="divide-y divide-white/10">
+                    {results.map((game) => (
+                      <button
+                        key={game.id}
+                        type="button"
+                        onClick={() => handleSelectGame(game)}
+                        className="flex w-full items-center gap-3 px-4 py-3 text-left transition hover:bg-white/5"
+                      >
+                        <span className="flex h-9 w-9 items-center justify-center rounded-full border border-white/10 bg-white/5 text-sm font-semibold text-zinc-200">
+                          {game.name.slice(0, 1).toUpperCase()}
+                        </span>
+                        <span className="min-w-0 flex-1">
+                          <span className="block truncate text-sm font-semibold text-white">
+                            {game.name}
+                          </span>
+                          <span className="block truncate text-xs uppercase tracking-[0.18em] text-zinc-500">
+                            Каталог игры
+                          </span>
+                        </span>
+                      </button>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="px-4 py-3 text-sm text-zinc-400">
+                    Ничего не найдено.
+                  </div>
+                )}
+              </div>
+            ) : null}
+          </div>
         </form>
 
         <div className="flex flex-col gap-3 lg:min-w-[360px] lg:items-end">
