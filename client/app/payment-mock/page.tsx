@@ -2,8 +2,10 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 
 import { MockPaymentButton } from "@/components/payment/mock-payment-button";
+import { FormattedPrice } from "@/components/ui/formatted-price";
 import { getCurrentSessionUser } from "@/lib/access-control";
 import { getAuthSession } from "@/lib/auth";
+import { getPendingCheckoutOrder } from "@/lib/marketplace";
 
 interface PaymentMockPageProps {
   searchParams: Promise<{
@@ -16,11 +18,26 @@ export default async function PaymentMockPage({
 }: PaymentMockPageProps) {
   const currentUser = await getCurrentSessionUser(await getAuthSession());
 
-  if (currentUser?.isBanned) {
+  if (!currentUser || currentUser.isBanned) {
     redirect("/");
   }
 
   const { orderId } = await searchParams;
+
+  if (!orderId) {
+    redirect("/");
+  }
+
+  let checkoutOrder;
+
+  try {
+    checkoutOrder = await getPendingCheckoutOrder({
+      orderId,
+      buyerId: currentUser.id,
+    });
+  } catch {
+    redirect("/");
+  }
 
   return (
     <main className="mx-auto flex min-h-[calc(100vh-140px)] w-full max-w-5xl items-center px-4 py-10 sm:px-6 lg:px-8 lg:py-14">
@@ -70,8 +87,24 @@ export default async function PaymentMockPage({
               Номер заказа
             </p>
             <p className="mt-3 break-all text-lg font-semibold text-white">
-              {orderId ? `#${orderId}` : "Не передан"}
+              #{checkoutOrder.id}
             </p>
+          </div>
+
+          <div className="mt-4 rounded-[1.5rem] border border-white/10 bg-white/5 p-5">
+            <p className="text-xs tracking-[0.22em] uppercase text-zinc-500">
+              Товар
+            </p>
+            <p className="mt-3 text-lg font-semibold text-white">
+              {checkoutOrder.product.title}
+            </p>
+
+            <div className="mt-4 flex items-center justify-between gap-4 border-t border-white/10 pt-4">
+              <span className="text-sm text-zinc-400">Сумма к оплате</span>
+              <span className="text-2xl font-semibold tracking-tight text-white">
+                <FormattedPrice amount={checkoutOrder.price} />
+              </span>
+            </div>
           </div>
 
           <div className="mt-4 rounded-[1.5rem] border border-sky-500/15 bg-sky-500/8 p-5 text-sm leading-7 text-sky-100">
@@ -79,7 +112,7 @@ export default async function PaymentMockPage({
           </div>
 
           <div className="mt-6">
-            <MockPaymentButton orderId={orderId ?? ""} />
+            <MockPaymentButton orderId={checkoutOrder.id} />
           </div>
 
           <div className="mt-6 flex flex-wrap gap-3">

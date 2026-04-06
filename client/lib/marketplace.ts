@@ -87,6 +87,33 @@ function ensureOrderAccess(
   throw new Error("Only order participants can access this order.");
 }
 
+function ensurePendingCheckoutAccess<
+  T extends {
+    buyerId: string;
+    status: OrderStatus;
+  },
+>(
+  buyerId: string,
+  orderId: string,
+  order: T | null,
+) {
+  if (!order) {
+    throw new Error(`Order with id ${orderId} was not found.`);
+  }
+
+  if (order.buyerId !== buyerId) {
+    throw new Error("Only the buyer can access checkout for this order.");
+  }
+
+  if (order.status !== OrderStatus.PENDING) {
+    throw new Error(
+      `Checkout is not available for order ${orderId} in status ${order.status}.`,
+    );
+  }
+
+  return order;
+}
+
 function ensureChatParticipant(
   userId: string,
   chatRoom: { buyerId: string; sellerId: string },
@@ -207,6 +234,7 @@ export function mapMarketplaceErrorToStatusCode(message: string) {
     message.includes("cannot be completed") ||
     message.includes("cannot be disputed") ||
     message.includes("cannot be resolved") ||
+    message.includes("Checkout is not available") ||
     message.includes("could not be")
   ) {
     return 409;
@@ -574,6 +602,49 @@ export async function createOrder(input: {
   };
 }
 
+export async function getPendingCheckoutOrder(input: {
+  orderId?: string;
+  buyerId: string;
+}) {
+  const orderId = normalizeText(input.orderId);
+  const buyerId = normalizeText(input.buyerId);
+
+  if (!orderId) {
+    throw new Error("orderId is required.");
+  }
+
+  if (!buyerId) {
+    throw new Error("buyerId is required.");
+  }
+
+  const order = await prisma.order.findUnique({
+    where: {
+      id: orderId,
+    },
+    select: {
+      id: true,
+      buyerId: true,
+      price: true,
+      status: true,
+      product: {
+        select: {
+          id: true,
+          title: true,
+        },
+      },
+    },
+  });
+
+  const checkoutOrder = ensurePendingCheckoutAccess(buyerId, orderId, order);
+
+  return {
+    id: checkoutOrder.id,
+    price: formatMoney(checkoutOrder.price),
+    status: checkoutOrder.status,
+    product: checkoutOrder.product,
+  };
+}
+
 export async function getOrderById(
   orderId: string,
   userId: string,
@@ -671,19 +742,11 @@ export async function confirmOrder(input: { orderId?: string; buyerId: string })
         },
       });
 
-      if (!existingOrder) {
-        throw new Error(`Order with id ${orderId} was not found.`);
-      }
-
-      if (existingOrder.buyerId !== buyerId) {
-        throw new Error("Only the buyer can confirm this order.");
-      }
-
-      if (existingOrder.status !== OrderStatus.PENDING) {
-        throw new Error(
-          `Order ${orderId} cannot be confirmed from status ${existingOrder.status}.`,
-        );
-      }
+      const checkoutOrder = ensurePendingCheckoutAccess(
+        buyerId,
+        orderId,
+        existingOrder,
+      );
 
       const updatedOrder = await transactionClient.order.updateMany({
         where: {
@@ -701,21 +764,21 @@ export async function confirmOrder(input: { orderId?: string; buyerId: string })
 
       await transactionClient.chatRoom.upsert({
         where: {
-          orderId: existingOrder.id,
+          orderId: checkoutOrder.id,
         },
         update: {
-          buyerId: existingOrder.buyerId,
-          sellerId: existingOrder.sellerId,
+          buyerId: checkoutOrder.buyerId,
+          sellerId: checkoutOrder.sellerId,
         },
         create: {
-          orderId: existingOrder.id,
-          buyerId: existingOrder.buyerId,
-          sellerId: existingOrder.sellerId,
+          orderId: checkoutOrder.id,
+          buyerId: checkoutOrder.buyerId,
+          sellerId: checkoutOrder.sellerId,
         },
       });
 
       return {
-        orderId: existingOrder.id,
+        orderId: checkoutOrder.id,
         status: OrderStatus.PAID,
       };
     },

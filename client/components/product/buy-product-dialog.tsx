@@ -1,7 +1,9 @@
 "use client";
 
+import { useRouter } from "next/navigation";
 import { useState } from "react";
 
+import { createPendingOrder } from "@/app/actions/orders";
 import { useCurrency } from "@/components/providers/currency-provider";
 import { Button } from "@/components/ui/button";
 import {
@@ -23,11 +25,13 @@ interface BuyProductDialogProps {
 }
 
 interface CreateOrderResponse {
-  orderId: string;
-  hosted_url: string;
+  ok: boolean;
+  orderId?: string;
+  message?: string;
 }
 
 export function BuyProductDialog({ product }: BuyProductDialogProps) {
+  const router = useRouter();
   const { formatPrice } = useCurrency();
   const [isLoading, setIsLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState("");
@@ -37,31 +41,13 @@ export function BuyProductDialog({ product }: BuyProductDialogProps) {
     setIsLoading(true);
 
     try {
-      const response = await fetch("/api/orders", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          productId: product.id,
-        }),
-      });
+      const result = (await createPendingOrder(product.id)) as CreateOrderResponse;
 
-      const payload = (await response.json().catch(() => null)) as
-        | { message?: string; error?: string }
-        | CreateOrderResponse
-        | null;
-
-      if (!response.ok) {
-        throw new Error(
-          (payload && "message" in payload && payload.message) ||
-            (payload && "error" in payload && payload.error) ||
-            "Не удалось создать заказ.",
-        );
+      if (!result.ok || !result.orderId) {
+        throw new Error(result.message || "Не удалось создать заказ.");
       }
 
-      const order = payload as CreateOrderResponse;
-      window.location.href = order.hosted_url;
+      router.push(`/payment-mock?orderId=${result.orderId}`);
     } catch (error) {
       setErrorMessage(
         error instanceof Error ? error.message : "Не удалось создать заказ.",

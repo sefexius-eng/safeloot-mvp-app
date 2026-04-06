@@ -1,6 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { redirect } from "next/navigation";
 
 import {
   BANNED_USER_MESSAGE,
@@ -9,6 +10,8 @@ import {
 } from "@/lib/access-control";
 import { getAuthSession } from "@/lib/auth";
 import {
+  confirmOrder,
+  createOrder,
   openOrderDispute,
   resolveOrderDisputeToBuyer,
   resolveOrderDisputeToSeller,
@@ -21,6 +24,16 @@ interface OrderActionResult {
   platformFee?: string;
   refundAmount?: string;
   sellerNetAmount?: string;
+}
+
+interface CreatePendingOrderResult {
+  ok: boolean;
+  orderId?: string;
+  message?: string;
+}
+
+export interface ProcessPaymentState {
+  message?: string;
 }
 
 async function requireActiveOrderUser() {
@@ -53,6 +66,61 @@ function revalidateOrderPaths(orderId: string) {
   revalidatePath(`/orders/${orderId}`);
   revalidatePath("/admin");
   revalidatePath("/profile");
+}
+
+export async function createPendingOrder(
+  productId: string,
+): Promise<CreatePendingOrderResult> {
+  try {
+    const currentUser = await requireActiveOrderUser();
+    const result = await createOrder({
+      productId,
+      buyerId: currentUser.id,
+    });
+
+    return {
+      ok: true,
+      orderId: result.orderId,
+    };
+  } catch (error) {
+    return {
+      ok: false,
+      message:
+        error instanceof Error ? error.message : "Не удалось создать заказ.",
+    };
+  }
+}
+
+export async function processPayment(
+  orderId: string,
+  _previousState: ProcessPaymentState,
+  _formData: FormData,
+): Promise<ProcessPaymentState> {
+  let result:
+    | {
+        orderId: string;
+        status: string;
+      }
+    | null = null;
+
+  try {
+    const currentUser = await requireActiveOrderUser();
+
+    result = await confirmOrder({
+      orderId,
+      buyerId: currentUser.id,
+    });
+  } catch (error) {
+    return {
+      message:
+        error instanceof Error
+          ? error.message
+          : "Не удалось подтвердить оплату.",
+    };
+  }
+
+  revalidateOrderPaths(result.orderId);
+  redirect(`/orders/${result.orderId}`);
 }
 
 export async function openDispute(orderId: string): Promise<OrderActionResult> {
