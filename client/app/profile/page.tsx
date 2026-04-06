@@ -56,6 +56,10 @@ function formatAmount(value: unknown) {
 export default async function ProfilePage() {
   const session = await getAuthSession();
   const sellerId = session?.user?.id?.trim() ?? "";
+  const displayName =
+    session?.user?.name?.trim() ||
+    session?.user?.email?.split("@")[0] ||
+    "Продавец";
   const sales = sellerId
     ? await prisma.order.findMany({
         where: {
@@ -82,6 +86,17 @@ export default async function ProfilePage() {
         <p className="mt-4 max-w-3xl text-sm leading-7 text-zinc-400 md:text-base">
           Здесь собраны ваши текущие балансы и все размещенные товары. Используйте кабинет для контроля средств в escrow и управления активными предложениями.
         </p>
+        <div className="mt-6 flex flex-wrap items-center gap-3">
+          <div className="inline-flex items-center rounded-full border border-white/10 bg-white/5 px-4 py-2 text-sm text-zinc-300">
+            Аккаунт: <span className="ml-2 font-semibold text-white">{displayName}</span>
+          </div>
+          <Link
+            href="/profile/settings"
+            className="inline-flex h-11 items-center justify-center rounded-2xl bg-orange-600 px-5 text-sm font-semibold text-white shadow-[0_16px_40px_rgba(249,115,22,0.28)] transition hover:-translate-y-0.5 hover:bg-orange-500"
+          >
+            Настроить профиль
+          </Link>
+        </div>
       </section>
 
       <ProfileDashboard />

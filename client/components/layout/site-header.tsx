@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { signOut, useSession } from "next-auth/react";
@@ -10,6 +11,8 @@ const PROFILE_REFRESH_INTERVAL_MS = 5000;
 interface CurrentUser {
   id: string;
   email: string;
+  name: string;
+  image: string | null;
   role: string;
   rank: string;
   availableBalance: string;
@@ -105,10 +108,12 @@ export function SiteHeader() {
     };
   }, [refreshToken, status, session?.user?.id]);
 
-  const avatarLetter =
-    session?.user?.email?.slice(0, 1).toUpperCase() ??
-    session?.user?.name?.slice(0, 1).toUpperCase() ??
-    "S";
+  const displayName =
+    user?.name?.trim() ||
+    session?.user?.name?.trim() ||
+    session?.user?.email?.split("@")[0] ||
+    "Профиль";
+  const avatarLetter = displayName.slice(0, 1).toUpperCase() || "S";
 
   return (
     <header className="sticky top-0 z-50 border-b border-white/10 bg-[rgba(9,9,11,0.78)] backdrop-blur-xl">
@@ -204,9 +209,21 @@ export function SiteHeader() {
                 <Link
                   href="/profile"
                   aria-label="Профиль пользователя"
-                  className="flex h-11 w-11 items-center justify-center rounded-2xl border border-white/10 bg-white/5 text-sm font-semibold text-white shadow-[0_12px_28px_rgba(0,0,0,0.22)] transition hover:bg-white/10"
+                  title={displayName}
+                  className="relative flex h-11 w-11 items-center justify-center overflow-hidden rounded-2xl border border-white/10 bg-white/5 text-sm font-semibold text-white shadow-[0_12px_28px_rgba(0,0,0,0.22)] transition hover:bg-white/10"
                 >
-                  {avatarLetter}
+                  {user?.image ? (
+                    <Image
+                      src={user.image}
+                      alt={`Аватар ${displayName}`}
+                      fill
+                      unoptimized
+                      className="object-cover"
+                      sizes="44px"
+                    />
+                  ) : (
+                    avatarLetter
+                  )}
                 </Link>
               </>
             ) : (

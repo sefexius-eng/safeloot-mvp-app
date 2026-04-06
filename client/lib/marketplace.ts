@@ -287,6 +287,8 @@ export async function getUserById(userId: string) {
     select: {
       id: true,
       email: true,
+      name: true,
+      image: true,
       role: true,
       rank: true,
       availableBalance: true,
@@ -301,6 +303,7 @@ export async function getUserById(userId: string) {
 
   return {
     ...user,
+    name: user.name ?? user.email.split("@")[0],
     availableBalance: formatMoney(user.availableBalance),
     holdBalance: formatMoney(user.holdBalance),
   };

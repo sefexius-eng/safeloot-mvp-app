@@ -7,6 +7,8 @@ declare module "next-auth" {
       id: string;
       role: Role;
       isBanned: boolean;
+      image?: string | null;
+      name?: string | null;
     };
   }
 
@@ -14,6 +16,8 @@ declare module "next-auth" {
     id: string;
     role: Role;
     isBanned: boolean;
+    image?: string | null;
+    name?: string | null;
   }
 }
 
@@ -22,5 +26,7 @@ declare module "next-auth/jwt" {
     id?: string;
     role?: Role;
     isBanned?: boolean;
+    picture?: string | null;
+    name?: string | null;
   }
 }

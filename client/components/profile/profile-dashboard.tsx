@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { useSession } from "next-auth/react";
@@ -9,6 +10,8 @@ type ProductType = "ITEM" | "ACCOUNT" | "SERVICE";
 interface CurrentUser {
   id: string;
   email: string;
+  name: string;
+  image: string | null;
   role: string;
   rank: string;
   availableBalance: string;
@@ -171,8 +174,78 @@ export function ProfileDashboard() {
     );
   }
 
+  const displayName = user.name.trim() || user.email.split("@")[0];
+  const avatarLetter = displayName.slice(0, 1).toUpperCase() || "S";
+
   return (
     <section className="space-y-8">
+      <div className="grid gap-5 xl:grid-cols-[minmax(0,1.15fr)_minmax(320px,0.85fr)]">
+        <article className="overflow-hidden rounded-[2rem] border border-white/10 bg-[radial-gradient(circle_at_top_left,rgba(251,146,60,0.24),transparent_32%),radial-gradient(circle_at_bottom_right,rgba(14,165,233,0.18),transparent_38%),rgba(9,9,11,0.92)] p-6 shadow-[0_24px_80px_rgba(0,0,0,0.28)] md:p-8">
+          <div className="flex flex-col gap-6 md:flex-row md:items-center">
+            <div className="relative flex h-24 w-24 shrink-0 items-center justify-center overflow-hidden rounded-[2rem] border border-white/10 bg-white/10 text-3xl font-semibold text-white shadow-[0_18px_45px_rgba(0,0,0,0.22)]">
+              {user.image ? (
+                <Image
+                  src={user.image}
+                  alt={`Аватар ${displayName}`}
+                  fill
+                  unoptimized
+                  className="object-cover"
+                  sizes="96px"
+                />
+              ) : (
+                avatarLetter
+              )}
+            </div>
+
+            <div className="min-w-0 flex-1">
+              <p className="text-xs font-semibold tracking-[0.24em] uppercase text-orange-200/80">
+                Профиль продавца
+              </p>
+              <h2 className="mt-3 truncate text-3xl font-semibold tracking-tight text-white md:text-4xl">
+                {displayName}
+              </h2>
+              <p className="mt-2 truncate text-sm text-zinc-300">{user.email}</p>
+
+              <div className="mt-5 flex flex-wrap gap-2 text-xs font-semibold uppercase tracking-[0.18em]">
+                <span className="rounded-full border border-white/10 bg-white/8 px-3 py-2 text-zinc-200">
+                  {user.role}
+                </span>
+                <span className="rounded-full border border-emerald-500/20 bg-emerald-500/10 px-3 py-2 text-emerald-200">
+                  Ранг {user.rank}
+                </span>
+              </div>
+            </div>
+          </div>
+        </article>
+
+        <article className="rounded-[2rem] border border-white/10 bg-zinc-900/80 p-6 shadow-[0_24px_80px_rgba(0,0,0,0.28)] backdrop-blur md:p-8">
+          <p className="text-xs font-semibold tracking-[0.24em] uppercase text-zinc-500">
+            Быстрые действия
+          </p>
+          <h3 className="mt-3 text-2xl font-semibold tracking-tight text-white">
+            Настройте ник и аватар
+          </h3>
+          <p className="mt-3 text-sm leading-7 text-zinc-400">
+            Откройте страницу настроек, чтобы обновить публичный никнейм и загрузить сжатый аватар, который сразу появится в кабинете.
+          </p>
+
+          <div className="mt-6 flex flex-wrap gap-3">
+            <Link
+              href="/profile/settings"
+              className="inline-flex h-11 items-center justify-center rounded-2xl bg-orange-600 px-5 text-sm font-semibold text-white shadow-[0_16px_40px_rgba(249,115,22,0.28)] transition hover:-translate-y-0.5 hover:bg-orange-500"
+            >
+              Открыть настройки
+            </Link>
+            <Link
+              href="/sell"
+              className="inline-flex h-11 items-center justify-center rounded-2xl border border-white/10 bg-white/5 px-5 text-sm font-semibold text-zinc-200 transition hover:bg-white/10"
+            >
+              Разместить товар
+            </Link>
+          </div>
+        </article>
+      </div>
+
       <div className="grid gap-5 md:grid-cols-2">
         <article className="rounded-[2rem] border border-emerald-500/15 bg-[linear-gradient(180deg,rgba(5,150,105,0.12),rgba(9,9,11,0.92))] p-6 shadow-[0_20px_60px_rgba(0,0,0,0.22)]">
           <p className="text-xs font-semibold tracking-[0.24em] uppercase text-emerald-300/80">
@@ -211,7 +284,7 @@ export function ProfileDashboard() {
           </div>
 
           <div className="text-sm text-zinc-400">
-            Продавец: <span className="font-medium text-zinc-200">{user.email}</span>
+            Продавец: <span className="font-medium text-zinc-200">{displayName}</span>
           </div>
         </div>
 
