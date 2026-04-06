@@ -1,8 +1,14 @@
 import Link from "next/link";
 
 import { ProfilePageClient } from "@/app/profile/profile-page-client";
+import {
+  ProfileTabs,
+  type ProfileTabsProduct,
+  type ProfileTabsReview,
+} from "@/components/profile-tabs";
 import { getAuthSession } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
+import { getSellerReviewSummaryBySellerId } from "@/lib/review-summary";
 import { mapWithdrawalListItem } from "@/lib/withdrawals";
 
 export const dynamic = "force-dynamic";
@@ -65,7 +71,7 @@ export default async function ProfilePage() {
     session?.user?.name?.trim() ||
     session?.user?.email?.split("@")[0] ||
     "Продавец";
-  const [sales, sellerAccount, withdrawals] = sellerId
+  const profileData = sellerId
     ? await Promise.all([
         prisma.order.findMany({
           where: {
@@ -83,7 +89,64 @@ export default async function ProfilePage() {
             id: sellerId,
           },
           select: {
+            id: true,
+            email: true,
+            name: true,
+            image: true,
+            rank: true,
             availableBalance: true,
+            products: {
+              select: {
+                id: true,
+                title: true,
+                description: true,
+                price: true,
+                isActive: true,
+                sellerId: true,
+                createdAt: true,
+                updatedAt: true,
+                game: {
+                  select: {
+                    id: true,
+                    name: true,
+                    slug: true,
+                    imageUrl: true,
+                  },
+                },
+                category: {
+                  select: {
+                    id: true,
+                    name: true,
+                    slug: true,
+                    gameId: true,
+                  },
+                },
+              },
+              orderBy: {
+                createdAt: "desc",
+              },
+            },
+            reviewsReceived: {
+              select: {
+                id: true,
+                rating: true,
+                comment: true,
+                sellerReply: true,
+                replyCreatedAt: true,
+                createdAt: true,
+                author: {
+                  select: {
+                    id: true,
+                    email: true,
+                    name: true,
+                    image: true,
+                  },
+                },
+              },
+              orderBy: {
+                createdAt: "desc",
+              },
+            },
           },
         }),
         prisma.withdrawal.findMany({
@@ -94,8 +157,58 @@ export default async function ProfilePage() {
             createdAt: "desc",
           },
         }),
+        getSellerReviewSummaryBySellerId(sellerId),
       ])
-    : [[], null, []];
+    : null;
+
+  const sales = profileData?.[0] ?? [];
+  const sellerProfile = profileData?.[1] ?? null;
+  const withdrawals = profileData?.[2] ?? [];
+  const sellerReviewSummary = profileData?.[3] ?? {
+    averageRating: null,
+    reviewCount: 0,
+  };
+
+  const profileProducts = sellerProfile
+    ? sellerProfile.products.map(
+        (product) =>
+          ({
+            id: product.id,
+            title: product.title,
+            description: product.description,
+            price: product.price.toFixed(8),
+            isActive: product.isActive,
+            sellerId: product.sellerId,
+            createdAt: product.createdAt.toISOString(),
+            updatedAt: product.updatedAt.toISOString(),
+            game: product.game,
+            category: product.category,
+            seller: {
+              id: sellerProfile.id,
+              email: sellerProfile.email,
+              name: sellerProfile.name,
+              image: sellerProfile.image,
+              rank: sellerProfile.rank,
+              reviewSummary: sellerReviewSummary,
+            },
+          }) satisfies ProfileTabsProduct,
+      )
+    : [];
+
+  const profileReviews = sellerProfile
+    ? sellerProfile.reviewsReceived.map(
+        (review) =>
+          ({
+            id: review.id,
+            rating: review.rating,
+            comment: review.comment,
+            sellerReply: review.sellerReply,
+            createdAt: review.createdAt.toISOString(),
+            replyCreatedAt: review.replyCreatedAt?.toISOString() ?? null,
+            author: review.author,
+          }) satisfies ProfileTabsReview,
+      )
+    : [];
 
   return (
     <main className="mx-auto flex w-full max-w-7xl flex-col gap-8 px-4 py-10 sm:px-6 lg:px-8 lg:py-14">
@@ -113,6 +226,14 @@ export default async function ProfilePage() {
           <div className="inline-flex items-center rounded-full border border-white/10 bg-white/5 px-4 py-2 text-sm text-zinc-300">
             Аккаунт: <span className="ml-2 font-semibold text-white">{displayName}</span>
           </div>
+          {sellerProfile?.id ? (
+            <Link
+              href={`/user/${sellerProfile.id}`}
+              className="inline-flex h-11 items-center justify-center rounded-2xl border border-white/10 bg-white/5 px-5 text-sm font-semibold text-zinc-200 transition hover:-translate-y-0.5 hover:bg-white/10"
+            >
+              👀 Посмотреть мою витрину
+            </Link>
+          ) : null}
           <Link
             href="/profile/settings"
             className="inline-flex h-11 items-center justify-center rounded-2xl bg-orange-600 px-5 text-sm font-semibold text-white shadow-[0_16px_40px_rgba(249,115,22,0.28)] transition hover:-translate-y-0.5 hover:bg-orange-500"
@@ -124,9 +245,16 @@ export default async function ProfilePage() {
 
       <ProfilePageClient
         isAuthenticated={Boolean(sellerId)}
-        availableBalance={sellerAccount?.availableBalance.toFixed(8) ?? "0"}
+        availableBalance={sellerProfile?.availableBalance.toFixed(8) ?? "0"}
         withdrawals={withdrawals.map(mapWithdrawalListItem)}
       />
+
+      {sellerProfile ? (
+        <ProfileTabs
+          products={profileProducts}
+          reviews={profileReviews}
+        />
+      ) : null}
 
       <section className="rounded-[2rem] border border-white/10 bg-zinc-900/80 p-6 shadow-[0_24px_80px_rgba(0,0,0,0.28)] backdrop-blur md:p-8">
         <div className="flex flex-col gap-3 border-b border-white/10 pb-5 md:flex-row md:items-end md:justify-between">

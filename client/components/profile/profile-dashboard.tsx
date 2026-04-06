@@ -2,15 +2,11 @@
 
 import Image from "next/image";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
-import { useEffect, useState, useTransition } from "react";
+import { useEffect, useState } from "react";
 import { useSession } from "next-auth/react";
 
-import { toggleAllProductsVisibility } from "@/app/actions/product";
-import { ProfileProductActions } from "@/components/profile/profile-product-actions";
 import { useCurrency } from "@/components/providers/currency-provider";
 import { SellerRatingBadge } from "@/components/reviews/seller-rating-badge";
-import { UserAvatar } from "@/components/ui/user-avatar";
 import type { SellerReviewSummary } from "@/lib/review-summary";
 
 const BALANCE_REFRESH_EVENT = "safeloot:balances-refresh";
@@ -28,48 +24,13 @@ interface CurrentUser {
   createdAt: string;
 }
 
-interface ProductItem {
-  id: string;
-  title: string;
-  description: string;
-  price: string;
-  isActive: boolean;
-  game: {
-    id: string;
-    name: string;
-    slug: string;
-    imageUrl: string | null;
-  };
-  category: {
-    id: string;
-    name: string;
-    slug: string;
-    gameId: string;
-  };
-  sellerId: string;
-  seller: {
-    id: string;
-    email: string;
-    name: string | null;
-    image: string | null;
-    rank: string;
-    reviewSummary: SellerReviewSummary;
-  };
-  createdAt: string;
-  updatedAt: string;
-}
-
 export function ProfileDashboard() {
-  const router = useRouter();
   const { status } = useSession();
   const { formatPrice } = useCurrency();
   const [user, setUser] = useState<CurrentUser | null>(null);
-  const [products, setProducts] = useState<ProductItem[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [errorMessage, setErrorMessage] = useState("");
-  const [bulkError, setBulkError] = useState("");
   const [refreshToken, setRefreshToken] = useState(0);
-  const [isBulkPending, startBulkTransition] = useTransition();
 
   useEffect(() => {
     function handleBalanceRefresh() {
@@ -94,7 +55,6 @@ export function ProfileDashboard() {
 
     if (status !== "authenticated") {
       setUser(null);
-      setProducts([]);
       setIsLoading(false);
 
       return () => {
@@ -106,15 +66,8 @@ export function ProfileDashboard() {
       setErrorMessage("");
 
       try {
-        const [userResponse, productsResponse] = await Promise.all([
-          fetch("/api/users/me", { cache: "no-store" }),
-          fetch("/api/users/me/products", { cache: "no-store" }),
-        ]);
-
-        const [userPayload, productsPayload] = await Promise.all([
-          userResponse.json().catch(() => null),
-          productsResponse.json().catch(() => null),
-        ]);
+        const userResponse = await fetch("/api/users/me", { cache: "no-store" });
+        const userPayload = await userResponse.json().catch(() => null);
 
         if (!userResponse.ok) {
           throw new Error(
@@ -124,17 +77,8 @@ export function ProfileDashboard() {
           );
         }
 
-        if (!productsResponse.ok) {
-          throw new Error(
-            (productsPayload && productsPayload.message) ||
-              (productsPayload && productsPayload.error) ||
-              "Не удалось загрузить товары.",
-          );
-        }
-
         if (isMounted) {
           setUser(userPayload as CurrentUser);
-          setProducts(productsPayload as ProductItem[]);
         }
       } catch (error) {
         if (isMounted) {
@@ -195,53 +139,6 @@ export function ProfileDashboard() {
 
   const displayName = user.name.trim() || user.email.split("@")[0];
   const avatarLetter = displayName.slice(0, 1).toUpperCase() || "S";
-
-  function handleProductDeleted(productId: string) {
-    setProducts((currentProducts) =>
-      currentProducts.filter((product) => product.id !== productId),
-    );
-  }
-
-  function handleProductVisibilityChanged(productId: string, isActive: boolean) {
-    setProducts((currentProducts) =>
-      currentProducts.map((product) =>
-        product.id === productId
-          ? {
-              ...product,
-              isActive,
-            }
-          : product,
-      ),
-    );
-  }
-
-  function handleToggleAllProducts(nextIsActive: boolean) {
-    setBulkError("");
-
-    startBulkTransition(() => {
-      void toggleAllProductsVisibility(nextIsActive)
-        .then((result) => {
-          if (!result.ok) {
-            setBulkError(result.message ?? "Не удалось изменить видимость товаров.");
-            return;
-          }
-
-          setProducts((currentProducts) =>
-            currentProducts.map((product) => ({
-              ...product,
-              isActive: nextIsActive,
-            })),
-          );
-          router.refresh();
-        })
-        .catch(() => {
-          setBulkError("Не удалось изменить видимость товаров.");
-        });
-    });
-  }
-
-  const activeProductsCount = products.filter((product) => product.isActive).length;
-  const hiddenProductsCount = products.length - activeProductsCount;
 
   return (
     <section className="space-y-8">
@@ -338,139 +235,6 @@ export function ProfileDashboard() {
           </p>
         </article>
       </div>
-
-      <section className="rounded-[2rem] border border-white/10 bg-zinc-900/80 p-6 shadow-[0_24px_80px_rgba(0,0,0,0.28)] backdrop-blur md:p-8">
-        <div className="flex flex-col gap-3 border-b border-white/10 pb-5 md:flex-row md:items-end md:justify-between">
-          <div>
-            <p className="text-sm font-semibold tracking-[0.24em] uppercase text-zinc-500">
-              Личный кабинет
-            </p>
-            <h2 className="mt-2 text-2xl font-semibold tracking-tight text-white md:text-3xl">
-              Мои товары
-            </h2>
-          </div>
-
-          <div className="text-sm text-zinc-400">
-            Продавец: <span className="font-medium text-zinc-200">{displayName}</span>
-          </div>
-        </div>
-
-        {products.length > 0 ? (
-          <div className="mt-6 flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
-            <div className="text-sm text-zinc-400">
-              Активных: <span className="font-medium text-zinc-200">{activeProductsCount}</span> · Скрытых: <span className="font-medium text-zinc-200">{hiddenProductsCount}</span>
-            </div>
-
-            <div className="flex flex-wrap gap-3">
-              <button
-                type="button"
-                onClick={() => handleToggleAllProducts(false)}
-                disabled={isBulkPending || hiddenProductsCount === products.length}
-                className="inline-flex h-11 items-center justify-center rounded-2xl border border-amber-500/20 bg-amber-500/10 px-5 text-sm font-semibold text-amber-100 transition hover:bg-amber-500/20 disabled:cursor-not-allowed disabled:opacity-60"
-              >
-                {isBulkPending ? "Обновляем..." : "🙈 Скрыть все"}
-              </button>
-              <button
-                type="button"
-                onClick={() => handleToggleAllProducts(true)}
-                disabled={isBulkPending || activeProductsCount === products.length}
-                className="inline-flex h-11 items-center justify-center rounded-2xl border border-emerald-500/20 bg-emerald-500/10 px-5 text-sm font-semibold text-emerald-100 transition hover:bg-emerald-500/20 disabled:cursor-not-allowed disabled:opacity-60"
-              >
-                {isBulkPending ? "Обновляем..." : "👁️ Показать все"}
-              </button>
-            </div>
-          </div>
-        ) : null}
-
-        {bulkError ? (
-          <p className="mt-4 text-sm text-rose-300">{bulkError}</p>
-        ) : null}
-
-        {products.length === 0 ? (
-          <div className="mt-6 rounded-[1.5rem] border border-white/10 bg-white/5 p-6 text-sm leading-7 text-zinc-400">
-            У вас пока нет опубликованных товаров. <Link href="/sell" className="font-semibold text-orange-300 transition hover:text-orange-200">Перейти к размещению</Link>
-          </div>
-        ) : (
-          <div className="mt-6 overflow-x-auto rounded-[1.5rem] border border-white/10">
-            <div className="min-w-[1160px] grid grid-cols-[minmax(0,1.2fr)_120px_140px_minmax(180px,1fr)_120px_220px] gap-4 border-b border-white/10 bg-white/5 px-5 py-4 text-xs font-semibold tracking-[0.2em] uppercase text-zinc-500">
-              <span>Товар</span>
-              <span>Игра</span>
-              <span>Категория</span>
-              <span>Продавец</span>
-              <span>Цена</span>
-              <span className="text-right">Управление</span>
-            </div>
-
-            <div className="min-w-[1160px] divide-y divide-white/10">
-              {products.map((product) => {
-                const sellerDisplayName =
-                  product.seller.name?.trim() || product.seller.email;
-
-                return (
-                  <div
-                    key={product.id}
-                    className={[
-                      "grid grid-cols-[minmax(0,1.2fr)_120px_140px_minmax(180px,1fr)_120px_220px] gap-4 px-5 py-4 transition hover:bg-white/5",
-                      product.isActive ? "opacity-100" : "opacity-50",
-                    ].join(" ")}
-                  >
-                    <div className="min-w-0">
-                      <Link
-                        href={`/product/${product.id}`}
-                        className="truncate text-sm font-semibold text-white transition hover:text-orange-200"
-                      >
-                        {product.title}
-                      </Link>
-                      <p className="mt-1 truncate text-sm text-zinc-500">
-                        #{product.id}
-                      </p>
-                      <span
-                        className={[
-                          "mt-2 inline-flex rounded-full border px-2.5 py-1 text-[11px] font-semibold uppercase tracking-[0.14em]",
-                          product.isActive
-                            ? "border-emerald-500/20 bg-emerald-500/10 text-emerald-200"
-                            : "border-amber-500/20 bg-amber-500/10 text-amber-200",
-                        ].join(" ")}
-                      >
-                        {product.isActive ? "Виден" : "Скрыт"}
-                      </span>
-                    </div>
-                    <span className="text-sm text-zinc-300">{product.game.name}</span>
-                    <span className="text-sm text-zinc-300">{product.category.name}</span>
-                    <div className="flex min-w-0 items-center gap-3">
-                      <UserAvatar
-                        src={product.seller.image}
-                        name={sellerDisplayName}
-                        email={product.seller.email}
-                        className="h-6 w-6 shrink-0"
-                      />
-                      <div className="min-w-0">
-                        <span className="block truncate text-sm font-medium text-zinc-200">
-                          {sellerDisplayName}
-                        </span>
-                        <SellerRatingBadge
-                          summary={product.seller.reviewSummary}
-                          className="mt-1"
-                          size="sm"
-                        />
-                      </div>
-                    </div>
-                    <span className="text-sm font-semibold text-white">{formatPrice(product.price)}</span>
-                    <div className="flex items-start justify-end">
-                      <ProfileProductActions
-                        productId={product.id}
-                        isActive={product.isActive}
-                        onDeleted={handleProductDeleted}
-                        onVisibilityChanged={handleProductVisibilityChanged}
-                      />
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          </div>
-        )}
-      </section>
     </section>
   );
 }
