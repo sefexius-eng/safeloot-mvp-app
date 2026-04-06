@@ -137,6 +137,7 @@ async function getGameCatalog(
           name: true,
           image: true,
           lastSeen: true,
+          role: true,
           rank: true,
         },
       },

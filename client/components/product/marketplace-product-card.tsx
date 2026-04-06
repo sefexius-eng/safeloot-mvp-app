@@ -1,10 +1,12 @@
 "use client";
 
+import type { Role } from "@prisma/client";
 import Link from "next/link";
 
 import CensoredText from "@/components/censored-text";
 import { SellerRatingBadge } from "@/components/reviews/seller-rating-badge";
 import { useCurrency } from "@/components/providers/currency-provider";
+import { TeamBadge } from "@/components/ui/team-badge";
 import { UserAvatar } from "@/components/ui/user-avatar";
 import type { SellerReviewSummary } from "@/lib/review-summary";
 
@@ -34,6 +36,7 @@ export interface MarketplaceProductCardData {
     name: string | null;
     image: string | null;
     lastSeen: string | null;
+    role: Role;
     rank: SellerRank;
     reviewSummary: SellerReviewSummary;
   };
@@ -156,9 +159,12 @@ export function MarketplaceProductCard({ product }: MarketplaceProductCardProps)
             <p className="text-[11px] font-semibold tracking-[0.18em] uppercase text-zinc-500">
               Продавец
             </p>
-            <p className="truncate text-sm font-semibold text-white transition group-hover/seller:text-orange-300 group-hover/seller:underline">
-              <CensoredText text={sellerDisplayName} />
-            </p>
+            <div className="flex min-w-0 items-center gap-2 text-sm font-semibold text-white transition group-hover/seller:text-orange-300 group-hover/seller:underline">
+              <span className="truncate">
+                <CensoredText text={sellerDisplayName} />
+              </span>
+              <TeamBadge role={product.seller.role} />
+            </div>
             <SellerRatingBadge
               summary={product.seller.reviewSummary}
               className="mt-2"

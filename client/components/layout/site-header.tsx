@@ -19,6 +19,7 @@ import {
 import { Select } from "@/components/ui/select";
 import { UserAvatar } from "@/components/ui/user-avatar";
 import catalogSeedData from "@/lib/catalog-seed-data.json";
+import { isAdminRole } from "@/lib/roles";
 
 const BALANCE_REFRESH_EVENT = "safeloot:balances-refresh";
 const LAST_SEEN_UPDATE_INTERVAL_MS = 5 * 60 * 1000;
@@ -435,7 +436,7 @@ export function SiteHeader() {
                       Продать
                     </Link>
 
-                    {session?.user?.role === "ADMIN" || session?.user?.role === "SUPER_ADMIN" ? (
+                    {isAdminRole(session?.user?.role) ? (
                       <Link
                         href="/admin"
                         className="inline-flex h-10 items-center justify-center rounded-xl border border-sky-400/20 bg-sky-500/10 px-4 text-sm font-semibold text-sky-100 shadow-[0_16px_40px_rgba(2,132,199,0.16)] transition hover:-translate-y-0.5 hover:bg-sky-500/20"

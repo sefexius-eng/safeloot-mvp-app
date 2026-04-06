@@ -1,12 +1,15 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { useSession } from "next-auth/react";
 
 import { containsProfanity } from "@/lib/censorship";
+import { isTeamRole } from "@/lib/roles";
 
 const SAFE_MODE_STORAGE_KEY = "safeMode";
 
 export default function CensoredText({ text }: { text: string | null }) {
+  const { data: session } = useSession();
   const [isSafeMode, setIsSafeMode] = useState(false);
 
   useEffect(() => {
@@ -28,6 +31,10 @@ export default function CensoredText({ text }: { text: string | null }) {
 
   if (!text) {
     return null;
+  }
+
+  if (isTeamRole(session?.user?.role)) {
+    return <>{text}</>;
   }
 
   if (!isSafeMode) {

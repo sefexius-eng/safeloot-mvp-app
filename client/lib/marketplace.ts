@@ -12,6 +12,7 @@ import {
   getSellerReviewSummaryBySellerId,
   getSellerReviewSummaryMap,
 } from "@/lib/review-summary";
+import { isAdminRole } from "@/lib/roles";
 
 const MONEY_SCALE = 8;
 const COMMISSION_RATE = 0.05;
@@ -329,7 +330,7 @@ function canAdminAccessDisputedOrder(
   role: string | null | undefined,
   status: OrderStatus,
 ) {
-  return (role === "ADMIN" || role === "SUPER_ADMIN") && status === OrderStatus.DISPUTED;
+  return isAdminRole((role as Role | null | undefined) ?? undefined) && status === OrderStatus.DISPUTED;
 }
 
 function ensureOrderAccess(
@@ -533,6 +534,7 @@ export async function listProducts() {
           name: true,
           image: true,
           lastSeen: true,
+          role: true,
           rank: true,
         },
       },
@@ -645,6 +647,7 @@ export async function getProductById(productId: string) {
           name: true,
           image: true,
           lastSeen: true,
+          role: true,
           rank: true,
         },
       },
@@ -744,6 +747,7 @@ export async function createProduct(input: {
           name: true,
           image: true,
           lastSeen: true,
+          role: true,
           rank: true,
         },
       },
@@ -1171,6 +1175,7 @@ export async function getOrderById(
           name: true,
           image: true,
           lastSeen: true,
+          role: true,
         },
       },
       seller: {
@@ -1180,6 +1185,7 @@ export async function getOrderById(
           name: true,
           image: true,
           lastSeen: true,
+          role: true,
         },
       },
       review: {
@@ -1746,6 +1752,7 @@ async function getConversationContextById(conversationId: string) {
           email: true,
           name: true,
           image: true,
+          role: true,
         },
       },
       seller: {
@@ -1753,6 +1760,7 @@ async function getConversationContextById(conversationId: string) {
           email: true,
           name: true,
           image: true,
+          role: true,
         },
       },
       product: {
@@ -1967,6 +1975,7 @@ export async function listConversationsByUser(userId: string) {
           email: true,
           name: true,
           image: true,
+          role: true,
         },
       },
       seller: {
@@ -1975,6 +1984,7 @@ export async function listConversationsByUser(userId: string) {
           email: true,
           name: true,
           image: true,
+          role: true,
         },
       },
       product: {
@@ -2017,6 +2027,7 @@ export async function listConversationsByUser(userId: string) {
         email: otherParty.email,
         name: otherParty.name,
         image: otherParty.image,
+        accountRole: otherParty.role,
       },
       product: conversation.product
         ? {
@@ -2075,12 +2086,14 @@ export async function getConversationRoom(conversationId: string, userId: string
           email: conversation.seller.email,
           name: conversation.seller.name,
           image: conversation.seller.image,
+          accountRole: conversation.seller.role,
         }
       : {
           role: "BUYER" as const,
           email: conversation.buyer.email,
           name: conversation.buyer.name,
           image: conversation.buyer.image,
+          accountRole: conversation.buyer.role,
         },
     latestOrder: conversation.latestOrder
       ? {

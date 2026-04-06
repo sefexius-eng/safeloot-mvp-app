@@ -2,6 +2,7 @@ import type { Role } from "@prisma/client";
 import type { Session } from "next-auth";
 
 import { prisma } from "@/lib/prisma";
+import { isAdminRole as isAdminRoleHelper } from "@/lib/roles";
 
 export const BANNED_AUTH_ERROR = "ACCOUNT_BANNED";
 export const BANNED_USER_MESSAGE =
@@ -14,7 +15,7 @@ export interface CurrentSessionUser {
 }
 
 export function isAdminRole(role: Role | null | undefined) {
-  return role === "ADMIN" || role === "SUPER_ADMIN";
+  return isAdminRoleHelper(role);
 }
 
 export function getSessionUserId(session: Session | null) {

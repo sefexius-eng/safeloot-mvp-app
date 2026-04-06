@@ -1,5 +1,6 @@
 "use client";
 
+import type { Role } from "@prisma/client";
 import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState, useTransition } from "react";
 import Link from "next/link";
@@ -16,8 +17,10 @@ import CensoredText from "@/components/censored-text";
 import { RatingStars } from "@/components/reviews/rating-stars";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { TeamBadge } from "@/components/ui/team-badge";
 import { Textarea } from "@/components/ui/textarea";
 import { UserAvatar } from "@/components/ui/user-avatar";
+import { isAdminRole } from "@/lib/roles";
 
 const CHAT_POLL_INTERVAL_MS = 3000;
 const ORDER_REFRESH_INTERVAL_MS = 30000;
@@ -42,6 +45,7 @@ interface ChatUserIdentity {
 
 interface OrderParticipant extends ChatUserIdentity {
   lastSeen: string;
+  role: Role;
 }
 
 type OrderStatus =
@@ -539,8 +543,7 @@ export function ActiveOrderView({ orderId }: ActiveOrderViewProps) {
     let isMounted = true;
 
     const isSpectator =
-      (currentUserAccountRole === "ADMIN" ||
-        currentUserAccountRole === "SUPER_ADMIN") &&
+      isAdminRole(currentUserAccountRole as Role) &&
       currentUserId !== order?.buyerId &&
       currentUserId !== order?.sellerId;
 
@@ -1053,8 +1056,7 @@ export function ActiveOrderView({ orderId }: ActiveOrderViewProps) {
     : "Собеседник";
   const isRemoteTyping = remoteTypingUsers.length > 0;
   const isSpectator =
-    (currentUserAccountRole === "ADMIN" ||
-      currentUserAccountRole === "SUPER_ADMIN") &&
+    isAdminRole(currentUserAccountRole as Role) &&
     !isParticipant;
   const canOpenDispute =
     isParticipant && (order.status === "PAID" || order.status === "DELIVERED");
@@ -1103,9 +1105,12 @@ export function ActiveOrderView({ orderId }: ActiveOrderViewProps) {
                 </p>
                 <Link
                   href={`/user/${interlocutor.id}`}
-                  className="mt-1 block truncate text-xl font-semibold tracking-tight text-white transition hover:text-orange-300 hover:underline"
+                  className="mt-1 inline-flex max-w-full items-center gap-2 truncate text-xl font-semibold tracking-tight text-white transition hover:text-orange-300 hover:underline"
                 >
-                  <CensoredText text={interlocutorDisplayName} />
+                  <span className="truncate">
+                    <CensoredText text={interlocutorDisplayName} />
+                  </span>
+                  <TeamBadge role={interlocutor.role} />
                 </Link>
                 <div className="mt-1 flex flex-wrap items-center gap-2 text-sm text-zinc-400">
                   <span>{interlocutorRole}</span>
@@ -1148,9 +1153,12 @@ export function ActiveOrderView({ orderId }: ActiveOrderViewProps) {
                       <p className="text-xs font-semibold tracking-[0.18em] uppercase text-zinc-500">
                         {role}
                       </p>
-                      <p className="truncate text-sm font-semibold text-white">
-                        <CensoredText text={getUserDisplayName(participant)} />
-                      </p>
+                      <div className="flex min-w-0 items-center gap-2 text-sm font-semibold text-white">
+                        <p className="truncate">
+                          <CensoredText text={getUserDisplayName(participant)} />
+                        </p>
+                        <TeamBadge role={participant.role} />
+                      </div>
                     </div>
                   </Link>
                 ))}

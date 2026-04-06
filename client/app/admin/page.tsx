@@ -1,3 +1,4 @@
+import type { Role } from "@prisma/client";
 import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 
@@ -7,6 +8,7 @@ import {
   AdminToggleBanButton,
   AdminWithdrawalActionButtons,
 } from "@/components/admin/admin-action-buttons";
+import { AdminRoleSelect } from "@/components/admin/admin-role-select";
 import {
   AdminSafeModeToggle,
 } from "@/components/admin/admin-safe-mode";
@@ -35,6 +37,7 @@ import {
 } from "@/lib/access-control";
 import { getAuthSession } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
+import { isSuperAdminRole } from "@/lib/roles";
 import { getWithdrawalStatusMeta } from "@/lib/withdrawals";
 
 export const dynamic = "force-dynamic";
@@ -77,8 +80,8 @@ function formatAmount(value: unknown) {
   }).format(numericValue);
 }
 
-function getRoleBadgeVariant(role: string) {
-  return role === "ADMIN" || role === "SUPER_ADMIN" ? "info" : "secondary";
+function getRoleBadgeVariant(role: Role) {
+  return isAdminRole(role) ? "info" : "secondary";
 }
 
 function getBanBadgeVariant(isBanned: boolean) {
@@ -275,6 +278,7 @@ export default async function AdminDashboardPage() {
   const pendingWithdrawalsCount = pendingWithdrawals.length;
   const disputedOrdersCount = disputedOrders.length;
   const canUseSafeMode = isAdminRole(currentUser.role);
+  const canManageRoles = isSuperAdminRole(currentUser.role);
 
   return (
     <main className="mx-auto flex w-full max-w-[92rem] flex-col gap-8 px-4 py-10 sm:px-6 lg:px-8 lg:py-14">
@@ -294,14 +298,16 @@ export default async function AdminDashboardPage() {
                 Администратор: <span className="font-semibold text-white">{session?.user?.email ?? "неизвестно"}</span>
               </span>
               <span className="rounded-full border border-white/10 bg-white/5 px-4 py-2">
-                Доступ подтвержден по роли <span className="font-semibold text-white">ADMIN / SUPER_ADMIN</span>
+                Доступ подтвержден по роли <span className="font-semibold text-white">MODERATOR / ADMIN / SUPER_ADMIN</span>
               </span>
             </div>
           </div>
 
           <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-1">
             {canUseSafeMode ? <AdminSafeModeToggle /> : null}
-            <PlatformRevenueCard revenue={session?.user?.platformRevenue ?? 0} />
+            {isSuperAdminRole(currentUser.role) ? (
+              <PlatformRevenueCard revenue={session?.user?.platformRevenue ?? 0} />
+            ) : null}
             <Card className="bg-black/20 shadow-none">
               <CardHeader className="gap-1 p-5">
                 <CardDescription>Пользователи</CardDescription>
@@ -465,7 +471,15 @@ export default async function AdminDashboardPage() {
                               </div>
                             </TableCell>
                             <TableCell>
-                              <Badge variant={getRoleBadgeVariant(user.role)}>{user.role}</Badge>
+                              {canManageRoles ? (
+                                <AdminRoleSelect
+                                  userId={user.id}
+                                  currentRole={user.role}
+                                  isCurrentUser={user.id === currentUser.id}
+                                />
+                              ) : (
+                                <Badge variant={getRoleBadgeVariant(user.role)}>{user.role}</Badge>
+                              )}
                             </TableCell>
                             <TableCell>
                               <Badge variant={getBanBadgeVariant(user.isBanned)}>

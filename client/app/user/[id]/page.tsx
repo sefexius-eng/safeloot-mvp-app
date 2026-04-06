@@ -8,6 +8,7 @@ import {
   type MarketplaceProductCardData,
 } from "@/components/product/marketplace-product-card";
 import { RatingStars } from "@/components/reviews/rating-stars";
+import { TeamBadge } from "@/components/ui/team-badge";
 import { UserAvatar } from "@/components/ui/user-avatar";
 import { prisma } from "@/lib/prisma";
 
@@ -102,6 +103,7 @@ async function getPublicSellerProfile(id: string) {
       name: true,
       image: true,
       lastSeen: true,
+      role: true,
       rank: true,
       createdAt: true,
       products: {
@@ -200,6 +202,7 @@ async function getPublicSellerProfile(id: string) {
           name: seller.name,
           image: seller.image,
           lastSeen: seller.lastSeen.toISOString(),
+          role: seller.role,
           rank: seller.rank,
           reviewSummary,
         },
@@ -256,8 +259,11 @@ export default async function PublicUserPage({ params }: PublicUserPageProps) {
               <p className="text-sm font-semibold tracking-[0.24em] uppercase text-zinc-500">
                 Публичный профиль продавца
               </p>
-              <h1 className="mt-2 truncate text-3xl font-semibold tracking-tight text-white md:text-5xl">
-                <CensoredText text={displayName} />
+              <h1 className="mt-2 flex flex-wrap items-center gap-2 text-3xl font-semibold tracking-tight text-white md:text-5xl">
+                <span className="truncate">
+                  <CensoredText text={displayName} />
+                </span>
+                <TeamBadge role={seller.role} className="md:text-[11px]" />
               </h1>
               <p className="mt-2 truncate text-sm text-zinc-400">{seller.email}</p>
 

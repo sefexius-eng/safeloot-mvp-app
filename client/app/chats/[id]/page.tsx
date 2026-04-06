@@ -5,6 +5,7 @@ import CensoredText from "@/components/censored-text";
 import { UserAvatar } from "@/components/ui/user-avatar";
 import { BuyProductDialog } from "@/components/product/buy-product-dialog";
 import { ConversationRoomView } from "@/components/chat/conversation-room-view";
+import { TeamBadge } from "@/components/ui/team-badge";
 import { getCurrentSessionUser } from "@/lib/access-control";
 import { getAuthSession } from "@/lib/auth";
 import { getConversationRoom } from "@/lib/marketplace";
@@ -105,9 +106,12 @@ export default async function ChatRoomPage({ params }: ChatPageProps) {
               imageClassName="rounded-full object-cover"
             />
             <div className="min-w-0">
-              <p className="truncate text-lg font-semibold text-white">
-                <CensoredText text={otherPartyName} />
-              </p>
+              <div className="flex min-w-0 items-center gap-2 text-lg font-semibold text-white">
+                <p className="truncate">
+                  <CensoredText text={otherPartyName} />
+                </p>
+                <TeamBadge role={conversation.otherParty.accountRole} />
+              </div>
               <p className="truncate text-sm text-gray-400">
                 <CensoredText text={conversation.product?.title ?? "Личный диалог"} />
               </p>

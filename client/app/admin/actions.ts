@@ -1,6 +1,6 @@
 "use server";
 
-import { OrderStatus, Prisma } from "@prisma/client";
+import { OrderStatus, Prisma, Role } from "@prisma/client";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 
@@ -10,6 +10,7 @@ import {
 } from "@/lib/access-control";
 import { getAuthSession } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
+import { isSuperAdminRole, isTeamRole, ROLE_OPTIONS } from "@/lib/roles";
 
 export interface AdminActionResult {
   ok: boolean;
@@ -20,6 +21,10 @@ async function requireAdminAccess() {
   const session = await getAuthSession();
   const currentUser = await getCurrentSessionUser(session);
 
+  if (!currentUser) {
+    redirect("/");
+  }
+
   if (!hasActiveAdminAccess(currentUser)) {
     redirect("/");
   }
@@ -27,11 +32,90 @@ async function requireAdminAccess() {
   return currentUser;
 }
 
+async function requireSuperAdminAccess() {
+  const session = await getAuthSession();
+  const currentUser = await getCurrentSessionUser(session);
+
+  if (!currentUser || currentUser.isBanned || !isSuperAdminRole(currentUser.role)) {
+    throw new Error("Нет прав");
+  }
+
+  return currentUser;
+}
+
+export async function changeUserRole(
+  userId: string,
+  newRole: Role,
+): Promise<AdminActionResult> {
+  const currentUser = await requireSuperAdminAccess();
+  const normalizedUserId = userId.trim();
+
+  if (!normalizedUserId) {
+    return {
+      ok: false,
+      message: "Не удалось определить пользователя.",
+    };
+  }
+
+  if (!ROLE_OPTIONS.includes(newRole)) {
+    return {
+      ok: false,
+      message: "Недопустимая роль.",
+    };
+  }
+
+  if (normalizedUserId === currentUser.id) {
+    return {
+      ok: false,
+      message: "Нельзя изменить свою роль.",
+    };
+  }
+
+  const user = await prisma.user.findUnique({
+    where: {
+      id: normalizedUserId,
+    },
+    select: {
+      id: true,
+      role: true,
+    },
+  });
+
+  if (!user) {
+    return {
+      ok: false,
+      message: "Пользователь не найден.",
+    };
+  }
+
+  if (user.role === newRole) {
+    return {
+      ok: true,
+    };
+  }
+
+  await prisma.user.update({
+    where: {
+      id: normalizedUserId,
+    },
+    data: {
+      role: newRole,
+    },
+  });
+
+  revalidatePath("/admin");
+  revalidatePath(`/user/${normalizedUserId}`);
+
+  return {
+    ok: true,
+  };
+}
+
 export async function toggleBanUser(
   userId: string,
-  currentStatus: boolean,
+  _currentStatus: boolean,
 ): Promise<AdminActionResult> {
-  await requireAdminAccess();
+  const currentUser = await requireAdminAccess();
 
   const normalizedUserId = userId.trim();
 
@@ -48,6 +132,8 @@ export async function toggleBanUser(
     },
     select: {
       id: true,
+      role: true,
+      isBanned: true,
     },
   });
 
@@ -58,12 +144,19 @@ export async function toggleBanUser(
     };
   }
 
+  if (currentUser.role === "MODERATOR" && isTeamRole(user.role)) {
+    return {
+      ok: false,
+      message: "Модератор не может банить сотрудников команды.",
+    };
+  }
+
   await prisma.user.update({
     where: {
       id: normalizedUserId,
     },
     data: {
-      isBanned: !currentStatus,
+      isBanned: !user.isBanned,
     },
   });
 
