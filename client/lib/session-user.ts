@@ -42,5 +42,6 @@ export async function requireActiveSessionUserId() {
 
   return {
     userId: currentUser.id,
+    role: currentUser.role,
   };
 }

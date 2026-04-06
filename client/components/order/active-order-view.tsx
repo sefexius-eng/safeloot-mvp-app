@@ -6,6 +6,11 @@ import Link from "next/link";
 import { useSession } from "next-auth/react";
 
 import { markMessagesAsRead, sendMessage } from "@/app/actions/chat";
+import {
+  openDispute,
+  resolveDisputeToBuyer,
+  resolveDisputeToSeller,
+} from "@/app/actions/orders";
 import { createReview } from "@/app/actions/reviews";
 import { RatingStars } from "@/components/reviews/rating-stars";
 import { Button } from "@/components/ui/button";
@@ -30,6 +35,7 @@ type OrderStatus =
   | "DELIVERED"
   | "COMPLETED"
   | "DISPUTED"
+  | "REFUNDED"
   | "CANCELLED";
 
 interface OrderDetail {
@@ -108,6 +114,8 @@ function getStatusLabel(status: OrderStatus) {
       return "Завершен";
     case "DISPUTED":
       return "Спор";
+    case "REFUNDED":
+      return "Возврат покупателю";
     case "CANCELLED":
       return "Отменен";
     default:
@@ -123,6 +131,8 @@ function getStatusBadgeClassName(status: OrderStatus) {
       return "border-emerald-500/20 bg-emerald-500/10 text-emerald-200";
     case "DISPUTED":
       return "border-red-500/20 bg-red-500/10 text-red-200";
+    case "REFUNDED":
+      return "border-amber-500/20 bg-amber-500/10 text-amber-200";
     case "CANCELLED":
       return "border-zinc-500/20 bg-zinc-500/10 text-zinc-300";
     default:
@@ -244,6 +254,9 @@ export function ActiveOrderView({ orderId }: ActiveOrderViewProps) {
   const [isSending, setIsSending] = useState(false);
   const [isProcessingAttachment, setIsProcessingAttachment] = useState(false);
   const [isCompleting, setIsCompleting] = useState(false);
+  const [isOpeningDispute, setIsOpeningDispute] = useState(false);
+  const [isResolvingToBuyer, setIsResolvingToBuyer] = useState(false);
+  const [isResolvingToSeller, setIsResolvingToSeller] = useState(false);
   const [loadError, setLoadError] = useState("");
   const [chatError, setChatError] = useState("");
   const [actionError, setActionError] = useState("");
@@ -256,6 +269,7 @@ export function ActiveOrderView({ orderId }: ActiveOrderViewProps) {
   const hasActiveTypingRef = useRef(false);
   const previousMessageCountRef = useRef(0);
   const currentUserId = session?.user?.id ?? "";
+  const currentUserRole = session?.user?.role ?? "USER";
 
   useEffect(() => {
     previousMessageCountRef.current = 0;
@@ -472,7 +486,7 @@ export function ActiveOrderView({ orderId }: ActiveOrderViewProps) {
   useEffect(() => {
     let isMounted = true;
 
-    if (!currentUserId || !chatRoomId) {
+    if (!currentUserId || !chatRoomId || currentUserRole === "ADMIN") {
       return () => {
         isMounted = false;
       };
@@ -514,7 +528,7 @@ export function ActiveOrderView({ orderId }: ActiveOrderViewProps) {
     return () => {
       isMounted = false;
     };
-  }, [chatRoomId, currentUserId, messages]);
+  }, [chatRoomId, currentUserId, currentUserRole, messages]);
 
   useEffect(() => {
     async function updateTypingState(isTyping: boolean) {
@@ -750,6 +764,117 @@ export function ActiveOrderView({ orderId }: ActiveOrderViewProps) {
     }
   }
 
+  async function handleOpenDispute() {
+    setIsOpeningDispute(true);
+    setActionError("");
+    setCompleteMessage("");
+
+    try {
+      const result = await openDispute(orderId);
+
+      if (!result.ok || !result.status) {
+        throw new Error(result.message ?? "Не удалось открыть спор.");
+      }
+
+      setOrder((currentOrder) =>
+        currentOrder
+          ? {
+              ...currentOrder,
+              status: result.status as OrderStatus,
+            }
+          : currentOrder,
+      );
+      setCompleteMessage("Спор открыт. Сделка заморожена до решения арбитра.");
+      router.refresh();
+    } catch (error) {
+      setActionError(
+        error instanceof Error ? error.message : "Не удалось открыть спор.",
+      );
+    } finally {
+      setIsOpeningDispute(false);
+    }
+  }
+
+  async function handleResolveDisputeToBuyer() {
+    setIsResolvingToBuyer(true);
+    setActionError("");
+    setCompleteMessage("");
+
+    try {
+      const result = await resolveDisputeToBuyer(orderId);
+
+      if (!result.ok || !result.status) {
+        throw new Error(
+          result.message ?? "Не удалось вернуть средства покупателю.",
+        );
+      }
+
+      setOrder((currentOrder) =>
+        currentOrder
+          ? {
+              ...currentOrder,
+              status: result.status as OrderStatus,
+              platformFee: "0.00000000",
+            }
+          : currentOrder,
+      );
+      setCompleteMessage(
+        result.refundAmount
+          ? `Арбитраж завершен: покупателю возвращено ${formatAmount(result.refundAmount)} USDT.`
+          : "Арбитраж завершен в пользу покупателя.",
+      );
+      window.dispatchEvent(new Event(BALANCE_REFRESH_EVENT));
+      router.refresh();
+    } catch (error) {
+      setActionError(
+        error instanceof Error
+          ? error.message
+          : "Не удалось вернуть средства покупателю.",
+      );
+    } finally {
+      setIsResolvingToBuyer(false);
+    }
+  }
+
+  async function handleResolveDisputeToSeller() {
+    setIsResolvingToSeller(true);
+    setActionError("");
+    setCompleteMessage("");
+
+    try {
+      const result = await resolveDisputeToSeller(orderId);
+
+      if (!result.ok || !result.status) {
+        throw new Error(result.message ?? "Не удалось завершить спор в пользу продавца.");
+      }
+
+      setOrder((currentOrder) =>
+        currentOrder
+          ? {
+              ...currentOrder,
+              status: result.status as OrderStatus,
+              platformFee: result.platformFee ?? currentOrder.platformFee,
+            }
+          : currentOrder,
+      );
+      setCompleteMessage(
+        result.sellerNetAmount
+          ? `Арбитраж завершен: продавцу начислено ${formatAmount(result.sellerNetAmount)} USDT.`
+          : "Арбитраж завершен в пользу продавца.",
+      );
+      window.dispatchEvent(new Event(BALANCE_REFRESH_EVENT));
+      router.refresh();
+    } catch (error) {
+      setActionError(
+        error instanceof Error
+          ? error.message
+          : "Не удалось завершить спор в пользу продавца.",
+      );
+    } finally {
+      setIsResolvingToSeller(false);
+    }
+  }
+
   function handleSubmitReview(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
 
@@ -829,6 +954,19 @@ export function ActiveOrderView({ orderId }: ActiveOrderViewProps) {
   const sellerIsTyping = remoteTypingUsers.some(
     (typingUser) => typingUser.role === "SELLER",
   );
+  const isAdminViewer = currentUserRole === "ADMIN";
+  const isParticipant =
+    currentUserId === order.buyerId || currentUserId === order.sellerId;
+  const canOpenDispute =
+    isParticipant &&
+    !isAdminViewer &&
+    (order.status === "PAID" || order.status === "DELIVERED");
+  const canCompleteOrder =
+    currentUserId === order.buyerId &&
+    !isAdminViewer &&
+    (order.status === "PAID" || order.status === "DELIVERED");
+  const showArbiterPanel = isAdminViewer && order.status === "DISPUTED";
+  const isChatReadOnly = isAdminViewer;
   const canLeaveReview =
     order.status === "COMPLETED" &&
     currentUserId === order.buyerId &&
@@ -859,6 +997,12 @@ export function ActiveOrderView({ orderId }: ActiveOrderViewProps) {
             online
           </span>
         </div>
+
+        {order.status === "DISPUTED" ? (
+          <div className="mt-5 rounded-[1.5rem] border border-amber-500/25 bg-amber-500/10 p-4 text-sm leading-7 text-amber-100">
+            Сделка находится в споре. Выдача средств и финальное закрытие заморожены до решения арбитра.
+          </div>
+        ) : null}
 
         <div
           ref={chatScrollContainerRef}
@@ -1005,6 +1149,12 @@ export function ActiveOrderView({ orderId }: ActiveOrderViewProps) {
           <p className="mt-4 text-sm text-zinc-400">Подготавливаем скриншот для отправки...</p>
         ) : null}
 
+        {isChatReadOnly ? (
+          <div className="mt-5 rounded-[1.25rem] border border-sky-500/20 bg-sky-500/10 p-4 text-sm leading-7 text-sky-100">
+            Арбитр может просматривать переписку, но не участвует в чате сделки.
+          </div>
+        ) : null}
+
         <form onSubmit={handleSendMessage} className="mt-5 flex gap-3">
           <input
             ref={fileInputRef}
@@ -1018,7 +1168,12 @@ export function ActiveOrderView({ orderId }: ActiveOrderViewProps) {
             aria-label="Прикрепить скриншот"
             title="Прикрепить скриншот"
             onClick={() => fileInputRef.current?.click()}
-            disabled={isSending || isProcessingAttachment || !currentUserId}
+            disabled={
+              isSending ||
+              isProcessingAttachment ||
+              !currentUserId ||
+              isChatReadOnly
+            }
             className="inline-flex h-14 w-14 shrink-0 items-center justify-center rounded-[1.35rem] border border-white/10 bg-white/5 text-xl text-zinc-200 shadow-[0_12px_30px_rgba(0,0,0,0.18)] transition hover:bg-white/10 disabled:cursor-not-allowed disabled:opacity-60"
           >
             📎
@@ -1026,9 +1181,20 @@ export function ActiveOrderView({ orderId }: ActiveOrderViewProps) {
           <Input
             value={draftMessage}
             onChange={(event) => setDraftMessage(event.target.value)}
-            placeholder={currentUserId ? "Напишите сообщение или приложите скриншот" : "Войдите, чтобы писать в чат"}
+            placeholder={
+              !currentUserId
+                ? "Войдите, чтобы писать в чат"
+                : isChatReadOnly
+                  ? "Чат доступен арбитру только для чтения"
+                  : "Напишите сообщение или приложите скриншот"
+            }
             className="h-14 flex-1 border-white/10 bg-white/5 text-zinc-100 placeholder:text-zinc-500 focus:border-orange-500/45 focus:bg-white/8"
-            disabled={isSending || isProcessingAttachment || !currentUserId}
+            disabled={
+              isSending ||
+              isProcessingAttachment ||
+              !currentUserId ||
+              isChatReadOnly
+            }
           />
           <Button
             type="submit"
@@ -1036,7 +1202,8 @@ export function ActiveOrderView({ orderId }: ActiveOrderViewProps) {
               isSending ||
               isProcessingAttachment ||
               (!draftMessage.trim() && !draftImageBase64) ||
-              !currentUserId
+              !currentUserId ||
+              isChatReadOnly
             }
             className="h-14 rounded-[1.35rem] bg-orange-600 px-6 text-sm font-semibold text-white shadow-[0_18px_42px_rgba(234,88,12,0.35)] hover:bg-orange-500"
           >
@@ -1095,6 +1262,54 @@ export function ActiveOrderView({ orderId }: ActiveOrderViewProps) {
           </div>
         </div>
 
+        {canOpenDispute ? (
+          <Button
+            type="button"
+            onClick={handleOpenDispute}
+            disabled={isOpeningDispute}
+            className="mt-6 h-14 w-full rounded-[1.35rem] bg-red-600 text-base font-semibold shadow-[0_18px_42px_rgba(220,38,38,0.32)] hover:bg-red-500"
+          >
+            {isOpeningDispute ? "Открываем спор..." : "Открыть спор"}
+          </Button>
+        ) : null}
+
+        {showArbiterPanel ? (
+          <div className="mt-6 rounded-[1.5rem] border border-amber-500/20 bg-amber-500/10 p-5">
+            <p className="text-xs font-semibold tracking-[0.24em] uppercase text-amber-200/80">
+              Панель арбитра
+            </p>
+            <h3 className="mt-2 text-lg font-semibold text-white">
+              Разрешение спора по сделке
+            </h3>
+            <p className="mt-2 text-sm leading-7 text-amber-50/80">
+              Проверьте переписку и примите решение о возврате покупателю или о передаче средств продавцу.
+            </p>
+
+            <div className="mt-4 grid gap-3">
+              <Button
+                type="button"
+                onClick={handleResolveDisputeToBuyer}
+                disabled={isResolvingToBuyer || isResolvingToSeller}
+                className="h-12 w-full rounded-[1.2rem] bg-amber-500 text-sm font-semibold text-zinc-950 shadow-[0_18px_42px_rgba(245,158,11,0.28)] hover:bg-amber-400"
+              >
+                {isResolvingToBuyer
+                  ? "Возвращаем средства..."
+                  : "Вернуть деньги покупателю"}
+              </Button>
+              <Button
+                type="button"
+                onClick={handleResolveDisputeToSeller}
+                disabled={isResolvingToBuyer || isResolvingToSeller}
+                className="h-12 w-full rounded-[1.2rem] bg-emerald-600 text-sm font-semibold text-white shadow-[0_18px_42px_rgba(5,150,105,0.28)] hover:bg-emerald-500"
+              >
+                {isResolvingToSeller
+                  ? "Передаем средства..."
+                  : "Передать средства продавцу"}
+              </Button>
+            </div>
+          </div>
+        ) : null}
+
         {completeMessage ? (
           <div className="mt-6 rounded-[1.5rem] border border-emerald-500/15 bg-emerald-500/10 p-4 text-sm leading-7 text-emerald-200">
             {completeMessage}
@@ -1107,7 +1322,7 @@ export function ActiveOrderView({ orderId }: ActiveOrderViewProps) {
           </div>
         ) : null}
 
-        {order.status !== "COMPLETED" ? (
+        {canCompleteOrder ? (
           <Button
             type="button"
             onClick={handleCompleteOrder}
@@ -1225,7 +1440,11 @@ export function ActiveOrderView({ orderId }: ActiveOrderViewProps) {
         ) : null}
 
         <div className="mt-6 rounded-[1.5rem] border border-white/10 bg-white/5 p-4 text-sm leading-7 text-zinc-300">
-          После подтверждения получения товара система завершит сделку и переведет средства продавцу с учетом комиссии платформы.
+          {order.status === "DISPUTED"
+            ? "Во время спора сделка заморожена: финальный исход определяет арбитр после проверки чата и материалов по заказу."
+            : order.status === "REFUNDED"
+              ? "Спор завершен возвратом. Средства возвращены покупателю, а заказ закрыт без выплаты продавцу."
+              : "После подтверждения получения товара система завершит сделку и переведет средства продавцу с учетом комиссии платформы."}
         </div>
       </aside>
     </section>

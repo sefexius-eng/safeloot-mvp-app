@@ -64,6 +64,29 @@ function ensureOrderParticipant(
   }
 }
 
+function canAdminAccessDisputedOrder(
+  role: string | null | undefined,
+  status: OrderStatus,
+) {
+  return role === "ADMIN" && status === OrderStatus.DISPUTED;
+}
+
+function ensureOrderAccess(
+  userId: string,
+  order: { buyerId: string; sellerId: string; status: OrderStatus },
+  role?: string,
+) {
+  if (
+    userId === order.buyerId ||
+    userId === order.sellerId ||
+    canAdminAccessDisputedOrder(role, order.status)
+  ) {
+    return;
+  }
+
+  throw new Error("Only order participants can access this order.");
+}
+
 function ensureChatParticipant(
   userId: string,
   chatRoom: { buyerId: string; sellerId: string },
@@ -71,6 +94,26 @@ function ensureChatParticipant(
   if (userId !== chatRoom.buyerId && userId !== chatRoom.sellerId) {
     throw new Error("Only order participants can access this chat.");
   }
+}
+
+function ensureChatAccess(
+  userId: string,
+  chatRoom: {
+    buyerId: string;
+    sellerId: string;
+    order: { status: OrderStatus };
+  },
+  role?: string,
+) {
+  if (
+    userId === chatRoom.buyerId ||
+    userId === chatRoom.sellerId ||
+    canAdminAccessDisputedOrder(role, chatRoom.order.status)
+  ) {
+    return;
+  }
+
+  throw new Error("Only order participants can access this chat.");
 }
 
 function setTypingState(orderId: string, senderId: string, isTyping: boolean) {
@@ -162,6 +205,8 @@ export function mapMarketplaceErrorToStatusCode(message: string) {
   if (
     message.includes("cannot be confirmed") ||
     message.includes("cannot be completed") ||
+    message.includes("cannot be disputed") ||
+    message.includes("cannot be resolved") ||
     message.includes("could not be")
   ) {
     return 409;
@@ -529,7 +574,11 @@ export async function createOrder(input: {
   };
 }
 
-export async function getOrderById(orderId: string, userId: string) {
+export async function getOrderById(
+  orderId: string,
+  userId: string,
+  role?: string,
+) {
   const normalizedOrderId = normalizeText(orderId);
   const normalizedUserId = normalizeText(userId);
 
@@ -577,7 +626,7 @@ export async function getOrderById(orderId: string, userId: string) {
     throw new Error(`Order with id ${normalizedOrderId} was not found.`);
   }
 
-  ensureOrderParticipant(normalizedUserId, order);
+  ensureOrderAccess(normalizedUserId, order, role);
 
   return {
     id: order.id,
@@ -775,6 +824,232 @@ export async function completeOrder(input: { orderId: string; buyerId: string })
   );
 }
 
+export async function openOrderDispute(input: {
+  orderId: string;
+  userId: string;
+}) {
+  const orderId = normalizeText(input.orderId);
+  const userId = normalizeText(input.userId);
+
+  if (!orderId) {
+    throw new Error("orderId is required.");
+  }
+
+  if (!userId) {
+    throw new Error("userId is required.");
+  }
+
+  return prisma.$transaction(
+    async (transactionClient) => {
+      const order = await transactionClient.order.findUnique({
+        where: { id: orderId },
+        select: {
+          id: true,
+          buyerId: true,
+          sellerId: true,
+          status: true,
+        },
+      });
+
+      if (!order) {
+        throw new Error(`Order with id ${orderId} was not found.`);
+      }
+
+      ensureOrderParticipant(userId, order);
+
+      if (
+        order.status !== OrderStatus.PAID &&
+        order.status !== OrderStatus.DELIVERED
+      ) {
+        throw new Error(
+          `Order ${orderId} cannot be disputed from status ${order.status}.`,
+        );
+      }
+
+      const updatedOrder = await transactionClient.order.updateMany({
+        where: {
+          id: order.id,
+          status: {
+            in: [OrderStatus.PAID, OrderStatus.DELIVERED],
+          },
+        },
+        data: {
+          status: OrderStatus.DISPUTED,
+        },
+      });
+
+      if (updatedOrder.count !== 1) {
+        throw new Error(`Order ${orderId} could not be disputed.`);
+      }
+
+      return {
+        orderId: order.id,
+        status: OrderStatus.DISPUTED,
+      };
+    },
+    {
+      isolationLevel: Prisma.TransactionIsolationLevel.Serializable,
+    },
+  );
+}
+
+export async function resolveOrderDisputeToBuyer(input: { orderId: string }) {
+  const orderId = normalizeText(input.orderId);
+
+  if (!orderId) {
+    throw new Error("orderId is required.");
+  }
+
+  return prisma.$transaction(
+    async (transactionClient) => {
+      const order = await transactionClient.order.findUnique({
+        where: { id: orderId },
+        select: {
+          id: true,
+          buyerId: true,
+          price: true,
+          status: true,
+        },
+      });
+
+      if (!order) {
+        throw new Error(`Order with id ${orderId} was not found.`);
+      }
+
+      if (order.status !== OrderStatus.DISPUTED) {
+        throw new Error(
+          `Order ${orderId} cannot be resolved from status ${order.status}.`,
+        );
+      }
+
+      const refundAmount = order.price.toDecimalPlaces(
+        MONEY_SCALE,
+        Prisma.Decimal.ROUND_HALF_UP,
+      );
+
+      const updatedOrder = await transactionClient.order.updateMany({
+        where: {
+          id: order.id,
+          status: OrderStatus.DISPUTED,
+        },
+        data: {
+          status: OrderStatus.REFUNDED,
+          platformFee: new Prisma.Decimal(0),
+        },
+      });
+
+      if (updatedOrder.count !== 1) {
+        throw new Error(`Order ${orderId} could not be resolved to buyer.`);
+      }
+
+      await transactionClient.user.update({
+        where: {
+          id: order.buyerId,
+        },
+        data: {
+          availableBalance: {
+            increment: refundAmount,
+          },
+        },
+      });
+
+      return {
+        orderId: order.id,
+        status: OrderStatus.REFUNDED,
+        refundAmount: formatMoney(refundAmount),
+      };
+    },
+    {
+      isolationLevel: Prisma.TransactionIsolationLevel.Serializable,
+    },
+  );
+}
+
+export async function resolveOrderDisputeToSeller(input: { orderId: string }) {
+  const orderId = normalizeText(input.orderId);
+
+  if (!orderId) {
+    throw new Error("orderId is required.");
+  }
+
+  return prisma.$transaction(
+    async (transactionClient) => {
+      const order = await transactionClient.order.findUnique({
+        where: { id: orderId },
+        select: {
+          id: true,
+          sellerId: true,
+          price: true,
+          status: true,
+        },
+      });
+
+      if (!order) {
+        throw new Error(`Order with id ${orderId} was not found.`);
+      }
+
+      if (order.status !== OrderStatus.DISPUTED) {
+        throw new Error(
+          `Order ${orderId} cannot be resolved from status ${order.status}.`,
+        );
+      }
+
+      const platformFee = order.price
+        .mul(PLATFORM_FEE_RATE)
+        .toDecimalPlaces(MONEY_SCALE, Prisma.Decimal.ROUND_HALF_UP);
+      const sellerNetAmount = order.price
+        .sub(platformFee)
+        .toDecimalPlaces(MONEY_SCALE, Prisma.Decimal.ROUND_HALF_UP);
+
+      const updatedOrder = await transactionClient.order.updateMany({
+        where: {
+          id: order.id,
+          status: OrderStatus.DISPUTED,
+        },
+        data: {
+          status: OrderStatus.COMPLETED,
+          platformFee,
+        },
+      });
+
+      if (updatedOrder.count !== 1) {
+        throw new Error(`Order ${orderId} could not be resolved to seller.`);
+      }
+
+      await transactionClient.user.update({
+        where: {
+          id: order.sellerId,
+        },
+        data: {
+          availableBalance: {
+            increment: sellerNetAmount,
+          },
+        },
+      });
+
+      await transactionClient.transaction.create({
+        data: {
+          userId: order.sellerId,
+          orderId: order.id,
+          amount: sellerNetAmount,
+          type: TransactionType.ESCROW_RELEASE,
+          status: TransactionStatus.COMPLETED,
+        },
+      });
+
+      return {
+        orderId: order.id,
+        status: OrderStatus.COMPLETED,
+        platformFee: formatMoney(platformFee),
+        sellerNetAmount: formatMoney(sellerNetAmount),
+      };
+    },
+    {
+      isolationLevel: Prisma.TransactionIsolationLevel.Serializable,
+    },
+  );
+}
+
 async function getChatRoomContext(orderId: string) {
   return prisma.chatRoom.findUnique({
     where: {
@@ -785,6 +1060,11 @@ async function getChatRoomContext(orderId: string) {
       orderId: true,
       buyerId: true,
       sellerId: true,
+      order: {
+        select: {
+          status: true,
+        },
+      },
       buyer: {
         select: {
           email: true,
@@ -809,6 +1089,11 @@ async function getChatRoomContextById(chatRoomId: string) {
       orderId: true,
       buyerId: true,
       sellerId: true,
+      order: {
+        select: {
+          status: true,
+        },
+      },
       buyer: {
         select: {
           email: true,
@@ -823,7 +1108,11 @@ async function getChatRoomContextById(chatRoomId: string) {
   });
 }
 
-export async function getChatMessages(orderId: string, userId: string) {
+export async function getChatMessages(
+  orderId: string,
+  userId: string,
+  role?: string,
+) {
   const normalizedOrderId = normalizeText(orderId);
   const normalizedUserId = normalizeText(userId);
 
@@ -844,6 +1133,11 @@ export async function getChatMessages(orderId: string, userId: string) {
       orderId: true,
       buyerId: true,
       sellerId: true,
+      order: {
+        select: {
+          status: true,
+        },
+      },
       messages: {
         orderBy: {
           createdAt: "asc",
@@ -871,7 +1165,7 @@ export async function getChatMessages(orderId: string, userId: string) {
     throw new Error(`Chat for order ${normalizedOrderId} was not found.`);
   }
 
-  ensureChatParticipant(normalizedUserId, chatRoom);
+  ensureChatAccess(normalizedUserId, chatRoom, role);
 
   return {
     orderId: chatRoom.orderId,
@@ -1004,7 +1298,11 @@ export async function markChatMessagesAsRead(input: {
   };
 }
 
-export async function getChatTyping(orderId: string, userId: string) {
+export async function getChatTyping(
+  orderId: string,
+  userId: string,
+  role?: string,
+) {
   const normalizedOrderId = normalizeText(orderId);
   const normalizedUserId = normalizeText(userId);
 
@@ -1022,7 +1320,7 @@ export async function getChatTyping(orderId: string, userId: string) {
     throw new Error(`Chat for order ${normalizedOrderId} was not found.`);
   }
 
-  ensureChatParticipant(normalizedUserId, chatRoom);
+  ensureChatAccess(normalizedUserId, chatRoom, role);
 
   return {
     orderId: chatRoom.orderId,

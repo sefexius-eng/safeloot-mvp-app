@@ -14,10 +14,10 @@ export async function GET(
       return sessionUser.response;
     }
 
-    const { userId } = sessionUser;
+    const { userId, role } = sessionUser;
 
     const { orderId } = await context.params;
-    const order = await getOrderById(orderId, userId);
+    const order = await getOrderById(orderId, userId, role);
 
     return NextResponse.json(order);
   } catch (error) {

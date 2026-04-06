@@ -24,6 +24,7 @@ enum OrderStatus {
   DELIVERED
   COMPLETED
   DISPUTED
+  REFUNDED
   CANCELLED
 }
 

@@ -18,10 +18,10 @@ export async function GET(
       return sessionUser.response;
     }
 
-    const { userId } = sessionUser;
+    const { userId, role } = sessionUser;
 
     const { orderId } = await context.params;
-    const typingState = await getChatTyping(orderId, userId);
+    const typingState = await getChatTyping(orderId, userId, role);
 
     return NextResponse.json(typingState);
   } catch (error) {

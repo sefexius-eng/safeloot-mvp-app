@@ -20,6 +20,8 @@ function getOrderStatusLabel(status: string) {
       return "Завершен";
     case "DISPUTED":
       return "Спор";
+    case "REFUNDED":
+      return "Возврат покупателю";
     case "CANCELLED":
       return "Отменен";
     default:
@@ -35,6 +37,8 @@ function getOrderStatusClassName(status: string) {
       return "border-emerald-500/20 bg-emerald-500/10 text-emerald-200";
     case "DISPUTED":
       return "border-red-500/20 bg-red-500/10 text-red-200";
+    case "REFUNDED":
+      return "border-amber-500/20 bg-amber-500/10 text-amber-200";
     case "CANCELLED":
       return "border-zinc-500/20 bg-zinc-500/10 text-zinc-300";
     default:

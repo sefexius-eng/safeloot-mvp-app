@@ -109,6 +109,11 @@ function getOrderStatusMeta(status?: string) {
         label: "Спор",
         variant: "destructive" as const,
       };
+    case "REFUNDED":
+      return {
+        label: "Возврат",
+        variant: "warning" as const,
+      };
     case "CANCELLED":
       return {
         label: "Отменен",
@@ -130,7 +135,7 @@ export default async function AdminDashboardPage() {
     redirect("/");
   }
 
-  const [users, products, orders, pendingWithdrawals] = await Promise.all([
+  const [users, products, orders, pendingWithdrawals, disputedOrders] = await Promise.all([
     prisma.user.findMany({
       select: {
         id: true,
@@ -231,6 +236,19 @@ export default async function AdminDashboardPage() {
         createdAt: "desc",
       },
     }),
+    prisma.order.findMany({
+      where: {
+        status: "DISPUTED",
+      },
+      include: {
+        buyer: true,
+        seller: true,
+        product: true,
+      },
+      orderBy: {
+        createdAt: "desc",
+      },
+    }),
   ]);
 
   const adminCount = users.filter((user) => user.role === "ADMIN").length;
@@ -239,9 +257,13 @@ export default async function AdminDashboardPage() {
     (product) => product._count.orders > 0,
   ).length;
   const activeOrdersCount = orders.filter(
-    (order) => order.status !== "COMPLETED" && order.status !== "CANCELLED",
+    (order) =>
+      order.status !== "COMPLETED" &&
+      order.status !== "CANCELLED" &&
+      order.status !== "REFUNDED",
   ).length;
   const pendingWithdrawalsCount = pendingWithdrawals.length;
+  const disputedOrdersCount = disputedOrders.length;
 
   return (
     <main className="mx-auto flex w-full max-w-[92rem] flex-col gap-8 px-4 py-10 sm:px-6 lg:px-8 lg:py-14">
@@ -302,6 +324,9 @@ export default async function AdminDashboardPage() {
                       <p className="text-xs uppercase tracking-[0.18em] text-zinc-500">
                         Активные: {activeOrdersCount}
                       </p>
+                      <p className="text-xs uppercase tracking-[0.18em] text-zinc-500">
+                        Споры: {disputedOrdersCount}
+                      </p>
                     </div>
                   </div>
                 </CardHeader>
@@ -339,6 +364,15 @@ export default async function AdminDashboardPage() {
               >
                 <span>Сделки</span>
                 <Badge variant="secondary">{orders.length}</Badge>
+              </a>
+              <a
+                href="#disputes"
+                className="flex items-center justify-between rounded-[1.25rem] border border-white/10 bg-white/5 px-4 py-3 text-sm font-semibold text-zinc-100 transition hover:bg-white/10"
+              >
+                <span>Активные споры</span>
+                <Badge variant={disputedOrdersCount > 0 ? "destructive" : "secondary"}>
+                  {disputedOrdersCount}
+                </Badge>
               </a>
               <a
                 href="#withdrawals"
@@ -589,6 +623,83 @@ export default async function AdminDashboardPage() {
                     </Table>
                   </div>
                 </div>
+              </CardContent>
+            </Card>
+          </section>
+
+          <section id="disputes" className="scroll-mt-24">
+            <Card>
+              <CardHeader className="border-b border-white/10">
+                <div className="flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
+                  <div>
+                    <CardDescription>Dispute Resolution</CardDescription>
+                    <CardTitle>Активные споры</CardTitle>
+                  </div>
+                  <Badge variant={disputedOrdersCount > 0 ? "destructive" : "secondary"}>
+                    Открыто: {disputedOrdersCount}
+                  </Badge>
+                </div>
+              </CardHeader>
+              <CardContent className="pt-6">
+                {disputedOrders.length === 0 ? (
+                  <div className="rounded-[1.5rem] border border-white/10 bg-white/5 p-6 text-sm leading-7 text-zinc-400">
+                    Сейчас нет сделок со статусом DISPUTED.
+                  </div>
+                ) : (
+                  <div className="overflow-hidden rounded-[1.5rem] border border-white/10 bg-black/10">
+                    <div className="overflow-x-auto">
+                      <Table>
+                        <TableHeader>
+                          <TableRow>
+                            <TableHead>ID заказа</TableHead>
+                            <TableHead>Товар</TableHead>
+                            <TableHead>Покупатель</TableHead>
+                            <TableHead>Продавец</TableHead>
+                            <TableHead className="text-right">Цена</TableHead>
+                            <TableHead className="text-right">Действие</TableHead>
+                          </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                          {disputedOrders.map((order) => (
+                            <TableRow key={order.id}>
+                              <TableCell>
+                                <div className="space-y-1">
+                                  <p className="font-mono text-xs text-zinc-300">{order.id}</p>
+                                  <p className="text-xs uppercase tracking-[0.18em] text-zinc-500">
+                                    {new Intl.DateTimeFormat("ru-RU", {
+                                      dateStyle: "medium",
+                                      timeStyle: "short",
+                                    }).format(order.createdAt)}
+                                  </p>
+                                </div>
+                              </TableCell>
+                              <TableCell>
+                                <p className="font-semibold text-white">{order.product.title}</p>
+                              </TableCell>
+                              <TableCell className="text-zinc-300">
+                                {order.buyer.name?.trim() || order.buyer.email}
+                              </TableCell>
+                              <TableCell className="text-zinc-300">
+                                {order.seller.name?.trim() || order.seller.email}
+                              </TableCell>
+                              <TableCell className="text-right font-semibold text-white">
+                                {formatAmount(order.price)} USDT
+                              </TableCell>
+                              <TableCell className="text-right">
+                                <a
+                                  href={`/orders/${order.id}`}
+                                  className="inline-flex h-10 items-center justify-center rounded-2xl border border-amber-500/20 bg-amber-500/10 px-4 text-sm font-semibold text-amber-100 transition hover:bg-amber-500/20"
+                                >
+                                  Перейти в чат сделки
+                                </a>
+                              </TableCell>
+                            </TableRow>
+                          ))}
+                        </TableBody>
+                      </Table>
+                    </div>
+                  </div>
+                )}
               </CardContent>
             </Card>
           </section>
