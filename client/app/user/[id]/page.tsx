@@ -11,6 +11,7 @@ import { UserAvatar } from "@/components/ui/user-avatar";
 import { prisma } from "@/lib/prisma";
 
 type SellerRank = "BRONZE" | "SILVER" | "GOLD";
+const SELLER_ONLINE_WINDOW_MS = 15 * 60 * 1000;
 
 interface PublicUserPageProps {
   params: Promise<{
@@ -71,6 +72,20 @@ function formatReviewDate(value: Date) {
     hour: "2-digit",
     minute: "2-digit",
   }).format(value);
+}
+
+function isSellerOnline(lastSeen?: Date | string | null) {
+  if (!lastSeen) {
+    return false;
+  }
+
+  const lastSeenTime = new Date(lastSeen).getTime();
+
+  if (!Number.isFinite(lastSeenTime)) {
+    return false;
+  }
+
+  return Date.now() - lastSeenTime <= SELLER_ONLINE_WINDOW_MS;
 }
 
 async function getPublicSellerProfile(id: string) {
@@ -205,19 +220,34 @@ export default async function PublicUserPage({ params }: PublicUserPageProps) {
   }
 
   const displayName = seller.name?.trim() || seller.email.split("@")[0];
+  const sellerIsOnline = isSellerOnline(seller.lastSeen);
 
   return (
     <main className="mx-auto flex w-full max-w-7xl flex-col gap-8 px-4 py-10 sm:px-6 lg:px-8 lg:py-14">
       <section className="overflow-hidden rounded-[2.25rem] border border-white/10 bg-[radial-gradient(circle_at_top_left,rgba(249,115,22,0.18),transparent_26%),radial-gradient(circle_at_bottom_right,rgba(14,165,233,0.14),transparent_30%),rgba(9,9,11,0.92)] p-7 shadow-[0_24px_80px_rgba(0,0,0,0.28)] md:p-10">
         <div className="flex flex-col gap-6 lg:flex-row lg:items-center lg:justify-between">
           <div className="flex min-w-0 items-center gap-5">
-            <UserAvatar
-              src={seller.image}
-              name={displayName}
-              email={seller.email}
-              className="h-24 w-24 shrink-0 border-white/10 bg-zinc-900/80 text-2xl"
-              imageClassName="rounded-full object-cover"
-            />
+            <div className="relative shrink-0">
+              <UserAvatar
+                src={seller.image}
+                name={displayName}
+                email={seller.email}
+                className="h-24 w-24 shrink-0 border-white/10 bg-zinc-900/80 text-2xl"
+                imageClassName="rounded-full object-cover"
+              />
+              <span
+                aria-label={sellerIsOnline ? "Продавец онлайн" : "Продавец не в сети"}
+                title={sellerIsOnline ? "Продавец онлайн" : "Продавец не в сети"}
+                className={[
+                  "absolute bottom-1 right-1 inline-flex h-5 w-5 items-center justify-center rounded-full border border-zinc-950 text-[10px] shadow-[0_8px_20px_rgba(0,0,0,0.28)]",
+                  sellerIsOnline
+                    ? "bg-emerald-500 text-emerald-950 shadow-[0_8px_20px_rgba(16,185,129,0.4)]"
+                    : "bg-zinc-600 text-zinc-200",
+                ].join(" ")}
+              >
+                ●
+              </span>
+            </div>
 
             <div className="min-w-0">
               <p className="text-sm font-semibold tracking-[0.24em] uppercase text-zinc-500">
@@ -233,6 +263,16 @@ export default async function PublicUserPage({ params }: PublicUserPageProps) {
                   className={`inline-flex rounded-full border px-3 py-1.5 font-medium ${getRankClassName(seller.rank)}`}
                 >
                   Ранг: {getRankLabel(seller.rank)}
+                </span>
+                <span
+                  className={[
+                    "inline-flex rounded-full border px-3 py-1.5 font-medium",
+                    sellerIsOnline
+                      ? "border-emerald-500/20 bg-emerald-500/10 text-emerald-200"
+                      : "border-white/10 bg-white/5 text-zinc-300",
+                  ].join(" ")}
+                >
+                  {sellerIsOnline ? "Онлайн сейчас" : "Сейчас не в сети"}
                 </span>
                 <span className="rounded-full border border-white/10 bg-white/5 px-3 py-1.5 text-zinc-300">
                   На площадке с {formatJoinedDate(seller.createdAt)}
