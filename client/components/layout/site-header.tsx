@@ -43,6 +43,17 @@ interface CurrentUser {
   createdAt: string;
 }
 
+function HeaderAuthSkeleton() {
+  return (
+    <div className="flex flex-wrap items-center gap-2 lg:justify-self-end">
+      <div className="h-10 w-[124px] animate-pulse rounded-2xl border border-white/10 bg-white/5" />
+      <div className="h-10 w-[92px] animate-pulse rounded-xl border border-white/10 bg-white/5" />
+      <div className="h-10 w-[96px] animate-pulse rounded-xl border border-white/10 bg-white/5" />
+      <div className="h-10 w-10 animate-pulse rounded-xl border border-white/10 bg-white/5" />
+    </div>
+  );
+}
+
 export function SiteHeader() {
   const router = useRouter();
   const { data: session, status } = useSession();
@@ -317,8 +328,11 @@ export function SiteHeader() {
             </div>
           </form>
 
-          <div className="flex flex-wrap items-center gap-2 lg:justify-self-end">
-            {status === "authenticated" ? (
+          {status === "loading" ? (
+            <HeaderAuthSkeleton />
+          ) : (
+            <div className="flex flex-wrap items-center gap-2 lg:justify-self-end">
+              {status === "authenticated" ? (
               <>
                 <div className="inline-flex items-center gap-3 rounded-2xl border border-white/10 bg-white/5 px-3 py-2 text-zinc-300 shadow-[0_12px_28px_rgba(0,0,0,0.22)]">
                   <span className="flex h-9 w-9 items-center justify-center rounded-xl border border-white/10 bg-white/5 text-zinc-200">
@@ -431,7 +445,7 @@ export function SiteHeader() {
                   </DropdownMenuContent>
                 </DropdownMenu>
               </>
-            ) : (
+              ) : status === "unauthenticated" ? (
               <>
                 <Link
                   href="/login"
@@ -447,8 +461,9 @@ export function SiteHeader() {
                   Регистрация
                 </Link>
               </>
-            )}
-          </div>
+              ) : null}
+            </div>
+          )}
         </div>
       </div>
     </header>
