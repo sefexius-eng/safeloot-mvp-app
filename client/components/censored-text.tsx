@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 
-import { BANNED_WORDS } from "@/lib/censorship";
+import { containsProfanity } from "@/lib/censorship";
 
 const SAFE_MODE_STORAGE_KEY = "safeMode";
 
@@ -34,10 +34,7 @@ export default function CensoredText({ text }: { text: string | null }) {
     return <>{text}</>;
   }
 
-  const normalizedText = text.toLowerCase();
-  const hasBadWords = BANNED_WORDS.some((word) =>
-    normalizedText.includes(word.toLowerCase()),
-  );
+  const hasBadWords = containsProfanity(text);
 
   if (!hasBadWords) {
     return <>{text}</>;
