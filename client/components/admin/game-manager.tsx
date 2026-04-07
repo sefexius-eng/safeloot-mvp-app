@@ -897,9 +897,9 @@ export function GameManager({ games: initialGames, currentUserRole }: GameManage
                                     </div>
                                   </div>
                                 ) : (
-                                  <div className="flex items-start justify-between gap-3">
-                                    <div className="min-w-0">
-                                      <p className="truncate text-sm font-semibold text-zinc-100">
+                                  <div className="flex w-full items-center justify-between gap-4">
+                                    <div className="min-w-0 flex-1">
+                                      <p className="truncate text-sm font-medium text-zinc-100">
                                         {category.name}
                                       </p>
                                       <div className="mt-1 flex flex-wrap items-center gap-2 text-[11px] uppercase tracking-[0.14em] text-zinc-500">
@@ -968,7 +968,7 @@ export function GameManager({ games: initialGames, currentUserRole }: GameManage
                             });
                           }}
                           placeholder="Name"
-                          className="h-9 border-white/10 bg-white/5 text-sm text-zinc-100 placeholder:text-zinc-500 focus:border-orange-500/45 focus:bg-white/8"
+                          className="h-9 border-slate-700 bg-slate-900 text-sm text-white placeholder:text-slate-400 focus:border-orange-500/45 focus:bg-slate-900"
                           disabled={isAddingCategory || isDeletingGame}
                         />
                         <Input
@@ -983,7 +983,7 @@ export function GameManager({ games: initialGames, currentUserRole }: GameManage
                             }));
                           }}
                           placeholder="Slug"
-                          className="h-9 border-white/10 bg-white/5 text-sm text-zinc-100 placeholder:text-zinc-500 focus:border-orange-500/45 focus:bg-white/8"
+                          className="h-9 border-slate-700 bg-slate-900 text-sm text-white placeholder:text-slate-400 focus:border-orange-500/45 focus:bg-slate-900"
                           disabled={isAddingCategory || isDeletingGame}
                         />
                         <button
