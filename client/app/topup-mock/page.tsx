@@ -56,13 +56,13 @@ export default async function TopupMockPage({ searchParams }: TopupMockPageProps
       <section className="grid w-full gap-6 rounded-[2rem] border border-white/10 bg-zinc-900/80 p-6 shadow-[0_24px_80px_rgba(0,0,0,0.28)] backdrop-blur md:grid-cols-[minmax(0,1fr)_340px] md:p-10">
         <div>
           <p className="text-sm font-semibold tracking-[0.24em] uppercase text-emerald-400">
-            Mock Cryptomus Checkout
+            Mock Stripe Checkout
           </p>
           <h1 className="mt-3 text-3xl font-semibold tracking-tight text-white md:text-4xl">
             Тестовое пополнение баланса SafeLoot
           </h1>
           <p className="mt-4 max-w-2xl text-sm leading-7 text-zinc-400 md:text-base">
-            Это безопасная локальная имитация оплаты. После подтверждения mock checkout вызовет webhook Cryptomus и зачислит средства на ваш available balance.
+            Это безопасная локальная имитация карточной оплаты. После подтверждения mock checkout отправит Stripe-style webhook и зачислит средства на ваш available balance.
           </p>
 
           <div className="mt-8 grid gap-4 sm:grid-cols-3">
@@ -71,7 +71,7 @@ export default async function TopupMockPage({ searchParams }: TopupMockPageProps
                 Провайдер
               </p>
               <p className="mt-3 text-lg font-semibold text-white">
-                Cryptomus Mock
+                Stripe Mock
               </p>
             </div>
             <div className="rounded-[1.5rem] border border-white/10 bg-white/5 p-4">
@@ -116,13 +116,14 @@ export default async function TopupMockPage({ searchParams }: TopupMockPageProps
           </div>
 
           <div className="mt-4 rounded-[1.5rem] border border-emerald-500/15 bg-emerald-500/8 p-5 text-sm leading-7 text-emerald-100">
-            Кнопка ниже имитирует callback от крипто-эквайринга и проверяет ваш webhook-поток без реального провайдера.
+            Кнопка ниже имитирует callback от карточного шлюза и проверяет ваш webhook-поток без реального Stripe аккаунта.
           </div>
 
           <div className="mt-6">
             <MockTopupButton
               transactionId={transaction.id}
               amount={transaction.amount.toString()}
+              currency={transaction.currency}
             />
           </div>
 

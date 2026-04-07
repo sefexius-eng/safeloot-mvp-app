@@ -4,10 +4,10 @@ import { Prisma, TransactionStatus, TransactionType } from "@prisma/client";
 
 import { BANNED_USER_MESSAGE, getCurrentSessionUser } from "@/lib/access-control";
 import { getAuthSession } from "@/lib/auth";
-import { createCryptomusInvoice } from "@/lib/cryptomus";
 import { prisma } from "@/lib/prisma";
+import { createStripeCheckoutSession } from "@/lib/stripe";
 
-interface CreateTopupInvoiceResult {
+interface CreateTopupSessionResult {
   ok: boolean;
   checkoutUrl?: string;
   transactionId?: string;
@@ -38,7 +38,7 @@ function normalizeTopupAmount(amount: number) {
   const normalizedAmount = new Prisma.Decimal(amount.toFixed(2));
 
   if (normalizedAmount.lt(1)) {
-    throw new Error("Минимальная сумма пополнения — 1 USDT.");
+    throw new Error("Минимальная сумма пополнения — 1 USD.");
   }
 
   if (normalizedAmount.gt(100000)) {
@@ -48,9 +48,9 @@ function normalizeTopupAmount(amount: number) {
   return normalizedAmount;
 }
 
-export async function createTopupInvoice(
+export async function createTopupSession(
   amount: number,
-): Promise<CreateTopupInvoiceResult> {
+): Promise<CreateTopupSessionResult> {
   try {
     const currentUser = await requireActivePaymentUser();
     const normalizedAmount = normalizeTopupAmount(amount);
@@ -58,7 +58,7 @@ export async function createTopupInvoice(
       data: {
         userId: currentUser.id,
         amount: normalizedAmount,
-        currency: "USDT",
+        currency: "USD",
         type: TransactionType.DEPOSIT,
         status: TransactionStatus.PENDING,
       },
@@ -69,28 +69,28 @@ export async function createTopupInvoice(
     });
 
     try {
-      const invoice = await createCryptomusInvoice({
+      const checkoutSession = await createStripeCheckoutSession({
         transactionId: transaction.id,
         amount: transaction.amount,
-        currency: "USDT",
+        currency: "USD",
       });
 
-      if (invoice.providerId) {
+      if (checkoutSession.providerId) {
         await prisma.transaction.update({
           where: {
             id: transaction.id,
           },
           data: {
-            externalId: invoice.providerId,
+            externalId: checkoutSession.providerId,
           },
         });
       }
 
       return {
         ok: true,
-        checkoutUrl: invoice.checkoutUrl,
+        checkoutUrl: checkoutSession.checkoutUrl,
         transactionId: transaction.id,
-        isMock: invoice.isMock,
+        isMock: checkoutSession.isMock,
       };
     } catch (error) {
       await prisma.transaction.update({
@@ -110,7 +110,9 @@ export async function createTopupInvoice(
       message:
         error instanceof Error
           ? error.message
-          : "Не удалось создать счёт на пополнение.",
+          : "Не удалось создать checkout сессию на пополнение.",
     };
   }
 }
+
+export const createTopupInvoice = createTopupSession;

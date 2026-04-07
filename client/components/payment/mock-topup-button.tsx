@@ -7,9 +7,14 @@ import { Button } from "@/components/ui/button";
 interface MockTopupButtonProps {
   transactionId: string;
   amount: string;
+  currency: string;
 }
 
-export function MockTopupButton({ transactionId, amount }: MockTopupButtonProps) {
+export function MockTopupButton({
+  transactionId,
+  amount,
+  currency,
+}: MockTopupButtonProps) {
   const [errorMessage, setErrorMessage] = useState("");
   const [isPending, setIsPending] = useState(false);
 
@@ -18,17 +23,30 @@ export function MockTopupButton({ transactionId, amount }: MockTopupButtonProps)
     setIsPending(true);
 
     try {
-      const response = await fetch("/api/webhooks/cryptomus", {
+      const amountTotal = Math.round(Number.parseFloat(amount) * 100);
+
+      const response = await fetch("/api/webhooks/stripe", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
+          "Stripe-Signature": "mock-topup-signature",
         },
         body: JSON.stringify({
-          order_id: transactionId,
-          uuid: `mock-${transactionId}`,
-          status: "paid",
-          amount,
-          currency: "USDT",
+          id: `evt_mock_${transactionId}`,
+          type: "checkout.session.completed",
+          data: {
+            object: {
+              id: `cs_mock_${transactionId}`,
+              client_reference_id: transactionId,
+              payment_status: "paid",
+              status: "complete",
+              amount_total: amountTotal,
+              currency: currency.toLowerCase(),
+              metadata: {
+                transactionId,
+              },
+            },
+          },
         }),
       });
 
@@ -37,7 +55,7 @@ export function MockTopupButton({ transactionId, amount }: MockTopupButtonProps)
           | { message?: string }
           | null;
 
-        throw new Error(payload?.message || "Не удалось подтвердить тестовую оплату.");
+        throw new Error(payload?.message || "Не удалось подтвердить тестовую карточную оплату.");
       }
 
       window.location.href = "/profile?topup=success";
@@ -45,7 +63,7 @@ export function MockTopupButton({ transactionId, amount }: MockTopupButtonProps)
       setErrorMessage(
         error instanceof Error
           ? error.message
-          : "Не удалось подтвердить тестовую оплату.",
+          : "Не удалось подтвердить тестовую карточную оплату.",
       );
       setIsPending(false);
     }
@@ -59,7 +77,9 @@ export function MockTopupButton({ transactionId, amount }: MockTopupButtonProps)
         disabled={isPending || !transactionId}
         className="h-14 w-full rounded-[1.35rem] bg-emerald-600 text-base font-semibold shadow-[0_18px_42px_rgba(5,150,105,0.35)] hover:bg-emerald-500 disabled:cursor-not-allowed disabled:opacity-60"
       >
-        {isPending ? "Подтверждаем оплату..." : "Имитировать успешную оплату"}
+        {isPending
+          ? "Подтверждаем карточную оплату..."
+          : "Имитировать успешную оплату картой"}
       </Button>
 
       {errorMessage ? (
