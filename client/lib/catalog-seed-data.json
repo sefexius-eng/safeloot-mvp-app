@@ -3,6 +3,7 @@
     {
       "name": "Albion Online",
       "slug": "albion-online",
+      "imageUrl": "/game-cover/albion-online",
       "categories": [
         { "name": "Аккаунты", "slug": "accounts" },
         { "name": "Серебро", "slug": "silver" },
@@ -12,6 +13,7 @@
     {
       "name": "Apex Legends",
       "slug": "apex-legends",
+      "imageUrl": "/game-cover/apex-legends",
       "categories": [
         { "name": "Аккаунты", "slug": "accounts" },
         { "name": "Монеты", "slug": "coins" },
@@ -21,6 +23,7 @@
     {
       "name": "Black Desert",
       "slug": "black-desert",
+      "imageUrl": "/game-cover/black-desert",
       "categories": [
         { "name": "Аккаунты", "slug": "accounts" },
         { "name": "Серебро", "slug": "silver" },
@@ -30,6 +33,7 @@
     {
       "name": "CS2",
       "slug": "cs2",
+      "imageUrl": "/game-cover/cs2",
       "categories": [
         { "name": "Аккаунты", "slug": "accounts" },
         { "name": "Скины", "slug": "skins" },
@@ -39,6 +43,7 @@
     {
       "name": "Dota 2",
       "slug": "dota2",
+      "imageUrl": "/game-cover/dota2",
       "categories": [
         { "name": "Аккаунты", "slug": "accounts" },
         { "name": "Предметы", "slug": "items" },
@@ -48,6 +53,7 @@
     {
       "name": "EA Sports FC 25",
       "slug": "ea-sports-fc-25",
+      "imageUrl": "/game-cover/ea-sports-fc-25",
       "categories": [
         { "name": "Аккаунты", "slug": "accounts" },
         { "name": "Монеты", "slug": "coins" },
@@ -57,6 +63,7 @@
     {
       "name": "Escape from Tarkov",
       "slug": "escape-from-tarkov",
+      "imageUrl": "/game-cover/escape-from-tarkov",
       "categories": [
         { "name": "Аккаунты", "slug": "accounts" },
         { "name": "Рубли", "slug": "rubles" },
@@ -66,6 +73,7 @@
     {
       "name": "Fortnite",
       "slug": "fortnite",
+      "imageUrl": "/game-cover/fortnite",
       "categories": [
         { "name": "Аккаунты", "slug": "accounts" },
         { "name": "V-Bucks", "slug": "v-bucks" },
@@ -75,6 +83,7 @@
     {
       "name": "Genshin Impact",
       "slug": "genshin-impact",
+      "imageUrl": "/game-cover/genshin-impact",
       "categories": [
         { "name": "Аккаунты", "slug": "accounts" },
         { "name": "Кристаллы", "slug": "crystals" },
@@ -84,6 +93,7 @@
     {
       "name": "GTA 5",
       "slug": "gta-5",
+      "imageUrl": "/game-cover/gta-5",
       "categories": [
         { "name": "Аккаунты", "slug": "accounts" },
         { "name": "Валюта", "slug": "currency" },
@@ -93,6 +103,7 @@
     {
       "name": "League of Legends",
       "slug": "league-of-legends",
+      "imageUrl": "/game-cover/league-of-legends",
       "categories": [
         { "name": "Аккаунты", "slug": "accounts" },
         { "name": "RP", "slug": "rp" },
@@ -102,6 +113,7 @@
     {
       "name": "Minecraft",
       "slug": "minecraft",
+      "imageUrl": "/game-cover/minecraft",
       "categories": [
         { "name": "Аккаунты", "slug": "accounts" },
         { "name": "Ресурсы", "slug": "resources" },
@@ -111,6 +123,7 @@
     {
       "name": "Path of Exile",
       "slug": "path-of-exile",
+      "imageUrl": "/game-cover/path-of-exile",
       "categories": [
         { "name": "Аккаунты", "slug": "accounts" },
         { "name": "Валюта", "slug": "currency" },
@@ -120,6 +133,7 @@
     {
       "name": "PUBG",
       "slug": "pubg",
+      "imageUrl": "/game-cover/pubg",
       "categories": [
         { "name": "Аккаунты", "slug": "accounts" },
         { "name": "UC", "slug": "uc" },
@@ -129,6 +143,7 @@
     {
       "name": "Roblox",
       "slug": "roblox",
+      "imageUrl": "/game-cover/roblox",
       "categories": [
         { "name": "Аккаунты", "slug": "accounts" },
         { "name": "Robux", "slug": "robux" },
@@ -138,6 +153,7 @@
     {
       "name": "Rust",
       "slug": "rust",
+      "imageUrl": "/game-cover/rust",
       "categories": [
         { "name": "Аккаунты", "slug": "accounts" },
         { "name": "Скины", "slug": "skins" },
@@ -147,6 +163,7 @@
     {
       "name": "Valorant",
       "slug": "valorant",
+      "imageUrl": "/game-cover/valorant",
       "categories": [
         { "name": "Аккаунты", "slug": "accounts" },
         { "name": "Услуги", "slug": "services" },
@@ -156,6 +173,7 @@
     {
       "name": "War Thunder",
       "slug": "war-thunder",
+      "imageUrl": "/game-cover/war-thunder",
       "categories": [
         { "name": "Аккаунты", "slug": "accounts" },
         { "name": "Орлы", "slug": "eagles" },
@@ -165,6 +183,7 @@
     {
       "name": "World of Tanks",
       "slug": "world-of-tanks",
+      "imageUrl": "/game-cover/world-of-tanks",
       "categories": [
         { "name": "Аккаунты", "slug": "accounts" },
         { "name": "Золото", "slug": "gold" },
@@ -174,6 +193,7 @@
     {
       "name": "World of Warcraft",
       "slug": "wow",
+      "imageUrl": "/game-cover/wow",
       "categories": [
         { "name": "Золото", "slug": "gold" },
         { "name": "Таймкарты", "slug": "timecards" },
@@ -182,11 +202,35 @@
     }
   ],
   "popularGames": [
-    { "name": "CS2", "slug": "cs2" },
-    { "name": "Dota 2", "slug": "dota2" },
-    { "name": "GTA 5", "slug": "gta-5" },
-    { "name": "Valorant", "slug": "valorant" },
-    { "name": "Rust", "slug": "rust" },
-    { "name": "Escape from Tarkov", "slug": "escape-from-tarkov" }
+    {
+      "name": "CS2",
+      "slug": "cs2",
+      "imageUrl": "/game-cover/cs2"
+    },
+    {
+      "name": "Dota 2",
+      "slug": "dota2",
+      "imageUrl": "/game-cover/dota2"
+    },
+    {
+      "name": "GTA 5",
+      "slug": "gta-5",
+      "imageUrl": "/game-cover/gta-5"
+    },
+    {
+      "name": "Valorant",
+      "slug": "valorant",
+      "imageUrl": "/game-cover/valorant"
+    },
+    {
+      "name": "Rust",
+      "slug": "rust",
+      "imageUrl": "/game-cover/rust"
+    },
+    {
+      "name": "Escape from Tarkov",
+      "slug": "escape-from-tarkov",
+      "imageUrl": "/game-cover/escape-from-tarkov"
+    }
   ]
 }

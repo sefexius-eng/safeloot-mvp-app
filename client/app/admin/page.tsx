@@ -8,6 +8,7 @@ import {
   AdminToggleBanButton,
   AdminWithdrawalActionButtons,
 } from "@/components/admin/admin-action-buttons";
+import { GameManager } from "@/components/admin/game-manager";
 import { PromoCodeManager } from "@/components/admin/promo-code-manager";
 import { AdminRoleSelect } from "@/components/admin/admin-role-select";
 import {
@@ -147,7 +148,7 @@ export default async function AdminDashboardPage() {
     redirect("/");
   }
 
-  const [users, products, orders, pendingWithdrawals, disputedOrders, activePromoCodes] = await Promise.all([
+  const [users, products, orders, pendingWithdrawals, disputedOrders, activePromoCodes, catalogGames] = await Promise.all([
     prisma.user.findMany({
       select: {
         id: true,
@@ -277,6 +278,23 @@ export default async function AdminDashboardPage() {
           },
         })
       : Promise.resolve([]),
+    prisma.game.findMany({
+      select: {
+        id: true,
+        name: true,
+        slug: true,
+        imageUrl: true,
+        _count: {
+          select: {
+            categories: true,
+            products: true,
+          },
+        },
+      },
+      orderBy: {
+        name: "asc",
+      },
+    }),
   ]);
 
   const adminCount = users.filter(
@@ -297,6 +315,7 @@ export default async function AdminDashboardPage() {
   const canUseSafeMode = isAdminRole(currentUser.role);
   const canManageRoles = isSuperAdminRole(currentUser.role);
   const canManagePromoCodes = isSuperAdminRole(currentUser.role);
+  const canManageGames = isAdminRole(currentUser.role);
   const visiblePromoCodes = activePromoCodes.filter(
     (promoCode) => promoCode.usedCount < promoCode.maxUses,
   );
@@ -393,6 +412,15 @@ export default async function AdminDashboardPage() {
                   <Badge variant="info">{visiblePromoCodes.length}</Badge>
                 </a>
               ) : null}
+              {canManageGames ? (
+                <a
+                  href="#games"
+                  className="flex items-center justify-between rounded-[1.25rem] border border-white/10 bg-white/5 px-4 py-3 text-sm font-semibold text-zinc-100 transition hover:bg-white/10"
+                >
+                  <span>Игры</span>
+                  <Badge variant="secondary">{catalogGames.length}</Badge>
+                </a>
+              ) : null}
               <a
                 href="#users"
                 className="flex items-center justify-between rounded-[1.25rem] border border-white/10 bg-white/5 px-4 py-3 text-sm font-semibold text-zinc-100 transition hover:bg-white/10"
@@ -457,6 +485,34 @@ export default async function AdminDashboardPage() {
                     activePromoCodes={visiblePromoCodes.map((promoCode) => ({
                       ...promoCode,
                       createdAt: promoCode.createdAt.toISOString(),
+                    }))}
+                  />
+                </CardContent>
+              </Card>
+            </section>
+          ) : null}
+
+          {canManageGames ? (
+            <section id="games" className="scroll-mt-24">
+              <Card>
+                <CardHeader className="border-b border-white/10">
+                  <div className="flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
+                    <div>
+                      <CardDescription>Catalog Games</CardDescription>
+                      <CardTitle>Игры и постеры</CardTitle>
+                    </div>
+                    <Badge variant="info">Всего игр: {catalogGames.length}</Badge>
+                  </div>
+                </CardHeader>
+                <CardContent className="pt-6">
+                  <GameManager
+                    games={catalogGames.map((game) => ({
+                      id: game.id,
+                      name: game.name,
+                      slug: game.slug,
+                      imageUrl: game.imageUrl,
+                      productCount: game._count.products,
+                      categoryCount: game._count.categories,
                     }))}
                   />
                 </CardContent>

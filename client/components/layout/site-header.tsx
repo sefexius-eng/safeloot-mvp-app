@@ -34,6 +34,32 @@ interface SearchGameResult {
   imageUrl: string | null;
 }
 
+function SearchGameIcon({
+  name,
+  imageUrl,
+}: {
+  name: string;
+  imageUrl: string | null;
+}) {
+  const fallbackLetter = name.slice(0, 1).toUpperCase() || "G";
+
+  if (imageUrl?.trim()) {
+    return (
+      <img
+        src={imageUrl}
+        alt={name}
+        className="h-9 w-9 rounded-xl border border-white/10 object-cover"
+      />
+    );
+  }
+
+  return (
+    <span className="flex h-9 w-9 items-center justify-center rounded-xl border border-white/10 bg-white/5 text-sm font-semibold text-zinc-200">
+      {fallbackLetter}
+    </span>
+  );
+}
+
 interface CurrentUser {
   id: string;
   email: string;
@@ -314,12 +340,16 @@ export function SiteHeader() {
                           <button
                             key={game.slug}
                             type="button"
-                            onClick={() => handleSelectGame({ ...game, id: game.slug, imageUrl: null })}
+                            onClick={() =>
+                              handleSelectGame({
+                                ...game,
+                                id: game.slug,
+                                imageUrl: game.imageUrl ?? null,
+                              })
+                            }
                             className="flex w-full items-center gap-3 px-4 py-3 text-left transition hover:bg-white/5"
                           >
-                            <span className="flex h-9 w-9 items-center justify-center rounded-full border border-orange-500/20 bg-orange-500/10 text-sm font-semibold text-orange-100">
-                              {game.name.slice(0, 1).toUpperCase()}
-                            </span>
+                            <SearchGameIcon name={game.name} imageUrl={game.imageUrl ?? null} />
                             <span className="min-w-0 flex-1">
                               <span className="block truncate text-sm font-semibold text-white">
                                 {game.name}
@@ -345,9 +375,7 @@ export function SiteHeader() {
                           onClick={() => handleSelectGame(game)}
                           className="flex w-full items-center gap-3 px-4 py-3 text-left transition hover:bg-white/5"
                         >
-                          <span className="flex h-9 w-9 items-center justify-center rounded-full border border-white/10 bg-white/5 text-sm font-semibold text-zinc-200">
-                            {game.name.slice(0, 1).toUpperCase()}
-                          </span>
+                          <SearchGameIcon name={game.name} imageUrl={game.imageUrl} />
                           <span className="min-w-0 flex-1">
                             <span className="block truncate text-sm font-semibold text-white">
                               {game.name}

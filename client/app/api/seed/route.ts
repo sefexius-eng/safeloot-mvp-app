@@ -4,11 +4,21 @@ import { NextResponse } from "next/server";
 import catalogSeedData from "@/lib/catalog-seed-data.json";
 import { prisma } from "@/lib/prisma";
 
+type SeedCatalogGame = {
+  name: string;
+  slug: string;
+  imageUrl?: string | null;
+  categories: Array<{
+    name: string;
+    slug: string;
+  }>;
+};
+
 async function seedCatalog() {
   let createdGames = 0;
   let createdCategories = 0;
 
-  for (const game of catalogSeedData.games) {
+  for (const game of catalogSeedData.games as SeedCatalogGame[]) {
     const existingGame = await prisma.game.findUnique({
       where: {
         slug: game.slug,
@@ -24,10 +34,12 @@ async function seedCatalog() {
       },
       update: {
         name: game.name,
+        imageUrl: game.imageUrl ?? null,
       },
       create: {
         name: game.name,
         slug: game.slug,
+        imageUrl: game.imageUrl ?? null,
       },
     });
 

@@ -17,6 +17,74 @@ export interface AdminActionResult {
   message?: string;
 }
 
+export interface CatalogGameSummary {
+  id: string;
+  name: string;
+  slug: string;
+  imageUrl: string | null;
+  productCount: number;
+  categoryCount: number;
+}
+
+export interface CatalogGameActionResult extends AdminActionResult {
+  game?: CatalogGameSummary;
+}
+
+function normalizeCatalogGameSlug(value: string) {
+  return value
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "")
+    .slice(0, 64);
+}
+
+function normalizeCatalogGameImageUrl(value: string) {
+  const trimmedValue = value.trim();
+
+  if (!trimmedValue) {
+    return null;
+  }
+
+  if (trimmedValue.startsWith("/")) {
+    return trimmedValue;
+  }
+
+  let parsedUrl: URL;
+
+  try {
+    parsedUrl = new URL(trimmedValue);
+  } catch {
+    throw new Error("Укажите корректный URL изображения.");
+  }
+
+  if (parsedUrl.protocol !== "http:" && parsedUrl.protocol !== "https:") {
+    throw new Error("URL изображения должен начинаться с http:// или https://.");
+  }
+
+  return parsedUrl.toString();
+}
+
+function mapCatalogGameSummary(game: {
+  id: string;
+  name: string;
+  slug: string;
+  imageUrl: string | null;
+  _count: {
+    products: number;
+    categories: number;
+  };
+}): CatalogGameSummary {
+  return {
+    id: game.id,
+    name: game.name,
+    slug: game.slug,
+    imageUrl: game.imageUrl,
+    productCount: game._count.products,
+    categoryCount: game._count.categories,
+  };
+}
+
 async function requireAdminAccess() {
   const session = await getAuthSession();
   const currentUser = await getCurrentSessionUser(session);
@@ -309,4 +377,168 @@ export async function releaseUserHoldBalance(
         error instanceof Error ? error.message : "Не удалось снять холд пользователя.",
     };
   }
+}
+
+export async function createCatalogGame(
+  name: string,
+  slug: string,
+  imageUrl: string,
+): Promise<CatalogGameActionResult> {
+  await requireAdminAccess();
+
+  const normalizedName = name.trim();
+  const normalizedSlug = normalizeCatalogGameSlug(slug || name);
+
+  if (!normalizedName) {
+    return {
+      ok: false,
+      message: "Введите название игры.",
+    };
+  }
+
+  if (!normalizedSlug) {
+    return {
+      ok: false,
+      message: "Введите корректный slug латиницей.",
+    };
+  }
+
+  let normalizedImageUrl: string | null;
+
+  try {
+    normalizedImageUrl = normalizeCatalogGameImageUrl(imageUrl);
+  } catch (error) {
+    return {
+      ok: false,
+      message:
+        error instanceof Error ? error.message : "Не удалось обработать URL изображения.",
+    };
+  }
+
+  const existingGame = await prisma.game.findUnique({
+    where: {
+      slug: normalizedSlug,
+    },
+    select: {
+      id: true,
+    },
+  });
+
+  if (existingGame) {
+    return {
+      ok: false,
+      message: "Игра с таким slug уже существует.",
+    };
+  }
+
+  const game = await prisma.game.create({
+    data: {
+      name: normalizedName,
+      slug: normalizedSlug,
+      imageUrl: normalizedImageUrl,
+    },
+    select: {
+      id: true,
+      name: true,
+      slug: true,
+      imageUrl: true,
+      _count: {
+        select: {
+          products: true,
+          categories: true,
+        },
+      },
+    },
+  });
+
+  revalidatePath("/");
+  revalidatePath("/admin");
+  revalidatePath("/sell");
+  revalidatePath("/games/[slug]", "page");
+
+  return {
+    ok: true,
+    message: "Игра добавлена в каталог.",
+    game: mapCatalogGameSummary(game),
+  };
+}
+
+export async function updateCatalogGameImage(
+  gameId: string,
+  imageUrl: string,
+): Promise<CatalogGameActionResult> {
+  await requireAdminAccess();
+
+  const normalizedGameId = gameId.trim();
+
+  if (!normalizedGameId) {
+    return {
+      ok: false,
+      message: "Не удалось определить игру.",
+    };
+  }
+
+  let normalizedImageUrl: string | null;
+
+  try {
+    normalizedImageUrl = normalizeCatalogGameImageUrl(imageUrl);
+  } catch (error) {
+    return {
+      ok: false,
+      message:
+        error instanceof Error ? error.message : "Не удалось обработать URL изображения.",
+    };
+  }
+
+  const existingGame = await prisma.game.findUnique({
+    where: {
+      id: normalizedGameId,
+    },
+    select: {
+      id: true,
+      slug: true,
+    },
+  });
+
+  if (!existingGame) {
+    return {
+      ok: false,
+      message: "Игра не найдена.",
+    };
+  }
+
+  const game = await prisma.game.update({
+    where: {
+      id: normalizedGameId,
+    },
+    data: {
+      imageUrl: normalizedImageUrl,
+    },
+    select: {
+      id: true,
+      name: true,
+      slug: true,
+      imageUrl: true,
+      _count: {
+        select: {
+          products: true,
+          categories: true,
+        },
+      },
+    },
+  });
+
+  revalidatePath("/");
+  revalidatePath("/admin");
+  revalidatePath("/sell");
+  revalidatePath("/games/[slug]", "page");
+  revalidatePath(`/games/${existingGame.slug}`);
+
+  return {
+    ok: true,
+    message: normalizedImageUrl
+      ? "Обложка игры обновлена."
+      : "URL обложки очищен, теперь используется fallback-оформление.",
+    game: mapCatalogGameSummary(game),
+  };
 }

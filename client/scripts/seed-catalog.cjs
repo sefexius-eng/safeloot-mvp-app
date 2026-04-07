@@ -9,10 +9,12 @@ async function main() {
       where: { slug: game.slug },
       update: {
         name: game.name,
+        imageUrl: game.imageUrl ?? null,
       },
       create: {
         name: game.name,
         slug: game.slug,
+        imageUrl: game.imageUrl ?? null,
       },
     });
 

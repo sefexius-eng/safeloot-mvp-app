@@ -1,9 +1,11 @@
+import Image from "next/image";
 import Link from "next/link";
 
 import {
   MarketplaceProductCard,
   type MarketplaceProductCardData,
 } from "@/components/product/marketplace-product-card";
+import catalogSeedData from "@/lib/catalog-seed-data.json";
 import { listProducts } from "@/lib/marketplace";
 import { prisma } from "@/lib/prisma";
 
@@ -11,7 +13,20 @@ interface GameDirectoryItem {
   id: string;
   name: string;
   slug: string;
+  imageUrl: string | null;
+  productCount: number;
 }
+
+const HERO_IMAGE_URL =
+  "https://images.unsplash.com/photo-1612287230202-1ff1d85d1bdf?q=80&w=1200&auto=format&fit=crop";
+const POPULAR_GAME_SLUGS = catalogSeedData.popularGames.map((game) => game.slug);
+const GAME_POSTER_BACKGROUNDS = [
+  "linear-gradient(165deg, rgba(249,115,22,0.84), rgba(244,63,94,0.32) 44%, rgba(9,9,11,0.96))",
+  "linear-gradient(165deg, rgba(14,165,233,0.84), rgba(37,99,235,0.30) 46%, rgba(2,6,23,0.96))",
+  "linear-gradient(165deg, rgba(168,85,247,0.78), rgba(236,72,153,0.30) 44%, rgba(9,9,11,0.96))",
+  "linear-gradient(165deg, rgba(16,185,129,0.82), rgba(6,182,212,0.28) 46%, rgba(3,7,18,0.96))",
+  "linear-gradient(165deg, rgba(250,204,21,0.78), rgba(234,88,12,0.30) 42%, rgba(17,24,39,0.96))",
+];
 
 async function getProducts(): Promise<MarketplaceProductCardData[]> {
   try {
@@ -24,7 +39,7 @@ async function getProducts(): Promise<MarketplaceProductCardData[]> {
 
 async function getGames(): Promise<GameDirectoryItem[]> {
   try {
-    return prisma.game.findMany({
+    const games = await prisma.game.findMany({
       orderBy: {
         name: "asc",
       },
@@ -32,8 +47,22 @@ async function getGames(): Promise<GameDirectoryItem[]> {
         id: true,
         name: true,
         slug: true,
+        imageUrl: true,
+        _count: {
+          select: {
+            products: true,
+          },
+        },
       },
     });
+
+    return games.map((game) => ({
+      id: game.id,
+      name: game.name,
+      slug: game.slug,
+      imageUrl: game.imageUrl,
+      productCount: game._count.products,
+    }));
   } catch (error) {
     console.error("[HOME_GAMES_ERROR]", error);
     return [];
@@ -53,19 +82,63 @@ function groupGamesByInitial(games: GameDirectoryItem[]) {
   }, {});
 }
 
+function getPopularGames(games: GameDirectoryItem[]) {
+  const popularGamesOrder = new Map(
+    POPULAR_GAME_SLUGS.map((slug, index) => [slug, index]),
+  );
+
+  return [...games]
+    .sort((left, right) => {
+      const leftOrder = popularGamesOrder.get(left.slug);
+      const rightOrder = popularGamesOrder.get(right.slug);
+
+      if (leftOrder !== undefined && rightOrder !== undefined) {
+        return leftOrder - rightOrder;
+      }
+
+      if (leftOrder !== undefined) {
+        return -1;
+      }
+
+      if (rightOrder !== undefined) {
+        return 1;
+      }
+
+      if (right.productCount !== left.productCount) {
+        return right.productCount - left.productCount;
+      }
+
+      return left.name.localeCompare(right.name, "ru-RU");
+    })
+    .slice(0, 8);
+}
+
+function getGamePosterBackground(slug: string) {
+  const hash = Array.from(slug).reduce(
+    (accumulator, symbol) => accumulator + symbol.charCodeAt(0),
+    0,
+  );
+
+  return GAME_POSTER_BACKGROUNDS[hash % GAME_POSTER_BACKGROUNDS.length];
+}
+
 export default async function Home() {
   const [products, games] = await Promise.all([getProducts(), getGames()]);
   const groupedGames = groupGamesByInitial(games);
   const gameInitials = Object.keys(groupedGames).sort((left, right) =>
     left.localeCompare(right, "ru-RU"),
   );
+  const popularGames = getPopularGames(games);
+  const featuredCatalogHref = popularGames[0]
+    ? `/games/${popularGames[0].slug}`
+    : "#popular-games";
 
   return (
     <main className="mx-auto flex w-full max-w-7xl flex-col gap-12 px-4 py-10 sm:px-6 lg:gap-16 lg:px-8 lg:py-14">
-      <section className="overflow-hidden rounded-[2rem] border border-white/10 bg-[linear-gradient(135deg,rgba(24,24,27,0.92),rgba(15,23,42,0.92))] shadow-[0_24px_80px_rgba(0,0,0,0.3)] backdrop-blur">
-        <div className="grid gap-10 px-6 py-8 md:px-10 md:py-12 lg:grid-cols-[minmax(0,1.2fr)_minmax(300px,0.8fr)] lg:px-14 lg:py-16">
+      <section className="overflow-hidden rounded-[2.4rem] border border-white/10 bg-[radial-gradient(circle_at_top_left,rgba(249,115,22,0.22),transparent_30%),radial-gradient(circle_at_bottom_right,rgba(14,165,233,0.16),transparent_36%),linear-gradient(135deg,rgba(24,24,27,0.96),rgba(15,23,42,0.94))] shadow-[0_24px_80px_rgba(0,0,0,0.3)] backdrop-blur">
+        <div className="grid gap-10 px-6 py-8 md:grid-cols-2 md:items-center md:px-10 md:py-12 lg:px-14 lg:py-16">
           <div className="space-y-8">
-            <div className="inline-flex rounded-full border border-orange-700/15 bg-orange-700/8 px-4 py-2 text-xs font-semibold tracking-[0.3em] uppercase text-orange-800">
+            <div className="inline-flex rounded-full border border-orange-400/20 bg-orange-500/10 px-4 py-2 text-xs font-semibold tracking-[0.3em] uppercase text-orange-200 shadow-[0_12px_30px_rgba(249,115,22,0.12)]">
               Безопасные сделки для игровых товаров
             </div>
 
@@ -79,9 +152,12 @@ export default async function Home() {
             </div>
 
             <div className="flex flex-wrap gap-3">
-              <button className="rounded-2xl bg-orange-600 px-6 py-3 text-sm font-semibold text-white shadow-[0_18px_45px_rgba(249,115,22,0.24)] transition hover:-translate-y-0.5 hover:bg-orange-500">
-                Начать покупать
-              </button>
+              <Link
+                href={featuredCatalogHref}
+                className="inline-flex rounded-2xl bg-orange-600 px-6 py-3 text-sm font-semibold text-white shadow-[0_18px_45px_rgba(249,115,22,0.24)] transition hover:-translate-y-0.5 hover:bg-orange-500"
+              >
+                Смотреть каталог
+              </Link>
               <Link
                 href="/sell"
                 className="inline-flex rounded-2xl border border-white/10 bg-white/6 px-6 py-3 text-sm font-semibold text-white transition hover:bg-white/10"
@@ -121,43 +197,119 @@ export default async function Home() {
             </div>
           </div>
 
-          <div className="relative rounded-[1.75rem] border border-white/10 bg-black/25 p-6 text-white shadow-[0_20px_65px_rgba(0,0,0,0.3)]">
-            <div className="absolute -right-10 top-8 h-32 w-32 rounded-full bg-orange-500/25 blur-3xl" />
-            <div className="absolute -left-6 bottom-8 h-24 w-24 rounded-full bg-cyan-400/20 blur-3xl" />
+          <div className="relative">
+            <div className="pointer-events-none absolute -right-6 top-6 h-36 w-36 rounded-full bg-orange-500/25 blur-3xl animate-pulse" />
+            <div className="pointer-events-none absolute -left-6 bottom-10 h-28 w-28 rounded-full bg-sky-400/20 blur-3xl animate-pulse" />
 
-            <div className="relative space-y-6">
-              <div>
-                <p className="text-xs tracking-[0.28em] uppercase text-neutral-400">
-                  Как это работает
-                </p>
-                <h2 className="mt-3 text-2xl font-semibold tracking-tight">
-                  Деньги удерживаются, пока покупатель не подтвердит сделку.
-                </h2>
+            <div className="group relative mx-auto min-h-[360px] overflow-hidden rounded-[2rem] border border-white/10 bg-black/25 shadow-[0_26px_90px_rgba(0,0,0,0.34)] transition-all duration-500 hover:-translate-y-2">
+              <Image
+                src={HERO_IMAGE_URL}
+                alt="Неоновый геймпад и игровое рабочее место"
+                fill
+                priority
+                sizes="(min-width: 768px) 50vw, 100vw"
+                className="object-cover transition duration-700 group-hover:scale-[1.03]"
+              />
+              <div className="absolute inset-0 bg-[linear-gradient(180deg,rgba(9,9,11,0.12),rgba(9,9,11,0.22)_45%,rgba(9,9,11,0.86))]" />
+
+              <div className="absolute right-4 top-4 rounded-[1.35rem] border border-white/10 bg-black/35 px-4 py-3 text-white shadow-[0_16px_40px_rgba(0,0,0,0.28)] backdrop-blur">
+                <p className="text-xs uppercase tracking-[0.22em] text-zinc-400">Каталог</p>
+                <p className="mt-2 text-2xl font-semibold">{games.length}</p>
+                <p className="text-sm text-zinc-300">игр в витрине</p>
               </div>
 
-              <div className="space-y-3">
-                <div className="rounded-2xl bg-white/8 p-4">
-                  <p className="text-sm font-semibold text-white">1. Покупатель оплачивает заказ</p>
-                  <p className="mt-1 text-sm leading-6 text-neutral-300">
-                    Средства списываются с доступного баланса и переходят под контроль платформы.
+              <div className="absolute bottom-4 left-4 rounded-[1.35rem] border border-white/10 bg-black/35 px-4 py-3 text-white shadow-[0_16px_40px_rgba(0,0,0,0.28)] backdrop-blur">
+                <p className="text-xs uppercase tracking-[0.22em] text-zinc-400">Escrow Shield</p>
+                <p className="mt-2 text-lg font-semibold">Защищённая оплата</p>
+                <p className="text-sm text-zinc-300">Средства удерживаются до подтверждения</p>
+              </div>
+
+              <div className="absolute inset-x-0 bottom-0 p-6 md:p-8">
+                <div className="max-w-lg rounded-[1.75rem] border border-white/10 bg-black/35 p-5 text-white shadow-[0_18px_50px_rgba(0,0,0,0.28)] backdrop-blur">
+                  <p className="text-xs font-semibold uppercase tracking-[0.24em] text-orange-200/90">
+                    Gaming Marketplace
                   </p>
-                </div>
-                <div className="rounded-2xl bg-white/8 p-4">
-                  <p className="text-sm font-semibold text-white">2. Продавец выполняет заказ</p>
-                  <p className="mt-1 text-sm leading-6 text-neutral-300">
-                    Все детали и подтверждения фиксируются в заказе и внутреннем чате.
-                  </p>
-                </div>
-                <div className="rounded-2xl bg-white/8 p-4">
-                  <p className="text-sm font-semibold text-white">3. Escrow выпускает средства</p>
-                  <p className="mt-1 text-sm leading-6 text-neutral-300">
-                    После завершения сделки продавцу начисляется сумма за вычетом комиссии платформы.
+                  <p className="mt-3 text-2xl font-semibold tracking-tight md:text-3xl">
+                    Яркая витрина, безопасные сделки и живой каталог игровых предложений.
                   </p>
                 </div>
               </div>
             </div>
           </div>
         </div>
+      </section>
+
+      <section id="popular-games" className="space-y-6">
+        <div className="flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
+          <div>
+            <p className="text-sm font-semibold tracking-[0.24em] uppercase text-zinc-500">
+              Популярные игры
+            </p>
+            <h2 className="mt-2 text-3xl font-semibold tracking-tight text-white">
+              Постеры игровых витрин
+            </h2>
+          </div>
+          <p className="max-w-2xl text-sm leading-7 text-zinc-400">
+            Быстрый визуальный вход в самые востребованные каталоги. Если для игры ещё не загружен постер, SafeLoot показывает яркий fallback в стилистике маркетплейса.
+          </p>
+        </div>
+
+        {popularGames.length === 0 ? (
+          <div className="rounded-[1.9rem] border border-dashed border-white/10 bg-white/5 px-6 py-10 text-sm leading-7 text-zinc-400 shadow-[0_14px_36px_rgba(0,0,0,0.16)]">
+            Пока нет игр для витрины популярных разделов.
+          </div>
+        ) : (
+          <div className="grid gap-4 grid-cols-2 md:grid-cols-3 xl:grid-cols-4">
+            {popularGames.map((game) => {
+              const fallbackLetter = game.name.slice(0, 1).toUpperCase() || "G";
+
+              return (
+                <Link
+                  key={game.id}
+                  href={`/games/${game.slug}`}
+                  className="group relative aspect-[3/4] overflow-hidden rounded-[1.75rem] border border-white/10 bg-zinc-900/80 shadow-[0_20px_60px_rgba(0,0,0,0.22)] transition duration-300 hover:-translate-y-1 hover:scale-[1.03]"
+                >
+                  {game.imageUrl?.trim() ? (
+                    <div
+                      className="absolute inset-0 bg-cover bg-center transition duration-500 group-hover:scale-105"
+                      style={{
+                        backgroundImage: `url(${game.imageUrl})`,
+                      }}
+                    />
+                  ) : (
+                    <div
+                      className="absolute inset-0 transition duration-500 group-hover:scale-105"
+                      style={{
+                        background: getGamePosterBackground(game.slug),
+                      }}
+                    />
+                  )}
+                  <div className="absolute inset-0 bg-[linear-gradient(180deg,rgba(9,9,11,0.1),rgba(9,9,11,0.3)_45%,rgba(9,9,11,0.92))]" />
+
+                  <div className="relative flex h-full flex-col justify-between p-4">
+                    <div className="flex items-start justify-between gap-3">
+                      <span className="inline-flex rounded-full border border-white/10 bg-black/30 px-3 py-1.5 text-[11px] font-semibold uppercase tracking-[0.18em] text-zinc-200 backdrop-blur">
+                        {game.productCount > 0 ? `${game.productCount} офферов` : "Каталог"}
+                      </span>
+                      <span className="flex h-10 w-10 items-center justify-center rounded-2xl border border-white/10 bg-black/30 text-sm font-semibold text-white shadow-[0_12px_28px_rgba(0,0,0,0.22)] backdrop-blur">
+                        {fallbackLetter}
+                      </span>
+                    </div>
+
+                    <div>
+                      <p className="text-xl font-bold tracking-tight text-white md:text-2xl">
+                        {game.name}
+                      </p>
+                      <p className="mt-2 text-sm font-medium text-zinc-200/85">
+                        Перейти к товарам и категориям
+                      </p>
+                    </div>
+                  </div>
+                </Link>
+              );
+            })}
+          </div>
+        )}
       </section>
 
       <section className="space-y-6">
@@ -167,7 +319,7 @@ export default async function Home() {
               Все игры
             </p>
             <h2 className="mt-2 text-3xl font-semibold tracking-tight text-white">
-              Быстрый переход по каталогу
+              Каталог по алфавиту
             </h2>
           </div>
           <p className="max-w-2xl text-sm leading-7 text-zinc-400">
