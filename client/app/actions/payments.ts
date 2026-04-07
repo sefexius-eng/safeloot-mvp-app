@@ -5,13 +5,13 @@ import { Prisma, TransactionStatus, TransactionType } from "@prisma/client";
 import { BANNED_USER_MESSAGE, getCurrentSessionUser } from "@/lib/access-control";
 import { getAuthSession } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
-import { createStripeCheckoutSession } from "@/lib/stripe";
+import { getSiteUrl } from "@/lib/site-url";
+import { stripe } from "@/lib/stripe";
 
 interface CreateTopupSessionResult {
   ok: boolean;
   checkoutUrl?: string;
   transactionId?: string;
-  isMock?: boolean;
   message?: string;
 }
 
@@ -48,12 +48,20 @@ function normalizeTopupAmount(amount: number) {
   return normalizedAmount;
 }
 
+function toMinorUnits(amount: Prisma.Decimal) {
+  return amount
+    .mul(100)
+    .toDecimalPlaces(0, Prisma.Decimal.ROUND_HALF_UP)
+    .toNumber();
+}
+
 export async function createTopupSession(
   amount: number,
 ): Promise<CreateTopupSessionResult> {
   try {
     const currentUser = await requireActivePaymentUser();
     const normalizedAmount = normalizeTopupAmount(amount);
+    const appUrl = process.env.NEXT_PUBLIC_APP_URL?.trim() || getSiteUrl();
     const transaction = await prisma.transaction.create({
       data: {
         userId: currentUser.id,
@@ -69,28 +77,50 @@ export async function createTopupSession(
     });
 
     try {
-      const checkoutSession = await createStripeCheckoutSession({
-        transactionId: transaction.id,
-        amount: transaction.amount,
-        currency: "USD",
+      const session = await stripe.checkout.sessions.create({
+        payment_method_types: ["card"],
+        line_items: [
+          {
+            price_data: {
+              currency: "usd",
+              product_data: {
+                name: "Пополнение баланса SafeLoot",
+              },
+              unit_amount: toMinorUnits(transaction.amount),
+            },
+            quantity: 1,
+          },
+        ],
+        mode: "payment",
+        success_url: `${appUrl}/profile?topup=success`,
+        cancel_url: `${appUrl}/profile?topup=cancelled`,
+        client_reference_id: transaction.id,
+        metadata: {
+          transactionId: transaction.id,
+        },
       });
 
-      if (checkoutSession.providerId) {
+      const checkoutUrl = session.url?.trim();
+
+      if (!checkoutUrl) {
+        throw new Error("Stripe не вернул checkout URL.");
+      }
+
+      if (session.id) {
         await prisma.transaction.update({
           where: {
             id: transaction.id,
           },
           data: {
-            externalId: checkoutSession.providerId,
+            externalId: session.id,
           },
         });
       }
 
       return {
         ok: true,
-        checkoutUrl: checkoutSession.checkoutUrl,
+        checkoutUrl,
         transactionId: transaction.id,
-        isMock: checkoutSession.isMock,
       };
     } catch (error) {
       await prisma.transaction.update({

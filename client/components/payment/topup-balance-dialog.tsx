@@ -99,10 +99,6 @@ export function TopupBalanceDialogMenuItem() {
               </p>
             </div>
 
-            <div className="rounded-[1.5rem] border border-sky-500/15 bg-sky-500/8 p-4 text-sm leading-7 text-sky-100">
-              Если Stripe ключи не настроены, откроется локальный mock checkout для безопасной отладки карточного платежного потока.
-            </div>
-
             {errorMessage ? (
               <div className="rounded-[1.25rem] border border-red-500/15 bg-red-500/10 p-4 text-sm leading-7 text-red-200">
                 {errorMessage}
