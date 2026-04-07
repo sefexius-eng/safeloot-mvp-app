@@ -5,7 +5,11 @@ import { revalidatePath } from "next/cache";
 import { BANNED_USER_MESSAGE, getCurrentSessionUser } from "@/lib/access-control";
 import { getAuthSession } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
-import { createTelegramLinkToken, getTelegramBotUsername } from "@/lib/telegram";
+import {
+  createTelegramLinkToken,
+  getTelegramBotUsername,
+  hasTelegramBotTokenConfigured,
+} from "@/lib/telegram";
 
 interface TelegramLinkActionResult {
   ok: boolean;
@@ -19,6 +23,8 @@ const TELEGRAM_CONNECT_ERROR_MESSAGE =
   "Не удалось подготовить подключение Telegram. Попробуйте позже.";
 const TELEGRAM_DISCONNECT_ERROR_MESSAGE =
   "Не удалось отключить Telegram. Попробуйте позже.";
+const TELEGRAM_TOKEN_MISSING_MESSAGE =
+  "Настройте TELEGRAM_BOT_TOKEN в Vercel";
 
 export async function createTelegramLinkAction(): Promise<TelegramLinkActionResult> {
   const session = await getAuthSession();
@@ -36,6 +42,13 @@ export async function createTelegramLinkAction(): Promise<TelegramLinkActionResu
     return {
       ok: false,
       error: BANNED_USER_MESSAGE,
+    };
+  }
+
+  if (!hasTelegramBotTokenConfigured()) {
+    return {
+      ok: false,
+      error: TELEGRAM_TOKEN_MISSING_MESSAGE,
     };
   }
 
@@ -84,7 +97,7 @@ export async function createTelegramLinkAction(): Promise<TelegramLinkActionResu
     return {
       ok: true,
       message: "Откройте Telegram и подтвердите привязку через бота.",
-      url: `https://t.me/${botUsername}?start=${encodeURIComponent(token)}`,
+      url: `https://t.me/${botUsername}?start=${token}`,
       telegramId: null,
     };
   } catch (error) {
@@ -92,7 +105,10 @@ export async function createTelegramLinkAction(): Promise<TelegramLinkActionResu
 
     return {
       ok: false,
-      error: TELEGRAM_CONNECT_ERROR_MESSAGE,
+      error:
+        error instanceof Error && error.message === "TELEGRAM_BOT_TOKEN is not configured."
+          ? TELEGRAM_TOKEN_MISSING_MESSAGE
+          : TELEGRAM_CONNECT_ERROR_MESSAGE,
     };
   }
 }

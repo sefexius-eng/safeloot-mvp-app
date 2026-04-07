@@ -1,9 +1,16 @@
 import { randomBytes } from "node:crypto";
 
-const telegramBotToken = process.env.TELEGRAM_BOT_TOKEN?.trim() || "";
-const telegramApiBaseUrl = telegramBotToken
-  ? `https://api.telegram.org/bot${telegramBotToken}`
-  : "";
+function getTelegramBotToken() {
+  return process.env.TELEGRAM_BOT_TOKEN?.trim() || "";
+}
+
+function getTelegramApiBaseUrl() {
+  const telegramBotToken = getTelegramBotToken();
+
+  return telegramBotToken
+    ? `https://api.telegram.org/bot${telegramBotToken}`
+    : "";
+}
 
 interface TelegramApiResponse<Result> {
   ok: boolean;
@@ -15,6 +22,9 @@ async function telegramApiRequest<Result>(
   method: string,
   payload?: Record<string, unknown>,
 ): Promise<Result> {
+  const telegramBotToken = getTelegramBotToken();
+  const telegramApiBaseUrl = getTelegramApiBaseUrl();
+
   if (!telegramBotToken || !telegramApiBaseUrl) {
     throw new Error("TELEGRAM_BOT_TOKEN is not configured.");
   }
@@ -43,9 +53,13 @@ export function createTelegramLinkToken() {
   return randomBytes(24).toString("hex");
 }
 
+export function hasTelegramBotTokenConfigured() {
+  return Boolean(getTelegramBotToken());
+}
+
 export async function getTelegramBotUsername() {
   const bot = await telegramApiRequest<{ username?: string }>("getMe");
-  const username = bot.username?.trim();
+  const username = bot.username?.trim().replace(/^@/, "");
 
   if (!username) {
     throw new Error("Telegram bot username is not available.");

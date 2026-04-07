@@ -23,7 +23,7 @@ interface TelegramUpdate {
 }
 
 const LINK_SUCCESS_MESSAGE =
-  "🎉 Аккаунт SafeLoot успешно привязан! Теперь вы будете получать уведомления здесь.";
+  "✅ Аккаунт привязан! Я буду присылать сюда уведомления о твоих продажах и новых сообщениях в SafeLoot.";
 const LINK_MISSING_TOKEN_MESSAGE =
   "Отправьте команду привязки из SafeLoot заново, чтобы подключить Telegram к аккаунту.";
 const LINK_INVALID_TOKEN_MESSAGE =
