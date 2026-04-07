@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 
+import { Analytics } from "@/components/analytics";
 import { BannedModal } from "@/components/banned-modal";
 import { SiteHeader } from "@/components/layout/site-header";
 import { AuthSessionProvider } from "@/components/providers/session-provider";
@@ -12,6 +13,10 @@ import "./globals.css";
 const baseUrl = getSiteUrl();
 const globalOgImageUrl =
   "https://images.unsplash.com/photo-1542751371-adc38448a05e?q=80&w=1200&auto=format&fit=crop";
+const googleSiteVerification =
+  process.env.NEXT_PUBLIC_GOOGLE_SITE_VERIFICATION?.trim() || undefined;
+const yandexSiteVerification =
+  process.env.NEXT_PUBLIC_YANDEX_VERIFICATION?.trim() || undefined;
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -28,6 +33,17 @@ export const metadata: Metadata = {
   title: "SafeLoot Market | Безопасная покупка игровых товаров",
   description:
     "Маркетплейс цифровых товаров. Безопасные сделки, Escrow система, защита покупателей и продавцов 24/7.",
+  verification:
+    googleSiteVerification || yandexSiteVerification
+      ? {
+          ...(googleSiteVerification
+            ? { google: googleSiteVerification }
+            : {}),
+          ...(yandexSiteVerification
+            ? { yandex: yandexSiteVerification }
+            : {}),
+        }
+      : undefined,
   openGraph: {
     type: "website",
     locale: "ru_RU",
@@ -74,6 +90,7 @@ export default async function RootLayout({
           <main className="flex-1">{children}</main>
           <SiteFooter />
         </AuthSessionProvider>
+        <Analytics />
       </body>
     </html>
   );
