@@ -9,7 +9,6 @@ import {
 import { getAuthSession } from "@/lib/auth";
 import { formatCurrency } from "@/lib/formatters";
 import { prisma } from "@/lib/prisma";
-import { getSellerReviewSummaryBySellerId } from "@/lib/review-summary";
 import { mapWithdrawalListItem } from "@/lib/withdrawals";
 
 export const dynamic = "force-dynamic";
@@ -94,10 +93,6 @@ export default async function ProfilePage() {
           },
           select: {
             id: true,
-            email: true,
-            name: true,
-            image: true,
-            rank: true,
             availableBalance: true,
             products: {
               select: {
@@ -161,17 +156,12 @@ export default async function ProfilePage() {
             createdAt: "desc",
           },
         }),
-        getSellerReviewSummaryBySellerId(sellerId),
       ])
     : null;
 
   const sales = profileData?.[0] ?? [];
   const sellerProfile = profileData?.[1] ?? null;
   const withdrawals = profileData?.[2] ?? [];
-  const sellerReviewSummary = profileData?.[3] ?? {
-    averageRating: null,
-    reviewCount: 0,
-  };
 
   const profileProducts = sellerProfile
     ? sellerProfile.products.map(
@@ -187,14 +177,6 @@ export default async function ProfilePage() {
             updatedAt: product.updatedAt.toISOString(),
             game: product.game,
             category: product.category,
-            seller: {
-              id: sellerProfile.id,
-              email: sellerProfile.email,
-              name: sellerProfile.name,
-              image: sellerProfile.image,
-              rank: sellerProfile.rank,
-              reviewSummary: sellerReviewSummary,
-            },
           }) satisfies ProfileTabsProduct,
       )
     : [];

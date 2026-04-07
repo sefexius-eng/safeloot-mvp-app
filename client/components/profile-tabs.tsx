@@ -10,10 +10,8 @@ import { useCurrency } from "@/components/providers/currency-provider";
 import { PromoCodePanel } from "@/components/profile/promo-code-panel";
 import { ProfileProductActions } from "@/components/profile/profile-product-actions";
 import { RatingStars } from "@/components/reviews/rating-stars";
-import { SellerRatingBadge } from "@/components/reviews/seller-rating-badge";
 import { SellerReviewReplyForm } from "@/components/reviews/seller-review-reply-form";
 import { UserAvatar } from "@/components/ui/user-avatar";
-import type { SellerReviewSummary } from "@/lib/review-summary";
 
 export interface ProfileTabsProduct {
   id: string;
@@ -34,14 +32,6 @@ export interface ProfileTabsProduct {
     gameId: string;
   };
   sellerId: string;
-  seller: {
-    id: string;
-    email: string;
-    name: string | null;
-    image: string | null;
-    rank: string;
-    reviewSummary: SellerReviewSummary;
-  };
   createdAt: string;
   updatedAt: string;
 }
@@ -217,25 +207,21 @@ export function ProfileTabs({ products: initialProducts, reviews }: ProfileTabsP
             </div>
           ) : (
             <div className="mt-6 overflow-x-auto rounded-[1.5rem] border border-white/10">
-              <div className="min-w-[1160px] grid grid-cols-[minmax(0,1.2fr)_120px_140px_minmax(180px,1fr)_120px_220px] gap-4 border-b border-white/10 bg-white/5 px-5 py-4 text-xs font-semibold tracking-[0.2em] uppercase text-zinc-500">
+              <div className="min-w-[980px] grid grid-cols-[minmax(280px,1.8fr)_140px_160px_120px_220px] gap-4 border-b border-white/10 bg-white/5 px-5 py-4 text-xs font-semibold tracking-[0.2em] uppercase text-zinc-500">
                 <span>Товар</span>
                 <span>Игра</span>
                 <span>Категория</span>
-                <span>Продавец</span>
                 <span>Цена</span>
                 <span className="text-right">Управление</span>
               </div>
 
-              <div className="min-w-[1160px] divide-y divide-white/10">
+              <div className="min-w-[980px] divide-y divide-white/10">
                 {products.map((product) => {
-                  const sellerDisplayName =
-                    product.seller.name?.trim() || product.seller.email;
-
                   return (
                     <div
                       key={product.id}
                       className={[
-                        "grid grid-cols-[minmax(0,1.2fr)_120px_140px_minmax(180px,1fr)_120px_220px] gap-4 px-5 py-4 transition hover:bg-white/5",
+                        "grid grid-cols-[minmax(280px,1.8fr)_140px_160px_120px_220px] gap-4 px-5 py-4 transition hover:bg-white/5",
                         product.isActive ? "opacity-100" : "opacity-50",
                       ].join(" ")}
                     >
@@ -262,24 +248,6 @@ export function ProfileTabs({ products: initialProducts, reviews }: ProfileTabsP
                       </div>
                       <span className="text-sm text-zinc-300">{product.game.name}</span>
                       <span className="text-sm text-zinc-300">{product.category.name}</span>
-                      <div className="flex min-w-0 items-center gap-3">
-                        <UserAvatar
-                          src={product.seller.image}
-                          name={sellerDisplayName}
-                          email={product.seller.email}
-                          className="h-6 w-6 shrink-0"
-                        />
-                        <div className="min-w-0">
-                          <span className="block truncate text-sm font-medium text-zinc-200">
-                            {sellerDisplayName}
-                          </span>
-                          <SellerRatingBadge
-                            summary={product.seller.reviewSummary}
-                            className="mt-1"
-                            size="sm"
-                          />
-                        </div>
-                      </div>
                       <span className="text-sm font-semibold text-white">{formatPrice(product.price)}</span>
                       <div className="flex items-start justify-end">
                         <ProfileProductActions
