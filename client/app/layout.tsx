@@ -8,6 +8,7 @@ import { SiteHeader } from "@/components/layout/site-header";
 import { AuthSessionProvider } from "@/components/providers/session-provider";
 import { SiteFooter } from "@/components/site-footer";
 import { getAuthSession } from "@/lib/auth";
+import { isEmailVerificationTestUser } from "@/lib/email-verification";
 import { getSiteUrl } from "@/lib/site-url";
 import "./globals.css";
 
@@ -86,7 +87,9 @@ export default async function RootLayout({
       <body className="min-h-screen flex flex-col">
         <AuthSessionProvider session={session}>
           <SiteHeader />
-          {session?.user && !session.user.emailVerified ? (
+          {session?.user &&
+          !session.user.emailVerified &&
+          isEmailVerificationTestUser(session.user.email) ? (
             <EmailVerificationBanner email={session.user.email ?? ""} />
           ) : null}
           <BannedModal />

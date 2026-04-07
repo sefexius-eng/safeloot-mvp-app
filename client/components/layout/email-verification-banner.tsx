@@ -16,21 +16,29 @@ export function EmailVerificationBanner({
   const [feedback, setFeedback] = useState("");
   const [errorMessage, setErrorMessage] = useState("");
 
+  const fallbackErrorMessage = "Не удалось отправить письмо. Попробуйте позже.";
+
   function handleSendVerificationEmail() {
     setFeedback("");
     setErrorMessage("");
 
     startTransition(() => {
-      void sendVerificationEmailAction().then((result) => {
-        if (result.ok) {
-          setFeedback(result.message);
-          setErrorMessage("");
-          return;
-        }
+      void sendVerificationEmailAction()
+        .then((result) => {
+          if (result.ok) {
+            setFeedback(result.message);
+            setErrorMessage("");
+            return;
+          }
 
-        setFeedback("");
-        setErrorMessage(result.message);
-      });
+          setErrorMessage("");
+          setFeedback("");
+          setErrorMessage(result.message || fallbackErrorMessage);
+        })
+        .catch(() => {
+          setFeedback("");
+          setErrorMessage(fallbackErrorMessage);
+        });
     });
   }
 

@@ -4,6 +4,13 @@ import { sendVerificationEmail } from "@/lib/mail";
 import { prisma } from "@/lib/prisma";
 
 const EMAIL_VERIFICATION_TTL_MS = 24 * 60 * 60 * 1000;
+export const EMAIL_VERIFICATION_TEST_USER = "sefexius@gmail.com";
+
+export function isEmailVerificationTestUser(
+  email: string | null | undefined,
+) {
+  return email?.trim().toLowerCase() === EMAIL_VERIFICATION_TEST_USER;
+}
 
 function createVerificationTokenValue() {
   return randomBytes(32).toString("hex");
@@ -34,6 +41,13 @@ export async function sendVerificationEmailToUser(userId: string) {
   if (user.emailVerified) {
     return {
       status: "already-verified" as const,
+      email: user.email,
+    };
+  }
+
+  if (!isEmailVerificationTestUser(user.email)) {
+    return {
+      status: "skipped-test-mode" as const,
       email: user.email,
     };
   }

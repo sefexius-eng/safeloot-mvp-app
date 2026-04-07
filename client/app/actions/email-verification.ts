@@ -5,7 +5,10 @@ import {
   getCurrentSessionUser,
 } from "@/lib/access-control";
 import { getAuthSession } from "@/lib/auth";
-import { sendVerificationEmailToUser } from "@/lib/email-verification";
+import {
+  isEmailVerificationTestUser,
+  sendVerificationEmailToUser,
+} from "@/lib/email-verification";
 
 interface SendVerificationEmailActionResult {
   ok: boolean;
@@ -13,8 +16,12 @@ interface SendVerificationEmailActionResult {
   email?: string;
 }
 
+const VERIFICATION_EMAIL_SEND_ERROR_MESSAGE =
+  "Не удалось отправить письмо. Попробуйте позже.";
+
 export async function sendVerificationEmailAction(): Promise<SendVerificationEmailActionResult> {
-  const currentUser = await getCurrentSessionUser(await getAuthSession());
+  const session = await getAuthSession();
+  const currentUser = await getCurrentSessionUser(session);
 
   if (!currentUser) {
     return {
@@ -30,6 +37,13 @@ export async function sendVerificationEmailAction(): Promise<SendVerificationEma
     };
   }
 
+  if (!isEmailVerificationTestUser(session?.user?.email)) {
+    return {
+      ok: false,
+      message: VERIFICATION_EMAIL_SEND_ERROR_MESSAGE,
+    };
+  }
+
   try {
     const result = await sendVerificationEmailToUser(currentUser.id);
 
@@ -38,6 +52,13 @@ export async function sendVerificationEmailAction(): Promise<SendVerificationEma
         ok: true,
         message: "Email уже подтвержден.",
         email: result.email,
+      };
+    }
+
+    if (result.status === "skipped-test-mode") {
+      return {
+        ok: false,
+        message: VERIFICATION_EMAIL_SEND_ERROR_MESSAGE,
       };
     }
 
@@ -51,10 +72,7 @@ export async function sendVerificationEmailAction(): Promise<SendVerificationEma
 
     return {
       ok: false,
-      message:
-        error instanceof Error
-          ? error.message
-          : "Не удалось отправить письмо для подтверждения email.",
+      message: VERIFICATION_EMAIL_SEND_ERROR_MESSAGE,
     };
   }
 }
