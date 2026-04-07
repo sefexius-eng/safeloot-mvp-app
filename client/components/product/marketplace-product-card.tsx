@@ -153,11 +153,20 @@ export function MarketplaceProductCard({ product }: MarketplaceProductCardProps)
                 </span>
               ) : null}
             </div>
-            <p className="mt-1 text-xs text-zinc-500">
-              {hasReviews
-                ? `★ ${formatAverageRating(averageRating)} · ${formatReviewCount(reviewSummary.reviewCount)}`
-                : "★ Пока без отзывов"}
-            </p>
+            <div className="mt-1 flex items-center gap-1.5 text-xs text-zinc-500">
+              <svg
+                viewBox="0 0 24 24"
+                aria-hidden="true"
+                className="h-3.5 w-3.5 shrink-0 fill-yellow-400 text-yellow-400"
+              >
+                <path d="M12 2.75l2.84 5.75 6.35.92-4.6 4.48 1.09 6.32L12 17.25 6.32 20.22l1.09-6.32-4.6-4.48 6.35-.92L12 2.75z" />
+              </svg>
+              <span className="text-zinc-500">
+                {hasReviews
+                  ? `${formatAverageRating(averageRating)} · ${formatReviewCount(reviewSummary.reviewCount)}`
+                  : "Пока без отзывов"}
+              </span>
+            </div>
           </div>
         </Link>
       </div>
