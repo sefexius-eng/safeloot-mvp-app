@@ -1,4 +1,7 @@
+"use client";
+
 import Link from "next/link";
+import { usePathname } from "next/navigation";
 
 const INFO_LINKS = [
   "Пользовательское соглашение",
@@ -15,6 +18,16 @@ const COMMUNITY_LINKS = [
 const PAYMENT_METHODS = ["Visa", "Mastercard", "USDT", "TON"];
 
 export function SiteFooter() {
+  const pathname = usePathname();
+  const isChatOrOrder =
+    pathname?.startsWith("/chats") ||
+    pathname?.startsWith("/orders") ||
+    pathname?.startsWith("/order");
+
+  if (isChatOrOrder) {
+    return null;
+  }
+
   return (
     <footer className="mt-auto border-t border-zinc-800 bg-[#0a0a0a]">
       <div className="mx-auto w-full max-w-7xl px-4 py-10 sm:px-6 lg:px-8 lg:py-12">

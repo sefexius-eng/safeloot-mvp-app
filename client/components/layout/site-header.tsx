@@ -77,7 +77,7 @@ function HeaderAuthSkeleton() {
   return (
     <div className="flex flex-wrap items-center gap-2 lg:justify-self-end">
       <div className="h-10 w-[124px] animate-pulse rounded-2xl border border-white/10 bg-white/5" />
-      <div className="h-10 w-[92px] animate-pulse rounded-xl border border-white/10 bg-white/5" />
+      <div className="hidden h-10 w-[92px] animate-pulse rounded-xl border border-white/10 bg-white/5 md:block" />
       <div className="h-10 w-[96px] animate-pulse rounded-xl border border-white/10 bg-white/5" />
       <div className="h-10 w-10 animate-pulse rounded-xl border border-white/10 bg-white/5" />
     </div>
@@ -430,7 +430,7 @@ export function SiteHeader() {
                         <span className="truncate text-sm font-bold text-white">
                           {availableBalanceLabel}
                         </span>
-                        <span className="mt-0.5 truncate text-xs text-zinc-500">
+                        <span className="mt-0.5 hidden truncate text-xs text-zinc-500 sm:inline">
                           Холд: {holdBalanceLabel}
                         </span>
                       </div>
@@ -497,7 +497,7 @@ export function SiteHeader() {
                   </DropdownMenuContent>
                 </DropdownMenu>
 
-                <div className="w-[92px] shrink-0">
+                <div className="hidden w-[92px] shrink-0 md:flex">
                   <Select
                     aria-label="Выбор валюты"
                     value={currency}
@@ -528,9 +528,10 @@ export function SiteHeader() {
                   <>
                     <Link
                       href="/sell"
-                      className="sell-link inline-flex h-10 items-center justify-center rounded-xl bg-orange-600 px-4 text-sm font-semibold text-white shadow-[0_16px_40px_rgba(249,115,22,0.28)] transition hover:-translate-y-0.5 hover:bg-orange-500"
+                      className="sell-link inline-flex h-10 w-10 items-center justify-center rounded-xl bg-orange-600 px-0 text-sm font-semibold text-white shadow-[0_16px_40px_rgba(249,115,22,0.28)] transition hover:-translate-y-0.5 hover:bg-orange-500 sm:w-auto sm:px-4"
                     >
-                      Продать
+                      <span className="sm:hidden" aria-hidden="true">+</span>
+                      <span className="hidden sm:inline">Продать</span>
                     </Link>
 
                     {isAdminRole(session?.user?.role) ? (

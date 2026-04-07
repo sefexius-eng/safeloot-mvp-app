@@ -119,19 +119,19 @@ export default async function ChatRoomPage({ params }: ChatPageProps) {
             </div>
           </div>
 
-          <div className="flex flex-wrap items-center gap-3 lg:justify-end">
+          <div className="w-full lg:w-auto">
             {statusMeta && conversation.latestOrder ? (
-              <>
-                <span className={`inline-flex rounded-full border px-3 py-1.5 text-sm font-semibold ${statusMeta.className}`}>
+              <div className="grid w-full grid-cols-2 gap-2 sm:flex sm:flex-wrap sm:items-center sm:justify-end sm:gap-3">
+                <span className={`inline-flex w-full items-center justify-center rounded-full border px-3 py-1.5 text-center text-sm font-semibold sm:w-auto ${statusMeta.className}`}>
                   {statusMeta.label}
                 </span>
                 <Link
                   href={`/orders/${conversation.latestOrder.id}`}
-                  className="inline-flex h-11 items-center justify-center rounded-2xl border border-sky-400/20 bg-sky-500/10 px-5 text-sm font-semibold text-sky-100 transition hover:bg-sky-500/20"
+                  className="inline-flex h-11 w-full items-center justify-center rounded-2xl border border-sky-400/20 bg-sky-500/10 px-5 text-center text-sm font-semibold text-sky-100 transition hover:bg-sky-500/20 sm:w-auto"
                 >
                   Перейти к заказу
                 </Link>
-              </>
+              </div>
             ) : purchasableProduct ? (
               <div className="w-full sm:w-[180px]">
                 <BuyProductDialog

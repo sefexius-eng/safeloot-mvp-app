@@ -137,14 +137,14 @@ export default async function Home() {
     <main className="mx-auto flex w-full max-w-7xl flex-col gap-12 px-4 py-10 sm:px-6 lg:gap-16 lg:px-8 lg:py-14">
       <section className="overflow-hidden rounded-[2.4rem] border border-white/10 bg-[radial-gradient(circle_at_top_left,rgba(249,115,22,0.22),transparent_30%),radial-gradient(circle_at_bottom_right,rgba(14,165,233,0.16),transparent_36%),linear-gradient(135deg,rgba(24,24,27,0.96),rgba(15,23,42,0.94))] shadow-[0_24px_80px_rgba(0,0,0,0.3)] backdrop-blur">
         <div className="grid gap-10 px-6 py-8 md:grid-cols-2 md:items-center md:px-10 md:py-12 lg:px-14 lg:py-16">
-          <div className="space-y-8">
+          <div>
             <div>
               <h1 className="max-w-4xl text-4xl font-semibold tracking-tight text-white md:text-6xl md:leading-[1.02]">
                 Покупайте и продавайте игровые товары без риска потерять деньги.
               </h1>
             </div>
 
-            <div className="flex flex-wrap gap-3">
+            <div className="mt-6 flex flex-wrap gap-3">
               <Link
                 href={featuredCatalogHref}
                 className="inline-flex rounded-2xl bg-orange-600 px-6 py-3 text-sm font-semibold text-white shadow-[0_18px_45px_rgba(249,115,22,0.24)] transition hover:-translate-y-0.5 hover:bg-orange-500"
@@ -159,24 +159,24 @@ export default async function Home() {
               </Link>
             </div>
 
-            <div className="grid gap-3 sm:grid-cols-3">
-              <div className="rounded-[1.5rem] border border-white/10 bg-white/5 p-4 shadow-[0_12px_30px_rgba(0,0,0,0.18)]">
-                <p className="text-xs tracking-[0.24em] uppercase text-zinc-500">
+            <div className="mt-6 grid grid-cols-3 gap-2">
+              <div className="rounded-[1.25rem] border border-white/10 bg-white/5 p-3 shadow-[0_12px_30px_rgba(0,0,0,0.18)] md:rounded-[1.5rem] md:p-4">
+                <p className="text-[10px] tracking-[0.2em] uppercase text-zinc-500 md:text-xs md:tracking-[0.24em]">
                   Сделки
                 </p>
-                <p className="mt-3 text-2xl font-semibold text-white">24/7</p>
+                <p className="mt-2 text-base font-semibold text-white md:mt-3 md:text-2xl">24/7</p>
               </div>
-              <div className="rounded-[1.5rem] border border-white/10 bg-white/5 p-4 shadow-[0_12px_30px_rgba(0,0,0,0.18)]">
-                <p className="text-xs tracking-[0.24em] uppercase text-zinc-500">
+              <div className="rounded-[1.25rem] border border-white/10 bg-white/5 p-3 shadow-[0_12px_30px_rgba(0,0,0,0.18)] md:rounded-[1.5rem] md:p-4">
+                <p className="text-[10px] tracking-[0.2em] uppercase text-zinc-500 md:text-xs md:tracking-[0.24em]">
                   Баланс
                 </p>
-                <p className="mt-3 text-2xl font-semibold text-white">USDT</p>
+                <p className="mt-2 text-base font-semibold text-white md:mt-3 md:text-2xl">USDT</p>
               </div>
-              <div className="rounded-[1.5rem] border border-white/10 bg-white/5 p-4 shadow-[0_12px_30px_rgba(0,0,0,0.18)]">
-                <p className="text-xs tracking-[0.24em] uppercase text-zinc-500">
+              <div className="rounded-[1.25rem] border border-white/10 bg-white/5 p-3 shadow-[0_12px_30px_rgba(0,0,0,0.18)] md:rounded-[1.5rem] md:p-4">
+                <p className="text-[10px] tracking-[0.2em] uppercase text-zinc-500 md:text-xs md:tracking-[0.24em]">
                   Защита
                 </p>
-                <p className="mt-3 text-2xl font-semibold text-white">Escrow</p>
+                <p className="mt-2 text-base font-semibold text-white md:mt-3 md:text-2xl">Escrow</p>
               </div>
             </div>
           </div>
