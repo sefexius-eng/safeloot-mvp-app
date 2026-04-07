@@ -1,7 +1,7 @@
 "use client";
 
 import type { Role } from "@prisma/client";
-import { useState, useTransition } from "react";
+import { useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { useSession } from "next-auth/react";
 
@@ -189,6 +189,7 @@ export function ProfileSettingsForm({
 }: ProfileSettingsFormProps) {
   const router = useRouter();
   const { update } = useSession();
+  const bannerInputRef = useRef<HTMLInputElement | null>(null);
   const [name, setName] = useState(initialName);
   const [image, setImage] = useState<string | null>(initialImage);
   const [bannerUrl, setBannerUrl] = useState(initialBannerUrl ?? "");
@@ -479,14 +480,40 @@ export function ProfileSettingsForm({
               Баннер профиля
             </label>
             <input
+              ref={bannerInputRef}
               id="profile-banner"
               type="file"
               accept="image/jpeg,image/png,image/webp"
               onChange={handleBannerFileChange}
-              className="block w-full rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-sm text-zinc-200 file:mr-4 file:rounded-xl file:border-0 file:bg-sky-600 file:px-4 file:py-2 file:font-semibold file:text-white file:transition hover:file:bg-sky-500"
+              className="sr-only"
             />
+            <div className="rounded-[1.5rem] border border-white/10 bg-white/5 p-4">
+              <div className="flex flex-wrap items-center gap-3">
+                <Button
+                  type="button"
+                  onClick={() => bannerInputRef.current?.click()}
+                  disabled={isPending || isProcessingImage}
+                  className="bg-sky-600 text-white shadow-[0_16px_40px_rgba(2,132,199,0.28)] hover:bg-sky-500"
+                >
+                  {isProcessingBanner ? "Подготавливаем баннер..." : "Выбрать файл баннера"}
+                </Button>
+
+                {normalizedBannerUrl ? (
+                  <span className="rounded-full border border-emerald-500/20 bg-emerald-500/10 px-3 py-1.5 text-sm text-emerald-200">
+                    Превью обновлено
+                  </span>
+                ) : (
+                  <span className="rounded-full border border-white/10 bg-black/20 px-3 py-1.5 text-sm text-zinc-400">
+                    Будет использован стандартный фон
+                  </span>
+                )}
+              </div>
+              <p className="mt-3 text-sm leading-7 text-zinc-500">
+                Поддерживаются JPG, PNG и WebP. После выбора файл конвертируется в WebP, а превью слева обновляется сразу, ещё до нажатия кнопки «Сохранить профиль».
+              </p>
+            </div>
             <p className="text-sm leading-7 text-zinc-500">
-              Поддерживаются JPG, PNG и WebP. Баннер автоматически конвертируется в WebP и сразу показывается в превью. Если очистить поле, в профиле останется фирменный градиентный фон.
+              Если очистить баннер, в профиле снова появится фирменный градиентный фон.
             </p>
           </div>
 

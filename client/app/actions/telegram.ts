@@ -24,7 +24,7 @@ const TELEGRAM_CONNECT_ERROR_MESSAGE =
 const TELEGRAM_DISCONNECT_ERROR_MESSAGE =
   "Не удалось отключить Telegram. Попробуйте позже.";
 const TELEGRAM_TOKEN_MISSING_MESSAGE =
-  "Настройте TELEGRAM_BOT_TOKEN в Vercel";
+  "Ошибка: Токен бота не настроен на сервере";
 
 export async function createTelegramLinkAction(): Promise<TelegramLinkActionResult> {
   const session = await getAuthSession();
