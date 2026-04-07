@@ -211,6 +211,11 @@ export default async function ProfilePage() {
           }) satisfies ProfileTabsReview,
       )
     : [];
+  const currentProfileRole = sellerProfile?.role ?? session?.user?.role;
+  const shouldShowProfileRoleBadge =
+    currentProfileRole && currentProfileRole !== "USER"
+      ? true
+      : profileProducts.length > 0;
 
   return (
     <main className="mx-auto flex w-full max-w-7xl flex-col gap-8 px-4 py-10 sm:px-6 lg:px-8 lg:py-14">
@@ -220,7 +225,11 @@ export default async function ProfilePage() {
         avatarName={sellerDisplayName}
         avatarSrc={sellerProfile?.image ?? session?.user?.image ?? null}
         bannerUrl={sellerProfile?.bannerUrl ?? null}
-        roleBadge={<ProfileRoleBadge role={sellerProfile?.role ?? session?.user?.role} />}
+        roleBadge={
+          shouldShowProfileRoleBadge ? (
+            <ProfileRoleBadge role={currentProfileRole} />
+          ) : null
+        }
         badges={effectiveBadges}
         details={
           <>
