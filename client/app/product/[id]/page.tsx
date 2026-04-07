@@ -32,8 +32,6 @@ interface ProductMetadataProps {
       };
 }
 
-const DEFAULT_OG_IMAGE_PATH = "/default-og-game.jpg";
-
 interface ProductDetail {
   id: string;
   title: string;
@@ -130,15 +128,19 @@ export async function generateMetadata({ params }: ProductMetadataProps): Promis
       "",
     );
 
-    let imageUrl = `${baseUrl}${DEFAULT_OG_IMAGE_PATH}`;
-    if (product.images && product.images.length > 0) {
-      const firstImage = product.images[0]?.trim();
+    let imageUrl = product.game?.imageUrl?.trim() || "";
 
-      if (firstImage) {
-        imageUrl = /^https?:\/\//i.test(firstImage)
-          ? firstImage
-          : `${baseUrl}/${firstImage.replace(/^\/+/, "")}`;
-      }
+    if (!imageUrl) {
+      imageUrl = "https://images.unsplash.com/photo-1542751371-adc38448a05e?q=80&w=1200&auto=format&fit=crop";
+    }
+
+    const firstProductImage = product.images?.[0]?.trim();
+    if (firstProductImage?.startsWith("http")) {
+      imageUrl = firstProductImage;
+    }
+
+    if (imageUrl.startsWith("/")) {
+      imageUrl = `${baseUrl}${imageUrl}`;
     }
 
     const priceValue = Number(product.price);
