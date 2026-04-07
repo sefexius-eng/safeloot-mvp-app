@@ -6,6 +6,10 @@ import { useRouter } from "next/navigation";
 import { useSession } from "next-auth/react";
 
 import { updateUserProfile } from "@/app/actions/profile";
+import {
+  createTelegramLinkAction,
+  disconnectTelegramAction,
+} from "@/app/actions/telegram";
 import { ProfileHero } from "@/components/profile/profile-hero";
 import { ProfileRoleBadge } from "@/components/profile/profile-role-badge";
 import { Button } from "@/components/ui/button";
@@ -27,6 +31,7 @@ interface ProfileSettingsFormProps {
   initialName: string;
   initialImage: string | null;
   initialPushNotifications: boolean;
+  initialTelegramId: string | null;
   initialRole: Role;
 }
 
@@ -179,6 +184,7 @@ export function ProfileSettingsForm({
   initialImage,
   initialName,
   initialPushNotifications,
+  initialTelegramId,
   initialRole,
 }: ProfileSettingsFormProps) {
   const router = useRouter();
@@ -193,11 +199,13 @@ export function ProfileSettingsForm({
   const [savedBannerUrl, setSavedBannerUrl] = useState(initialBannerUrl ?? "");
   const [savedEmailNotifications, setSavedEmailNotifications] = useState(initialEmailNotifications);
   const [savedPushNotifications, setSavedPushNotifications] = useState(initialPushNotifications);
+  const [telegramId, setTelegramId] = useState<string | null>(initialTelegramId);
   const [errorMessage, setErrorMessage] = useState("");
   const [successMessage, setSuccessMessage] = useState("");
   const [isProcessingAvatar, setIsProcessingAvatar] = useState(false);
   const [isProcessingBanner, setIsProcessingBanner] = useState(false);
   const [isPending, startTransition] = useTransition();
+  const [isTelegramPending, startTelegramTransition] = useTransition();
 
   const displayName = name.trim() || initialEmail.split("@")[0] || "Профиль";
   const normalizedBannerUrl = bannerUrl.trim();
@@ -323,6 +331,67 @@ export function ProfileSettingsForm({
           : "Не удалось сохранить профиль.",
       );
     }
+  }
+
+  function handleConnectTelegram() {
+    setErrorMessage("");
+    setSuccessMessage("");
+
+    startTelegramTransition(() => {
+      void createTelegramLinkAction()
+        .then((result) => {
+          if (!result.ok) {
+            setErrorMessage(
+              result.error || result.message || "Не удалось подготовить подключение Telegram.",
+            );
+            return;
+          }
+
+          if (result.telegramId) {
+            setTelegramId(result.telegramId);
+          }
+
+          if (result.url && typeof window !== "undefined") {
+            const popup = window.open(result.url, "_blank", "noopener,noreferrer");
+
+            if (!popup) {
+              window.location.href = result.url;
+            }
+          }
+
+          setSuccessMessage(
+            result.message || "Откройте Telegram и подтвердите привязку через бота.",
+          );
+          router.refresh();
+        })
+        .catch(() => {
+          setErrorMessage("Не удалось подготовить подключение Telegram.");
+        });
+    });
+  }
+
+  function handleDisconnectTelegram() {
+    setErrorMessage("");
+    setSuccessMessage("");
+
+    startTelegramTransition(() => {
+      void disconnectTelegramAction()
+        .then((result) => {
+          if (!result.ok) {
+            setErrorMessage(
+              result.error || result.message || "Не удалось отключить Telegram.",
+            );
+            return;
+          }
+
+          setTelegramId(null);
+          setSuccessMessage(result.message || "Telegram отключен.");
+          router.refresh();
+        })
+        .catch(() => {
+          setErrorMessage("Не удалось отключить Telegram.");
+        });
+    });
   }
 
   return (
@@ -496,8 +565,41 @@ export function ProfileSettingsForm({
                 />
               </div>
 
-              <div className="rounded-[1.25rem] border border-dashed border-white/10 bg-black/20 px-4 py-3 text-sm leading-6 text-zinc-400">
-                Telegram-бот (В разработке)
+              <div className="flex flex-col gap-4 rounded-[1.25rem] border border-white/10 bg-black/20 px-4 py-4 sm:flex-row sm:items-center sm:justify-between">
+                <div className="min-w-0">
+                  <div className="text-sm font-semibold text-zinc-100">
+                    Telegram-бот
+                  </div>
+                  {telegramId ? (
+                    <p className="mt-1 break-words text-sm leading-6 text-emerald-300">
+                      ✅ Подключено (ID: {telegramId})
+                    </p>
+                  ) : (
+                    <p className="mt-1 text-sm leading-6 text-zinc-400">
+                      Подключите Telegram, чтобы получать уведомления о сделках напрямую в боте SafeLoot.
+                    </p>
+                  )}
+                </div>
+
+                {telegramId ? (
+                  <Button
+                    type="button"
+                    onClick={handleDisconnectTelegram}
+                    disabled={isTelegramPending}
+                    className="border border-white/10 bg-white/5 text-zinc-200 shadow-none hover:bg-white/10"
+                  >
+                    {isTelegramPending ? "Отключаем..." : "Отключить"}
+                  </Button>
+                ) : (
+                  <Button
+                    type="button"
+                    onClick={handleConnectTelegram}
+                    disabled={isTelegramPending}
+                    className="bg-sky-600 text-white shadow-[0_16px_40px_rgba(2,132,199,0.28)] hover:bg-sky-500"
+                  >
+                    {isTelegramPending ? "Готовим ссылку..." : "Подключить Telegram"}
+                  </Button>
+                )}
               </div>
             </div>
           </section>

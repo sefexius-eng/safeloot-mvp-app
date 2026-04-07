@@ -30,6 +30,7 @@ export default async function ProfileSettingsPage() {
       badges: true,
       emailNotifications: true,
       pushNotifications: true,
+      telegramId: true,
       role: true,
     },
   });
@@ -53,6 +54,7 @@ export default async function ProfileSettingsPage() {
   );
   const initialEmailNotifications = userProfile.emailNotifications;
   const initialPushNotifications = userProfile.pushNotifications;
+  const initialTelegramId = userProfile.telegramId?.toString() ?? null;
   const initialRole = userProfile.role;
 
   return (
@@ -89,6 +91,7 @@ export default async function ProfileSettingsPage() {
         initialImage={initialImage}
         initialName={initialName}
         initialPushNotifications={initialPushNotifications}
+        initialTelegramId={initialTelegramId}
         initialRole={initialRole}
       />
     </main>
