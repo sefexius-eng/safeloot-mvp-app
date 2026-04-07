@@ -8,6 +8,7 @@ import type { Role } from "@prisma/client";
 
 import { searchGames } from "@/app/actions/search";
 import { NotificationsBell } from "@/components/notifications-bell";
+import { TopupBalanceDialogMenuItem } from "@/components/payment/topup-balance-dialog";
 import { useCurrency } from "@/components/providers/currency-provider";
 import {
   DropdownMenu,
@@ -306,6 +307,7 @@ export function SiteHeader() {
           <DropdownMenuItem asChild>
             <Link href="/profile/settings">Настройки профиля</Link>
           </DropdownMenuItem>
+          <TopupBalanceDialogMenuItem />
           <DropdownMenuSeparator className="my-1 h-px bg-white/10" />
           <div className="px-2 py-2">
             <NotificationsBell mode="panel" />
