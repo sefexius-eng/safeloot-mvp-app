@@ -5,7 +5,7 @@ export function getSiteUrl() {
     process.env.API_BASE_URL?.replace(/\/api\/?$/, "") ??
     process.env.NEXT_PUBLIC_API_URL?.replace(/\/api\/?$/, "") ??
     (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : null) ??
-    "http://localhost:3000";
+    "https://safeloot.vercel.app";
 
   const normalizedUrl = envUrl.trim().replace(/\/+$/, "");
 

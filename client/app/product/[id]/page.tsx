@@ -13,7 +13,6 @@ import { formatCurrency } from "@/lib/formatters";
 import { getProductById } from "@/lib/marketplace";
 import { prisma } from "@/lib/prisma";
 import type { SellerReviewSummary } from "@/lib/review-summary";
-import { getSiteUrl } from "@/lib/site-url";
 
 type SellerRank = "BRONZE" | "SILVER" | "GOLD";
 
@@ -23,21 +22,7 @@ interface ProductPageProps {
   }>;
 }
 
-const DEFAULT_OG_IMAGE_PATH = "/opengraph-image";
-
-function resolveMetadataImageUrl(imageUrl?: string | null) {
-  const siteUrl = getSiteUrl();
-
-  if (!imageUrl?.trim()) {
-    return new URL(DEFAULT_OG_IMAGE_PATH, siteUrl).toString();
-  }
-
-  try {
-    return new URL(imageUrl).toString();
-  } catch {
-    return new URL(imageUrl.startsWith("/") ? imageUrl : `/${imageUrl}`, siteUrl).toString();
-  }
-}
+const DEFAULT_OG_IMAGE_PATH = "/default-og-game.jpg";
 
 interface ProductDetail {
   id: string;
@@ -152,12 +137,22 @@ export async function generateMetadata({ params }: ProductPageProps): Promise<Me
   const productTitle = product.title.trim() || "Товар";
   const gameName = product.game.name.trim() || "игры";
   const formattedPrice = formatCurrency(Number(product.price));
-  const imageUrl = resolveMetadataImageUrl(product.images[0]);
+  const baseUrl = process.env.NEXT_PUBLIC_APP_URL || "https://safeloot.vercel.app";
+  const normalizedBaseUrl = baseUrl.replace(/\/+$/, "");
+  let imageUrl = product.images?.[0]?.trim() || `${normalizedBaseUrl}${DEFAULT_OG_IMAGE_PATH}`;
+
+  if (imageUrl.startsWith("/")) {
+    imageUrl = `${normalizedBaseUrl}${imageUrl}`;
+  } else if (!/^https?:\/\//i.test(imageUrl)) {
+    imageUrl = `${normalizedBaseUrl}/${imageUrl.replace(/^\/+/, "")}`;
+  }
 
   return {
     title: `${productTitle} | SafeLoot`,
     description: `Купить ${productTitle} для игры ${gameName}. Продавец: ${sellerName}. Цена: ${formattedPrice} USDT. Безопасная сделка на SafeLoot.`,
     openGraph: {
+      url: `${normalizedBaseUrl}/product/${id}`,
+      siteName: "SafeLoot",
       title: `${productTitle} - ${formattedPrice} USDT`,
       description: `Безопасная покупка на SafeLoot. Продавец: ${sellerName}.`,
       images: [

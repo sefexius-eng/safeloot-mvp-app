@@ -8,6 +8,10 @@ import { getAuthSession } from "@/lib/auth";
 import { getSiteUrl } from "@/lib/site-url";
 import "./globals.css";
 
+const baseUrl = getSiteUrl();
+const globalOgImageUrl =
+  "https://images.unsplash.com/photo-1542751371-adc38448a05e?q=80&w=1200&auto=format&fit=crop";
+
 const geistSans = Geist({
   variable: "--font-geist-sans",
   subsets: ["latin"],
@@ -19,9 +23,34 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  metadataBase: new URL(getSiteUrl()),
-  title: "SafeLoot Market",
-  description: "Маркетплейс игровых товаров с безопасной сделкой и escrow.",
+  metadataBase: new URL(baseUrl),
+  title: "SafeLoot Market | Безопасная покупка игровых товаров",
+  description:
+    "Маркетплейс цифровых товаров. Безопасные сделки, Escrow система, защита покупателей и продавцов 24/7.",
+  openGraph: {
+    type: "website",
+    locale: "ru_RU",
+    url: `${baseUrl}/`,
+    title: "SafeLoot Market - Элитный игровой маркетплейс",
+    description:
+      "Покупай и продавай аккаунты, валюту и предметы безопасно через Escrow.",
+    siteName: "SafeLoot",
+    images: [
+      {
+        url: globalOgImageUrl,
+        width: 1200,
+        height: 630,
+        alt: "SafeLoot Market",
+      },
+    ],
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "SafeLoot Market - Элитный игровой маркетплейс",
+    description:
+      "Покупай и продавай аккаунты, валюту и предметы безопасно через Escrow.",
+    images: [globalOgImageUrl],
+  },
 };
 
 export default async function RootLayout({
