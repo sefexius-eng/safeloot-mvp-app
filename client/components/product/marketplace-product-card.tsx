@@ -42,6 +42,10 @@ interface MarketplaceProductCardProps {
   product: MarketplaceProductCardData;
 }
 
+function getProductCover(product: MarketplaceProductCardData) {
+  return product.images[0] || product.game.imageUrl || null;
+}
+
 function getSellerDisplayName(seller: MarketplaceProductCardData["seller"]) {
   return seller.name?.trim() || "Продавец";
 }
@@ -83,27 +87,51 @@ export function MarketplaceProductCard({ product }: MarketplaceProductCardProps)
   const hasReviews =
     reviewSummary.averageRating !== null && reviewSummary.reviewCount > 0;
   const averageRating = reviewSummary.averageRating ?? 0;
+  const coverImage = getProductCover(product);
 
   return (
-    <article className="group flex h-full flex-col rounded-[1.75rem] border border-white/10 bg-white/5 p-5 shadow-[0_14px_36px_rgba(0,0,0,0.18)] transition hover:-translate-y-1 hover:border-orange-500/30 hover:shadow-[0_20px_46px_rgba(0,0,0,0.26)]">
+    <article className="group flex h-full flex-col overflow-hidden rounded-[1.75rem] border border-white/10 bg-[linear-gradient(180deg,rgba(24,24,27,0.96),rgba(12,12,14,0.98))] shadow-[0_18px_48px_rgba(0,0,0,0.24)] transition hover:-translate-y-1.5 hover:border-orange-500/30 hover:shadow-[0_28px_64px_rgba(0,0,0,0.32)]">
       <Link href={`/product/${product.id}`} className="block">
-        <div className="flex items-start justify-between gap-4">
-          <div className="min-w-0 flex-1">
-            <h3 className="truncate text-lg font-semibold tracking-tight text-white transition group-hover:text-orange-200">
-              <CensoredText text={product.title} />
-            </h3>
-            <p className="mt-1 truncate text-sm text-zinc-400">
-              {product.game.name}
-            </p>
-          </div>
+        <div className="relative h-40 w-full overflow-hidden border-b border-white/10 bg-zinc-900">
+          {coverImage ? (
+            <img
+              src={coverImage}
+              alt={product.title}
+              className="h-full w-full object-cover transition duration-500 group-hover:scale-105"
+            />
+          ) : (
+            <div className="flex h-full w-full items-end bg-[radial-gradient(circle_at_top_left,rgba(251,191,36,0.34),transparent_38%),radial-gradient(circle_at_bottom_right,rgba(59,130,246,0.28),transparent_42%),linear-gradient(135deg,rgba(39,39,42,1),rgba(9,9,11,1))] p-4">
+              <div className="rounded-full border border-white/10 bg-black/25 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.24em] text-zinc-300">
+                {product.game.name}
+              </div>
+            </div>
+          )}
 
-          <div className="shrink-0 whitespace-nowrap text-right text-xl font-bold tracking-tight text-white">
+          <div className="pointer-events-none absolute inset-0 bg-[linear-gradient(180deg,rgba(10,10,10,0.02),rgba(10,10,10,0.1)_50%,rgba(10,10,10,0.76))]" />
+          <div className="absolute bottom-3 left-3 right-3 flex items-end justify-between gap-3">
+            <div className="min-w-0 rounded-full border border-white/10 bg-black/35 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.22em] text-zinc-200 backdrop-blur-sm">
+              {product.game.name}
+            </div>
+            <div className="shrink-0 rounded-full border border-orange-400/20 bg-orange-500/15 px-3 py-1 text-xs font-semibold text-orange-100 backdrop-blur-sm">
+              {product.category.name}
+            </div>
+          </div>
+        </div>
+
+        <div className="flex flex-1 flex-col p-4">
+          <p className="text-xs font-medium uppercase tracking-[0.18em] text-zinc-500">
+            {product.game.name}
+          </p>
+          <h3 className="mt-1 line-clamp-2 text-sm font-semibold leading-6 text-white transition group-hover:text-orange-100">
+            <CensoredText text={product.title} />
+          </h3>
+          <div className="mt-3 text-lg font-bold tracking-tight text-orange-300">
             {formatPrice(product.price)}
           </div>
         </div>
       </Link>
 
-      <div className="mt-4 border-t border-white/10 pt-4">
+      <div className="mt-auto border-t border-white/10 px-4 pb-4 pt-3">
         <Link
           href={`/user/${product.seller.id}`}
           className="flex min-w-0 items-center gap-3"
@@ -111,24 +139,24 @@ export function MarketplaceProductCard({ product }: MarketplaceProductCardProps)
           <UserAvatar
             src={product.seller.image}
             name={sellerDisplayName}
-            className="h-8 w-8 shrink-0 border-white/10 bg-zinc-900/80"
+            className="h-10 w-10 shrink-0 rounded-full border-white/10 bg-zinc-900/80"
             imageClassName="rounded-full object-cover"
           />
-          <div className="min-w-0">
+          <div className="min-w-0 flex-1">
             <div className="flex items-center gap-2">
               <p className="truncate text-sm font-medium text-zinc-200 transition group-hover:text-white">
                 <CensoredText text={sellerDisplayName} />
               </p>
               {isTeamSeller(product.seller.role) ? (
-                <span className="shrink-0 rounded bg-blue-600 px-1.5 py-0.5 text-[10px] font-bold text-white align-middle">
-                  🛡️ TEAM
+                <span className="shrink-0 rounded-full border border-sky-400/20 bg-sky-500/15 px-2 py-0.5 text-[10px] font-bold uppercase tracking-[0.12em] text-sky-100 align-middle">
+                  TEAM
                 </span>
               ) : null}
             </div>
             <p className="mt-1 text-xs text-zinc-500">
               {hasReviews
-                ? `⭐ ${formatAverageRating(averageRating)} (${formatReviewCount(reviewSummary.reviewCount)})`
-                : "⭐ Нет отзывов"}
+                ? `★ ${formatAverageRating(averageRating)} · ${formatReviewCount(reviewSummary.reviewCount)}`
+                : "★ Пока без отзывов"}
             </p>
           </div>
         </Link>
