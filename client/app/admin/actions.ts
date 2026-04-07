@@ -357,7 +357,7 @@ export async function toggleBanUser(
 export async function deleteProductAdmin(
   productId: string,
 ): Promise<AdminActionResult> {
-  await requireAdminAccess();
+  const currentUser = await requireAdminAccess();
 
   const normalizedProductId = productId.trim();
 
@@ -374,6 +374,11 @@ export async function deleteProductAdmin(
     },
     select: {
       id: true,
+      game: {
+        select: {
+          slug: true,
+        },
+      },
       _count: {
         select: {
           orders: true,
@@ -400,14 +405,16 @@ export async function deleteProductAdmin(
     };
   }
 
-  if (product.orders.length > 0) {
+  const canForceDelete = currentUser.role === "SUPER_ADMIN";
+
+  if (!canForceDelete && product.orders.length > 0) {
     return {
       ok: false,
       message: "Нельзя удалить товар, пока у него есть активные сделки.",
     };
   }
 
-  if (product._count.orders > 0) {
+  if (!canForceDelete && product._count.orders > 0) {
     return {
       ok: false,
       message: "Нельзя удалить товар с историей сделок.",
@@ -423,6 +430,133 @@ export async function deleteProductAdmin(
   revalidatePath("/");
   revalidatePath("/profile");
   revalidatePath("/admin");
+  revalidatePath("/games/[slug]", "page");
+  revalidatePath(`/games/${product.game.slug}`);
+  revalidatePath(`/product/${product.id}`);
+  revalidatePath(`/product/${product.id}/edit`);
+
+  return {
+    ok: true,
+  };
+}
+
+export async function deleteOrderAdmin(
+  orderId: string,
+): Promise<AdminActionResult> {
+  await requireSuperAdminAccess();
+
+  const normalizedOrderId = orderId.trim();
+
+  if (!normalizedOrderId) {
+    return {
+      ok: false,
+      message: "Не удалось определить заказ.",
+    };
+  }
+
+  const order = await prisma.order.findUnique({
+    where: {
+      id: normalizedOrderId,
+    },
+    select: {
+      id: true,
+      productId: true,
+      buyerId: true,
+      sellerId: true,
+      product: {
+        select: {
+          game: {
+            select: {
+              slug: true,
+            },
+          },
+        },
+      },
+    },
+  });
+
+  if (!order) {
+    return {
+      ok: false,
+      message: "Заказ не найден.",
+    };
+  }
+
+  await prisma.order.delete({
+    where: {
+      id: normalizedOrderId,
+    },
+  });
+
+  revalidatePath("/");
+  revalidatePath("/admin");
+  revalidatePath("/profile");
+  revalidatePath("/chats");
+  revalidatePath(`/order/${order.id}`);
+  revalidatePath(`/orders/${order.id}`);
+  revalidatePath(`/product/${order.productId}`);
+  revalidatePath(`/user/${order.buyerId}`);
+  revalidatePath(`/user/${order.sellerId}`);
+  revalidatePath("/games/[slug]", "page");
+  revalidatePath(`/games/${order.product.game.slug}`);
+
+  return {
+    ok: true,
+  };
+}
+
+export async function deleteUserAdmin(
+  userId: string,
+): Promise<AdminActionResult> {
+  const currentUser = await requireSuperAdminAccess();
+  const normalizedUserId = userId.trim();
+
+  if (!normalizedUserId) {
+    return {
+      ok: false,
+      message: "Не удалось определить пользователя.",
+    };
+  }
+
+  if (normalizedUserId === currentUser.id) {
+    return {
+      ok: false,
+      message: "Нельзя удалить текущего SUPER_ADMIN.",
+    };
+  }
+
+  const user = await prisma.user.findUnique({
+    where: {
+      id: normalizedUserId,
+    },
+    select: {
+      id: true,
+    },
+  });
+
+  if (!user) {
+    return {
+      ok: false,
+      message: "Пользователь не найден.",
+    };
+  }
+
+  await prisma.user.delete({
+    where: {
+      id: normalizedUserId,
+    },
+  });
+
+  revalidatePath("/");
+  revalidatePath("/admin");
+  revalidatePath("/profile");
+  revalidatePath("/sell");
+  revalidatePath("/chats");
+  revalidatePath("/games/[slug]", "page");
+  revalidatePath("/product/[id]", "page");
+  revalidatePath("/order/[orderId]", "page");
+  revalidatePath("/orders/[orderId]", "page");
+  revalidatePath("/user/[id]", "page");
 
   return {
     ok: true,

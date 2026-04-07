@@ -3,7 +3,9 @@ import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 
 import {
+  AdminDeleteOrderButton,
   AdminDeleteProductButton,
+  AdminDeleteUserButton,
   AdminReleaseHoldButton,
   AdminToggleBanButton,
   AdminWithdrawalActionButtons,
@@ -332,6 +334,7 @@ export default async function AdminDashboardPage() {
   const canManageRoles = isSuperAdminRole(currentUser.role);
   const canManagePromoCodes = isSuperAdminRole(currentUser.role);
   const canManageGames = isAdminRole(currentUser.role);
+  const canForceDelete = isSuperAdminRole(currentUser.role);
   const visiblePromoCodes = activePromoCodes.filter(
     (promoCode) => promoCode.usedCount < promoCode.maxUses,
   );
@@ -630,6 +633,9 @@ export default async function AdminDashboardPage() {
                                   userId={user.id}
                                   currentStatus={user.isBanned}
                                 />
+                                {canForceDelete && user.id !== currentUser.id ? (
+                                  <AdminDeleteUserButton userId={user.id} />
+                                ) : null}
                               </div>
                             </TableCell>
                           </TableRow>
@@ -671,7 +677,7 @@ export default async function AdminDashboardPage() {
                         {products.map((product) => {
                           const latestOrderStatus = product.orders[0]?.status;
                           const statusMeta = getOrderStatusMeta(latestOrderStatus);
-                          const canDelete = product._count.orders === 0;
+                          const canDelete = canForceDelete || product._count.orders === 0;
 
                           return (
                             <TableRow key={product.id}>
@@ -757,6 +763,7 @@ export default async function AdminDashboardPage() {
                           <TableHead>Продавец</TableHead>
                           <TableHead>Статус заказа</TableHead>
                           <TableHead className="text-right">Цена</TableHead>
+                          {canForceDelete ? <TableHead className="text-right">Действие</TableHead> : null}
                         </TableRow>
                       </TableHeader>
                       <TableBody>
@@ -812,6 +819,11 @@ export default async function AdminDashboardPage() {
                               <TableCell className="text-right font-semibold text-white">
                                 {formatAmount(order.price)} USDT
                               </TableCell>
+                              {canForceDelete ? (
+                                <TableCell className="text-right">
+                                  <AdminDeleteOrderButton orderId={order.id} />
+                                </TableCell>
+                              ) : null}
                             </TableRow>
                           );
                         })}

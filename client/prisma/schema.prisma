@@ -109,7 +109,7 @@ model Product {
   gameId      String    @map("catalog_game_id")
   categoryId  String
   sellerId    String
-  seller      User      @relation("SellerProducts", fields: [sellerId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+  seller      User      @relation("SellerProducts", fields: [sellerId], references: [id], onDelete: Cascade, onUpdate: Cascade)
   game        Game      @relation(fields: [gameId], references: [id], onDelete: Restrict, onUpdate: Cascade)
   category    Category  @relation(fields: [categoryId], references: [id], onDelete: Restrict, onUpdate: Cascade)
   orders      Order[]
@@ -132,9 +132,9 @@ model Order {
   platformFee  Decimal       @default(0) @db.Decimal(36, 8)
   commission   Float         @default(0)
   status       OrderStatus   @default(PENDING)
-  buyer        User          @relation("BuyerOrders", fields: [buyerId], references: [id], onDelete: Restrict, onUpdate: Cascade)
-  seller       User          @relation("SellerOrders", fields: [sellerId], references: [id], onDelete: Restrict, onUpdate: Cascade)
-  product      Product       @relation(fields: [productId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+  buyer        User          @relation("BuyerOrders", fields: [buyerId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+  seller       User          @relation("SellerOrders", fields: [sellerId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+  product      Product       @relation(fields: [productId], references: [id], onDelete: Cascade, onUpdate: Cascade)
   review       Review?
   transactions Transaction[]
   createdAt    DateTime      @default(now())
@@ -157,8 +157,8 @@ model Review {
   sellerReply String?
   replyCreatedAt DateTime?
   order      Order    @relation(fields: [orderId], references: [id], onDelete: Cascade, onUpdate: Cascade)
-  author     User     @relation("ReviewAuthor", fields: [authorId], references: [id], onDelete: Restrict, onUpdate: Cascade)
-  seller     User     @relation("ReviewSeller", fields: [sellerId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+  author     User     @relation("ReviewAuthor", fields: [authorId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+  seller     User     @relation("ReviewSeller", fields: [sellerId], references: [id], onDelete: Cascade, onUpdate: Cascade)
   createdAt  DateTime @default(now())
 
   @@index([authorId])
@@ -175,7 +175,7 @@ model Transaction {
   externalId String?           @unique
   type       TransactionType
   status     TransactionStatus @default(PENDING)
-  user       User              @relation(fields: [userId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+  user       User              @relation(fields: [userId], references: [id], onDelete: Cascade, onUpdate: Cascade)
   order      Order?            @relation(fields: [orderId], references: [id], onDelete: SetNull, onUpdate: Cascade)
   createdAt  DateTime          @default(now())
   updatedAt  DateTime          @updatedAt
@@ -234,9 +234,9 @@ model Conversation {
   buyerId   String
   sellerId  String
   productId String?
-  buyer     User      @relation("BuyerConversations", fields: [buyerId], references: [id], onDelete: Restrict, onUpdate: Cascade)
-  seller    User      @relation("SellerConversations", fields: [sellerId], references: [id], onDelete: Restrict, onUpdate: Cascade)
-  product   Product?  @relation(fields: [productId], references: [id], onDelete: SetNull, onUpdate: Cascade)
+  buyer     User      @relation("BuyerConversations", fields: [buyerId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+  seller    User      @relation("SellerConversations", fields: [sellerId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+  product   Product?  @relation(fields: [productId], references: [id], onDelete: Cascade, onUpdate: Cascade)
   messages  Message[]
   createdAt DateTime  @default(now())
   updatedAt DateTime  @updatedAt
@@ -255,7 +255,7 @@ model Message {
   imageUrl       String?
   isRead         Boolean      @default(false)
   conversation   Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade, onUpdate: Cascade)
-  sender         User         @relation("MessageSender", fields: [senderId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+  sender         User         @relation("MessageSender", fields: [senderId], references: [id], onDelete: Cascade, onUpdate: Cascade)
   createdAt      DateTime     @default(now())
   updatedAt      DateTime     @updatedAt
 

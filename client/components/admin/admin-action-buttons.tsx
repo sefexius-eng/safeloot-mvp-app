@@ -3,7 +3,9 @@
 import { useState, useTransition } from "react";
 
 import {
+  deleteOrderAdmin,
   deleteProductAdmin,
+  deleteUserAdmin,
   releaseUserHoldBalance,
   toggleBanUser,
 } from "@/app/admin/actions";
@@ -27,6 +29,14 @@ interface AdminReleaseHoldButtonProps {
 interface AdminDeleteProductButtonProps {
   productId: string;
   canDelete: boolean;
+}
+
+interface AdminDeleteOrderButtonProps {
+  orderId: string;
+}
+
+interface AdminDeleteUserButtonProps {
+  userId: string;
 }
 
 interface AdminWithdrawalActionButtonsProps {
@@ -228,6 +238,84 @@ export function AdminReleaseHoldButton({
       >
         {isPending ? "Загрузка..." : "Снять холд"}
       </button>
+      {error ? <p className="max-w-[220px] text-right text-xs text-rose-300">{error}</p> : null}
+    </div>
+  );
+}
+
+export function AdminDeleteOrderButton({ orderId }: AdminDeleteOrderButtonProps) {
+  const [isPending, startTransition] = useTransition();
+  const [error, setError] = useState<string | null>(null);
+
+  function handleClick() {
+    if (!window.confirm("Удалить тестовый заказ и связанные review-записи?")) {
+      return;
+    }
+
+    setError(null);
+
+    startTransition(() => {
+      void deleteOrderAdmin(orderId)
+        .then((result) => {
+          if (!result.ok) {
+            setError(result.message ?? "Не удалось удалить заказ.");
+          }
+        })
+        .catch(() => {
+          setError("Не удалось удалить заказ.");
+        });
+    });
+  }
+
+  return (
+    <div className="flex flex-col items-end gap-2">
+      <Button
+        type="button"
+        onClick={handleClick}
+        disabled={isPending}
+        className="h-10 rounded-xl bg-rose-600 px-4 text-white shadow-none hover:bg-rose-500"
+      >
+        {isPending ? "Загрузка..." : "Удалить"}
+      </Button>
+      {error ? <p className="max-w-[220px] text-right text-xs text-rose-300">{error}</p> : null}
+    </div>
+  );
+}
+
+export function AdminDeleteUserButton({ userId }: AdminDeleteUserButtonProps) {
+  const [isPending, startTransition] = useTransition();
+  const [error, setError] = useState<string | null>(null);
+
+  function handleClick() {
+    if (!window.confirm("Удалить пользователя и все его тестовые данные каскадно?")) {
+      return;
+    }
+
+    setError(null);
+
+    startTransition(() => {
+      void deleteUserAdmin(userId)
+        .then((result) => {
+          if (!result.ok) {
+            setError(result.message ?? "Не удалось удалить пользователя.");
+          }
+        })
+        .catch(() => {
+          setError("Не удалось удалить пользователя.");
+        });
+    });
+  }
+
+  return (
+    <div className="flex flex-col items-end gap-2">
+      <Button
+        type="button"
+        onClick={handleClick}
+        disabled={isPending}
+        className="h-10 rounded-xl bg-rose-600 px-4 text-white shadow-none hover:bg-rose-500"
+      >
+        {isPending ? "Загрузка..." : "Удалить"}
+      </Button>
       {error ? <p className="max-w-[220px] text-right text-xs text-rose-300">{error}</p> : null}
     </div>
   );

@@ -283,7 +283,7 @@ function ensureProductManagementAccess(
   role: Role | string | undefined,
   product: { sellerId: string },
 ) {
-  if (userId === product.sellerId || role === Role.ADMIN) {
+  if (userId === product.sellerId || isAdminRole((role as Role | null | undefined) ?? undefined)) {
     return;
   }
 
