@@ -10,10 +10,7 @@ const INFO_LINKS = [
   "Поддержка",
 ];
 
-const COMMUNITY_LINKS = [
-  "Telegram",
-  "Discord",
-];
+const COMMUNITY_LINKS = ["Telegram", "Discord"];
 
 const PAYMENT_METHODS = ["Visa", "Mastercard", "USDT", "TON"];
 
@@ -57,13 +54,13 @@ export function SiteFooter() {
             </p>
             <nav className="mt-4 flex flex-col gap-3 text-sm text-zinc-400">
               {INFO_LINKS.map((label) => (
-                <a
+                <Link
                   key={label}
-                  href="#"
+                  href="/help"
                   className="transition hover:text-white"
                 >
                   {label}
-                </a>
+                </Link>
               ))}
             </nav>
           </div>
@@ -74,13 +71,13 @@ export function SiteFooter() {
             </p>
             <div className="mt-4 flex flex-col gap-3 text-sm text-zinc-400">
               {COMMUNITY_LINKS.map((label) => (
-                <a
+                <Link
                   key={label}
-                  href="#"
+                  href="/help"
                   className="transition hover:text-white"
                 >
                   {label}
-                </a>
+                </Link>
               ))}
             </div>
           </div>

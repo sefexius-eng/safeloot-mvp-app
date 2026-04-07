@@ -2,13 +2,13 @@ import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 
 import CensoredText from "@/components/censored-text";
+import { ChatMessages } from "@/components/chat-messages";
 import { UserAvatar } from "@/components/ui/user-avatar";
 import { BuyProductDialog } from "@/components/product/buy-product-dialog";
-import { ConversationRoomView } from "@/components/chat/conversation-room-view";
 import { TeamBadge } from "@/components/ui/team-badge";
 import { getCurrentSessionUser } from "@/lib/access-control";
 import { getAuthSession } from "@/lib/auth";
-import { getConversationRoom } from "@/lib/marketplace";
+import { getConversationMessages, getConversationRoom } from "@/lib/marketplace";
 
 interface ChatPageProps {
   params: Promise<{
@@ -83,6 +83,12 @@ export default async function ChatRoomPage({ params }: ChatPageProps) {
     notFound();
   }
 
+  const initialConversationMessages = await getConversationMessages(
+    conversation.id,
+    currentUser.id,
+    currentUser.role,
+  );
+
   const statusMeta = conversation.latestOrder
     ? getOrderStatusMeta(conversation.latestOrder.status)
     : null;
@@ -151,7 +157,11 @@ export default async function ChatRoomPage({ params }: ChatPageProps) {
         </div>
       </header>
 
-      <ConversationRoomView conversationId={conversation.id} />
+      <ChatMessages
+        conversationId={conversation.id}
+        currentUserId={currentUser.id}
+        initialMessages={initialConversationMessages.messages}
+      />
     </div>
   );
 }
