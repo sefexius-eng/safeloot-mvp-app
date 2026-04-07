@@ -52,53 +52,24 @@ function attachCurrencySymbol(currency: CurrencyDefinition, formattedValue: stri
   return `${formattedValue} ${currency.symbol}`;
 }
 
-function formatFixedCurrencyValue(amount: number) {
-  return new Intl.NumberFormat("en-US", {
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2,
-  })
-    .format(Number(formatCurrency(amount)))
-    .replace(/,/g, " ");
-}
-
 function formatCurrencyValue(
   currency: CurrencyCode,
   basePriceInUsd: string | number,
   options?: {
     clampNegative?: boolean;
-    forceTwoDecimals?: boolean;
   },
 ) {
   const numericPrice = Number(basePriceInUsd);
   const currentCurrency = getCurrencyDefinition(currency);
 
   if (!Number.isFinite(numericPrice)) {
-    return attachCurrencySymbol(
-      currentCurrency,
-      options?.forceTwoDecimals ? formatCurrency(0) : "0",
-    );
+    return attachCurrencySymbol(currentCurrency, formatCurrency(0));
   }
 
   const safePrice = options?.clampNegative ? Math.max(0, numericPrice) : numericPrice;
   const convertedValue = safePrice * currentCurrency.rate;
 
-  if (options?.forceTwoDecimals) {
-    return attachCurrencySymbol(
-      currentCurrency,
-      formatFixedCurrencyValue(convertedValue),
-    );
-  }
-
-  const roundedValue = Math.round((convertedValue + Number.EPSILON) * 100) / 100;
-  const hasFraction = Math.abs(roundedValue % 1) > Number.EPSILON;
-  const localizedValue = new Intl.NumberFormat("en-US", {
-    minimumFractionDigits: hasFraction ? 2 : 0,
-    maximumFractionDigits: 2,
-  })
-    .format(roundedValue)
-    .replace(/,/g, " ");
-
-  return attachCurrencySymbol(currentCurrency, localizedValue);
+  return attachCurrencySymbol(currentCurrency, formatCurrency(convertedValue));
 }
 
 export function CurrencyProvider({ children }: { children: React.ReactNode }) {
@@ -132,7 +103,6 @@ export function CurrencyProvider({ children }: { children: React.ReactNode }) {
   function formatBalance(basePriceInUsd: string | number) {
     return formatCurrencyValue(currency, basePriceInUsd, {
       clampNegative: true,
-      forceTwoDecimals: true,
     });
   }
 

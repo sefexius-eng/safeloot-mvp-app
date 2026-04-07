@@ -4,5 +4,7 @@ export function formatCurrency(amount: number) {
     ? Math.max(0, numericAmount)
     : 0;
 
-  return safeAmount.toFixed(2);
+  return new Intl.NumberFormat("ru-RU", {
+    maximumFractionDigits: 0,
+  }).format(safeAmount);
 }
