@@ -4,6 +4,7 @@ import { Geist, Geist_Mono } from "next/font/google";
 import { BannedModal } from "@/components/banned-modal";
 import { SiteHeader } from "@/components/layout/site-header";
 import { AuthSessionProvider } from "@/components/providers/session-provider";
+import { SiteFooter } from "@/components/site-footer";
 import { getAuthSession } from "@/lib/auth";
 import { getSiteUrl } from "@/lib/site-url";
 import "./globals.css";
@@ -65,12 +66,13 @@ export default async function RootLayout({
       lang="ru"
       className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
     >
-      <body className="min-h-full flex flex-col">
+      <body className="min-h-screen flex flex-col">
         <AuthSessionProvider session={session}>
           <SiteHeader />
           <BannedModal />
 
-          <div className="flex-1">{children}</div>
+          <main className="flex-1">{children}</main>
+          <SiteFooter />
         </AuthSessionProvider>
       </body>
     </html>
