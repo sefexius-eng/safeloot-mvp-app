@@ -134,9 +134,6 @@ export function ProfileTabs({ products: initialProducts, reviews }: ProfileTabsP
         <h2 className="mt-2 text-2xl font-semibold tracking-tight text-white md:text-3xl">
           Управление витриной и отзывами
         </h2>
-        <p className="mt-3 max-w-3xl text-sm leading-7 text-zinc-400">
-          Переключайтесь между товарами и отзывами, чтобы поддерживать актуальную витрину и отвечать покупателям прямо из кабинета.
-        </p>
       </div>
 
       <PromoCodePanel />

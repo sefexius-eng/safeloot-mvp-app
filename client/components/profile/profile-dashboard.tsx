@@ -191,9 +191,6 @@ export function ProfileDashboard() {
           <h3 className="mt-3 text-2xl font-semibold tracking-tight text-white">
             Настройте ник и аватар
           </h3>
-          <p className="mt-3 text-sm leading-7 text-zinc-400">
-            Откройте страницу настроек, чтобы обновить публичный никнейм и загрузить сжатый аватар, который сразу появится в кабинете.
-          </p>
 
           <div className="mt-6 flex flex-wrap gap-3">
             <Link
@@ -220,9 +217,6 @@ export function ProfileDashboard() {
           <p className="mt-4 text-4xl font-semibold tracking-tight text-white md:text-5xl">
             {formatBalance(displayAvailable)}
           </p>
-          <p className="mt-3 text-sm leading-7 text-zinc-300">
-            Баланс, который продавец может использовать после вывода из внутренней системы.
-          </p>
         </article>
 
         <article className="rounded-[2rem] border border-sky-500/15 bg-[linear-gradient(180deg,rgba(14,165,233,0.12),rgba(9,9,11,0.92))] p-6 shadow-[0_20px_60px_rgba(0,0,0,0.22)]">
@@ -231,9 +225,6 @@ export function ProfileDashboard() {
           </p>
           <p className="mt-4 text-4xl font-semibold tracking-tight text-white md:text-5xl">
             {formatBalance(displayHold)}
-          </p>
-          <p className="mt-3 text-sm leading-7 text-zinc-300">
-            Средства по завершенным сделкам, зафиксированные во внутреннем escrow-балансе.
           </p>
         </article>
       </div>

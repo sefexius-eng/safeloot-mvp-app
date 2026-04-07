@@ -91,9 +91,6 @@ export function PromoCodePanel() {
             <h3 className="mt-2 text-xl font-semibold tracking-tight text-white">
               Подарочный код
             </h3>
-            <p className="mt-2 max-w-2xl text-sm leading-7 text-zinc-300">
-              Введите подарочный код, чтобы моментально зачислить бонус на доступный баланс аккаунта.
-            </p>
           </div>
 
           <form onSubmit={handleSubmit} className="flex w-full flex-col gap-3 sm:flex-row lg:max-w-[520px]">

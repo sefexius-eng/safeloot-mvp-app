@@ -164,9 +164,6 @@ export function WithdrawalPanel({
           <h2 className="mt-2 text-2xl font-semibold tracking-tight text-white md:text-3xl">
             Заявки на вывод средств
           </h2>
-          <p className="mt-3 max-w-3xl text-sm leading-7 text-zinc-400">
-            Вывод доступен только из available balance. Заявка уходит администратору, а история всех выплат сохраняется ниже.
-          </p>
         </div>
 
         {isAuthenticated ? (

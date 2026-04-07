@@ -205,9 +205,6 @@ export default async function ProfilePage() {
         <h1 className="mt-3 text-3xl font-semibold tracking-tight text-white md:text-5xl md:leading-[1.05]">
           Личный кабинет продавца
         </h1>
-        <p className="mt-4 max-w-3xl text-sm leading-7 text-zinc-400 md:text-base">
-          Здесь собраны ваши текущие балансы и все размещенные товары. Используйте кабинет для контроля средств в escrow и управления активными предложениями.
-        </p>
         <div className="mt-6 flex flex-wrap items-center gap-3">
           <div className="inline-flex items-center rounded-full border border-white/10 bg-white/5 px-4 py-2 text-sm text-zinc-300">
             Аккаунт: <span className="ml-2 font-semibold text-white">{displayName}</span>

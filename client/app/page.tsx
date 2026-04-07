@@ -138,17 +138,10 @@ export default async function Home() {
       <section className="overflow-hidden rounded-[2.4rem] border border-white/10 bg-[radial-gradient(circle_at_top_left,rgba(249,115,22,0.22),transparent_30%),radial-gradient(circle_at_bottom_right,rgba(14,165,233,0.16),transparent_36%),linear-gradient(135deg,rgba(24,24,27,0.96),rgba(15,23,42,0.94))] shadow-[0_24px_80px_rgba(0,0,0,0.3)] backdrop-blur">
         <div className="grid gap-10 px-6 py-8 md:grid-cols-2 md:items-center md:px-10 md:py-12 lg:px-14 lg:py-16">
           <div className="space-y-8">
-            <div className="inline-flex rounded-full border border-orange-400/20 bg-orange-500/10 px-4 py-2 text-xs font-semibold tracking-[0.3em] uppercase text-orange-200 shadow-[0_12px_30px_rgba(249,115,22,0.12)]">
-              Безопасные сделки для игровых товаров
-            </div>
-
-            <div className="space-y-5">
+            <div>
               <h1 className="max-w-4xl text-4xl font-semibold tracking-tight text-white md:text-6xl md:leading-[1.02]">
                 Покупайте и продавайте игровые товары без риска потерять деньги.
               </h1>
-              <p className="max-w-2xl text-base leading-8 text-zinc-300 md:text-lg">
-                Escrow удерживает средства до подтверждения заказа. Продавец получает выплату только после завершения сделки, а покупатель сохраняет контроль на каждом этапе.
-              </p>
             </div>
 
             <div className="flex flex-wrap gap-3">
@@ -172,27 +165,18 @@ export default async function Home() {
                   Сделки
                 </p>
                 <p className="mt-3 text-2xl font-semibold text-white">24/7</p>
-                <p className="mt-2 text-sm leading-6 text-zinc-400">
-                  Контроль статусов, чаты по заказу и прозрачное движение средств.
-                </p>
               </div>
               <div className="rounded-[1.5rem] border border-white/10 bg-white/5 p-4 shadow-[0_12px_30px_rgba(0,0,0,0.18)]">
                 <p className="text-xs tracking-[0.24em] uppercase text-zinc-500">
                   Баланс
                 </p>
                 <p className="mt-3 text-2xl font-semibold text-white">USDT</p>
-                <p className="mt-2 text-sm leading-6 text-zinc-400">
-                  Разделение на доступный баланс и hold для безопасного клиринга.
-                </p>
               </div>
               <div className="rounded-[1.5rem] border border-white/10 bg-white/5 p-4 shadow-[0_12px_30px_rgba(0,0,0,0.18)]">
                 <p className="text-xs tracking-[0.24em] uppercase text-zinc-500">
                   Защита
                 </p>
                 <p className="mt-3 text-2xl font-semibold text-white">Escrow</p>
-                <p className="mt-2 text-sm leading-6 text-zinc-400">
-                  Платформа удерживает оплату до успешного завершения заказа.
-                </p>
               </div>
             </div>
           </div>
@@ -215,22 +199,17 @@ export default async function Home() {
               <div className="absolute right-4 top-4 rounded-[1.35rem] border border-white/10 bg-black/35 px-4 py-3 text-white shadow-[0_16px_40px_rgba(0,0,0,0.28)] backdrop-blur">
                 <p className="text-xs uppercase tracking-[0.22em] text-zinc-400">Каталог</p>
                 <p className="mt-2 text-2xl font-semibold">{games.length}</p>
-                <p className="text-sm text-zinc-300">игр в витрине</p>
               </div>
 
               <div className="absolute bottom-4 left-4 rounded-[1.35rem] border border-white/10 bg-black/35 px-4 py-3 text-white shadow-[0_16px_40px_rgba(0,0,0,0.28)] backdrop-blur">
                 <p className="text-xs uppercase tracking-[0.22em] text-zinc-400">Escrow Shield</p>
                 <p className="mt-2 text-lg font-semibold">Защищённая оплата</p>
-                <p className="text-sm text-zinc-300">Средства удерживаются до подтверждения</p>
               </div>
 
               <div className="absolute inset-x-0 bottom-0 p-6 md:p-8">
                 <div className="max-w-lg rounded-[1.75rem] border border-white/10 bg-black/35 p-5 text-white shadow-[0_18px_50px_rgba(0,0,0,0.28)] backdrop-blur">
                   <p className="text-xs font-semibold uppercase tracking-[0.24em] text-orange-200/90">
                     Gaming Marketplace
-                  </p>
-                  <p className="mt-3 text-2xl font-semibold tracking-tight md:text-3xl">
-                    Яркая витрина, безопасные сделки и живой каталог игровых предложений.
                   </p>
                 </div>
               </div>
@@ -240,19 +219,9 @@ export default async function Home() {
       </section>
 
       <section id="popular-games" className="space-y-6">
-        <div className="flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
-          <div>
-            <p className="text-sm font-semibold tracking-[0.24em] uppercase text-zinc-500">
-              Популярные игры
-            </p>
-            <h2 className="mt-2 text-3xl font-semibold tracking-tight text-white">
-              Постеры игровых витрин
-            </h2>
-          </div>
-          <p className="max-w-2xl text-sm leading-7 text-zinc-400">
-            Быстрый визуальный вход в самые востребованные каталоги. Если для игры ещё не загружен постер, SafeLoot показывает яркий fallback в стилистике маркетплейса.
-          </p>
-        </div>
+        <h2 className="text-3xl font-semibold tracking-tight text-white">
+          Постеры игровых витрин
+        </h2>
 
         {popularGames.length === 0 ? (
           <div className="rounded-[1.9rem] border border-dashed border-white/10 bg-white/5 px-6 py-10 text-sm leading-7 text-zinc-400 shadow-[0_14px_36px_rgba(0,0,0,0.16)]">
@@ -313,19 +282,9 @@ export default async function Home() {
       </section>
 
       <section className="space-y-6">
-        <div className="flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
-          <div>
-            <p className="text-sm font-semibold tracking-[0.24em] uppercase text-zinc-500">
-              Все игры
-            </p>
-            <h2 className="mt-2 text-3xl font-semibold tracking-tight text-white">
-              Каталог по алфавиту
-            </h2>
-          </div>
-          <p className="max-w-2xl text-sm leading-7 text-zinc-400">
-            Плотный каталог в духе FunPay: выберите игру и сразу перейдите к её категориям и товарам.
-          </p>
-        </div>
+        <h2 className="text-3xl font-semibold tracking-tight text-white">
+          Каталог по алфавиту
+        </h2>
 
         {games.length === 0 ? (
           <div className="rounded-[1.9rem] border border-dashed border-white/10 bg-white/5 px-6 py-10 text-sm leading-7 text-zinc-400 shadow-[0_14px_36px_rgba(0,0,0,0.16)]">
@@ -363,19 +322,9 @@ export default async function Home() {
       </section>
 
       <section className="space-y-6">
-        <div className="flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
-          <div>
-            <p className="text-sm font-semibold tracking-[0.24em] uppercase text-zinc-500">
-              Активные предложения
-            </p>
-            <h2 className="mt-2 text-3xl font-semibold tracking-tight text-white">
-              Актуальные товары маркетплейса
-            </h2>
-          </div>
-          <p className="max-w-2xl text-sm leading-7 text-zinc-400">
-            Каталог на главной обновляется автоматически. Ниже выводятся реальные товары из базы вместе с категорией, игрой, ценой и рангом продавца.
-          </p>
-        </div>
+        <h2 className="text-3xl font-semibold tracking-tight text-white">
+          Актуальные товары маркетплейса
+        </h2>
 
         {products.length === 0 ? (
           <div className="rounded-[1.9rem] border border-dashed border-white/10 bg-white/5 px-6 py-12 text-center shadow-[0_14px_36px_rgba(0,0,0,0.16)]">
