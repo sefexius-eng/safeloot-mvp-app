@@ -72,6 +72,10 @@ function formatReviewCount(count: number) {
   return `${count} отзывов`;
 }
 
+function isTeamSeller(role: Role) {
+  return ["MODERATOR", "ADMIN", "SUPER_ADMIN"].includes(role);
+}
+
 export function MarketplaceProductCard({ product }: MarketplaceProductCardProps) {
   const { formatPrice } = useCurrency();
   const sellerDisplayName = getSellerDisplayName(product.seller);
@@ -107,13 +111,20 @@ export function MarketplaceProductCard({ product }: MarketplaceProductCardProps)
           <UserAvatar
             src={product.seller.image}
             name={sellerDisplayName}
-            className="h-6 w-6 shrink-0 border-white/10 bg-zinc-900/80"
+            className="h-8 w-8 shrink-0 border-white/10 bg-zinc-900/80"
             imageClassName="rounded-full object-cover"
           />
           <div className="min-w-0">
-            <p className="truncate text-sm font-medium text-zinc-200 transition group-hover:text-white">
-              <CensoredText text={sellerDisplayName} />
-            </p>
+            <div className="flex items-center gap-2">
+              <p className="truncate text-sm font-medium text-zinc-200 transition group-hover:text-white">
+                <CensoredText text={sellerDisplayName} />
+              </p>
+              {isTeamSeller(product.seller.role) ? (
+                <span className="shrink-0 rounded bg-blue-600 px-1.5 py-0.5 text-[10px] font-bold text-white align-middle">
+                  🛡️ TEAM
+                </span>
+              ) : null}
+            </div>
             <p className="mt-1 text-xs text-zinc-500">
               {hasReviews
                 ? `⭐ ${formatAverageRating(averageRating)} (${formatReviewCount(reviewSummary.reviewCount)})`
