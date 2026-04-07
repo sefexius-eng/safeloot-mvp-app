@@ -139,6 +139,8 @@ export function ProfileDashboard() {
 
   const displayName = user.name.trim() || user.email.split("@")[0];
   const avatarLetter = displayName.slice(0, 1).toUpperCase() || "S";
+  const displayAvailable = Math.max(0, Number(user.availableBalance));
+  const displayHold = Math.max(0, Number(user.holdBalance));
 
   return (
     <section className="space-y-8">
@@ -216,7 +218,7 @@ export function ProfileDashboard() {
             Доступно к выводу
           </p>
           <p className="mt-4 text-4xl font-semibold tracking-tight text-white md:text-5xl">
-            {formatBalance(user.availableBalance)}
+            {formatBalance(displayAvailable)}
           </p>
           <p className="mt-3 text-sm leading-7 text-zinc-300">
             Баланс, который продавец может использовать после вывода из внутренней системы.
@@ -228,7 +230,7 @@ export function ProfileDashboard() {
             В холде (Escrow)
           </p>
           <p className="mt-4 text-4xl font-semibold tracking-tight text-white md:text-5xl">
-            {formatBalance(user.holdBalance)}
+            {formatBalance(displayHold)}
           </p>
           <p className="mt-3 text-sm leading-7 text-zinc-300">
             Средства по завершенным сделкам, зафиксированные во внутреннем escrow-балансе.

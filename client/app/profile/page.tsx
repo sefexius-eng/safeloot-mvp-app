@@ -77,6 +77,9 @@ export default async function ProfilePage() {
         prisma.order.findMany({
           where: {
             sellerId,
+            status: {
+              in: ["PAID", "DISPUTED"],
+            },
           },
           include: {
             product: true,
@@ -281,7 +284,7 @@ export default async function ProfilePage() {
           </div>
         ) : sales.length === 0 ? (
           <div className="mt-6 rounded-[1.5rem] border border-white/10 bg-white/5 p-6 text-sm leading-7 text-zinc-400">
-            У вас пока нет продаж. Как только покупатель оформит заказ на ваш товар, сделка появится в этом разделе.
+            У вас пока нет активных сделок. Здесь показываются только заказы со статусами PAID и DISPUTED.
           </div>
         ) : (
           <div className="mt-6 space-y-4">

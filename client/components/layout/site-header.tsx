@@ -243,8 +243,10 @@ export function SiteHeader() {
     session?.user?.name?.trim() ||
     session?.user?.email?.split("@")[0] ||
     "Профиль";
-  const availableBalanceLabel = formatBalance(user?.availableBalance ?? "0");
-  const holdBalanceLabel = formatBalance(user?.holdBalance ?? "0");
+  const displayAvailable = Math.max(0, Number(user?.availableBalance ?? 0));
+  const displayHold = Math.max(0, Number(user?.holdBalance ?? 0));
+  const availableBalanceLabel = formatBalance(displayAvailable);
+  const holdBalanceLabel = formatBalance(displayHold);
 
   return (
     <header className="sticky top-0 z-50 border-b border-white/10 bg-[rgba(9,9,11,0.78)] backdrop-blur-xl">
@@ -433,7 +435,7 @@ export function SiteHeader() {
                       </svg>
                     </button>
                   </DropdownMenuTrigger>
-                  <DropdownMenuContent className="w-64">
+                  <DropdownMenuContent align="end" className="w-64">
                     <DropdownMenuLabel>Аккаунт</DropdownMenuLabel>
                     <div className="px-3 pb-2">
                       <p className="truncate text-sm font-semibold text-white">
