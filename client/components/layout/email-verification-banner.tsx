@@ -39,7 +39,7 @@ export function EmailVerificationBanner({
       <div className="mx-auto flex w-full max-w-7xl flex-col gap-2 px-4 py-2.5 sm:px-6 lg:flex-row lg:items-center lg:justify-between lg:px-8">
         <div className="min-w-0">
           <p className="text-sm font-semibold text-amber-100">
-            ⚠️ Пожалуйста, подтвердите ваш email, чтобы получать уведомления и продавать товары.
+            ⚠️ Пожалуйста, подтвердите ваш email, чтобы вовремя получать важные уведомления о ваших сделках.
           </p>
           <p className="mt-1 text-xs text-amber-100/75">
             Текущий адрес: {email}
