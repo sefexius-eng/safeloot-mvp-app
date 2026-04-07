@@ -1,7 +1,8 @@
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
+import { Analytics } from "@vercel/analytics/react";
 
-import { Analytics } from "@/components/analytics";
+import { Analytics as ExternalAnalytics } from "@/components/analytics";
 import { BannedModal } from "@/components/banned-modal";
 import { EmailVerificationBanner } from "@/components/layout/email-verification-banner";
 import { SiteHeader } from "@/components/layout/site-header";
@@ -97,6 +98,7 @@ export default async function RootLayout({
           <main className="flex-1">{children}</main>
           <SiteFooter />
         </AuthSessionProvider>
+        <ExternalAnalytics />
         <Analytics />
       </body>
     </html>
