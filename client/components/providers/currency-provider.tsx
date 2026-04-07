@@ -2,15 +2,15 @@
 
 import { createContext, useContext, useEffect, useState } from "react";
 
+import {
+  CURRENCIES,
+  getCurrencyDefinition,
+  type CurrencyCode,
+  type CurrencyDefinition,
+} from "@/lib/currency-config";
 import { formatCurrency } from "@/lib/formatters";
 
-export type CurrencyCode = "USD" | "RUB" | "UAH" | "EUR" | "KZT" | "PLN";
-
-interface CurrencyDefinition {
-  code: CurrencyCode;
-  symbol: string;
-  rate: number;
-}
+export type { CurrencyCode } from "@/lib/currency-config";
 
 interface CurrencyContextValue {
   currency: CurrencyCode;
@@ -25,20 +25,7 @@ interface CurrencyContextValue {
 
 const CURRENCY_STORAGE_KEY = "safeloot:currency";
 
-const CURRENCIES: CurrencyDefinition[] = [
-  { code: "USD", symbol: "$", rate: 1 },
-  { code: "RUB", symbol: "₽", rate: 93 },
-  { code: "UAH", symbol: "₴", rate: 39 },
-  { code: "EUR", symbol: "€", rate: 0.92 },
-  { code: "KZT", symbol: "₸", rate: 445 },
-  { code: "PLN", symbol: "zł", rate: 3.98 },
-];
-
 const CurrencyContext = createContext<CurrencyContextValue | null>(null);
-
-function getCurrencyDefinition(currency: CurrencyCode) {
-  return CURRENCIES.find((item) => item.code === currency) ?? CURRENCIES[0];
-}
 
 function attachCurrencySymbol(currency: CurrencyDefinition, formattedValue: string) {
   if (currency.code === "PLN") {

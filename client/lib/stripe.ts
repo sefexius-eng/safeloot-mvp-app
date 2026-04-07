@@ -56,8 +56,12 @@ export async function handleCompletedTopupSession(
   }
 
   const providerId = session.id?.trim() || null;
-  const amount = parseAmountTotal(session.amount_total);
+  const chargedAmount = parseAmountTotal(session.amount_total);
   const currency = normalizeCurrency(session.currency ?? "USD");
+  const creditedAmountUsd = parseMetadataAmount(
+    session.metadata?.creditedAmountUsd,
+    "creditedAmountUsd is required for a Stripe webhook.",
+  );
 
   return prisma.$transaction(
     async (transactionClient) => {
@@ -83,7 +87,7 @@ export async function handleCompletedTopupSession(
         throw new Error(`Transaction ${transactionId} is not a balance topup.`);
       }
 
-      if (!existingTransaction.amount.equals(amount)) {
+      if (!existingTransaction.amount.equals(chargedAmount)) {
         throw new Error(`Amount mismatch for transaction ${transactionId}.`);
       }
 
@@ -126,7 +130,7 @@ export async function handleCompletedTopupSession(
         },
         data: {
           availableBalance: {
-            increment: existingTransaction.amount,
+            increment: creditedAmountUsd,
           },
         },
       });
@@ -145,6 +149,17 @@ export async function handleCompletedTopupSession(
 
 function normalizeCurrency(currency: string) {
   return currency.trim().toUpperCase();
+}
+
+function parseMetadataAmount(
+  value: string | null | undefined,
+  errorMessage: string,
+) {
+  if (!value?.trim()) {
+    throw new Error(errorMessage);
+  }
+
+  return new Prisma.Decimal(value).toDecimalPlaces(8, Prisma.Decimal.ROUND_HALF_UP);
 }
 
 function parseAmountTotal(amountTotal: number | null | undefined) {

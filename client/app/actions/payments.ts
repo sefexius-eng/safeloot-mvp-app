@@ -4,6 +4,11 @@ import { Prisma, TransactionStatus, TransactionType } from "@prisma/client";
 
 import { BANNED_USER_MESSAGE, getCurrentSessionUser } from "@/lib/access-control";
 import { getAuthSession } from "@/lib/auth";
+import {
+  getCurrencyDefinition,
+  isStripeTopupCurrency,
+  type CurrencyCode,
+} from "@/lib/currency-config";
 import { prisma } from "@/lib/prisma";
 import { getSiteUrl } from "@/lib/site-url";
 import { stripe } from "@/lib/stripe";
@@ -30,22 +35,41 @@ async function requireActivePaymentUser() {
   return currentUser;
 }
 
-function normalizeTopupAmount(amount: number) {
+function normalizeTopupAmount(amount: number, currencyCode: CurrencyCode) {
   if (!Number.isFinite(amount)) {
     throw new Error("Укажите корректную сумму пополнения.");
   }
 
+  const currencyDefinition = getCurrencyDefinition(currencyCode);
   const normalizedAmount = new Prisma.Decimal(amount.toFixed(2));
+  const minimumAmount = new Prisma.Decimal(currencyDefinition.rate).toDecimalPlaces(
+    2,
+    Prisma.Decimal.ROUND_HALF_UP,
+  );
+  const maximumAmount = new Prisma.Decimal(100000)
+    .mul(currencyDefinition.rate)
+    .toDecimalPlaces(2, Prisma.Decimal.ROUND_HALF_UP);
 
-  if (normalizedAmount.lt(1)) {
-    throw new Error("Минимальная сумма пополнения — 1 USD.");
+  if (normalizedAmount.lt(minimumAmount)) {
+    throw new Error(
+      `Минимальная сумма пополнения — ${minimumAmount.toFixed(2)} ${currencyCode}.`,
+    );
   }
 
-  if (normalizedAmount.gt(100000)) {
+  if (normalizedAmount.gt(maximumAmount)) {
     throw new Error("Сумма пополнения превышает допустимый лимит.");
   }
 
   return normalizedAmount;
+}
+
+function convertPaymentAmountToUsd(
+  amount: Prisma.Decimal,
+  currencyCode: CurrencyCode,
+) {
+  const currencyDefinition = getCurrencyDefinition(currencyCode);
+
+  return amount.div(currencyDefinition.rate).toDecimalPlaces(8, Prisma.Decimal.ROUND_HALF_UP);
 }
 
 function toMinorUnits(amount: Prisma.Decimal) {
@@ -57,16 +81,23 @@ function toMinorUnits(amount: Prisma.Decimal) {
 
 export async function createTopupSession(
   amount: number,
+  currencyCode = "USD",
 ): Promise<CreateTopupSessionResult> {
   try {
     const currentUser = await requireActivePaymentUser();
-    const normalizedAmount = normalizeTopupAmount(amount);
+    const normalizedCurrencyCode = currencyCode.trim().toUpperCase();
+
+    if (!isStripeTopupCurrency(normalizedCurrencyCode)) {
+      throw new Error("Для оплаты картой поддерживаются только USD, EUR и UAH.");
+    }
+
+    const normalizedAmount = normalizeTopupAmount(amount, normalizedCurrencyCode);
     const appUrl = process.env.NEXT_PUBLIC_APP_URL?.trim() || getSiteUrl();
     const transaction = await prisma.transaction.create({
       data: {
         userId: currentUser.id,
         amount: normalizedAmount,
-        currency: "USD",
+        currency: normalizedCurrencyCode,
         type: TransactionType.DEPOSIT,
         status: TransactionStatus.PENDING,
       },
@@ -82,7 +113,7 @@ export async function createTopupSession(
         line_items: [
           {
             price_data: {
-              currency: "usd",
+              currency: normalizedCurrencyCode.toLowerCase(),
               product_data: {
                 name: "Пополнение баланса SafeLoot",
               },
@@ -97,6 +128,11 @@ export async function createTopupSession(
         client_reference_id: transaction.id,
         metadata: {
           transactionId: transaction.id,
+          creditedAmountUsd: convertPaymentAmountToUsd(
+            transaction.amount,
+            normalizedCurrencyCode,
+          ).toFixed(8),
+          paymentCurrency: normalizedCurrencyCode,
         },
       });
 
