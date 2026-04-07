@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import { signOut, useSession } from "next-auth/react";
+import type { Role } from "@prisma/client";
 
 import { searchGames } from "@/app/actions/search";
 import { NotificationsBell } from "@/components/notifications-bell";
@@ -65,7 +66,7 @@ interface CurrentUser {
   email: string;
   name: string;
   image: string | null;
-  role: string;
+  role: Role;
   rank: string;
   lastSeen: string;
   availableBalance: string;
@@ -80,6 +81,16 @@ function HeaderAuthSkeleton() {
       <div className="hidden h-10 w-[92px] animate-pulse rounded-xl border border-white/10 bg-white/5 md:block" />
       <div className="h-10 w-[96px] animate-pulse rounded-xl border border-white/10 bg-white/5" />
       <div className="h-10 w-10 animate-pulse rounded-xl border border-white/10 bg-white/5" />
+    </div>
+  );
+}
+
+function HeaderMobileAuthSkeleton() {
+  return (
+    <div className="flex items-center gap-2 md:hidden">
+      <div className="h-9 w-9 animate-pulse rounded-md border border-white/10 bg-white/5" />
+      <div className="h-9 w-9 animate-pulse rounded-md border border-white/10 bg-white/5" />
+      <div className="h-9 w-9 animate-pulse rounded-md border border-white/10 bg-white/5" />
     </div>
   );
 }
@@ -274,27 +285,123 @@ export function SiteHeader() {
   const availableBalanceLabel = formatBalance(displayAvailable);
   const holdBalanceLabel = formatBalance(displayHold);
 
+  function renderProfileMenu(trigger: React.ReactNode, contentClassName: string) {
+    return (
+      <DropdownMenu>
+        <DropdownMenuTrigger asChild>{trigger}</DropdownMenuTrigger>
+        <DropdownMenuContent align="end" className={contentClassName}>
+          <DropdownMenuLabel>Аккаунт</DropdownMenuLabel>
+          <div className="px-3 pb-2">
+            <p className="truncate text-sm font-semibold text-white">
+              {displayName}
+            </p>
+            <p className="truncate text-xs text-zinc-500">
+              {user?.email ?? session?.user?.email ?? ""}
+            </p>
+          </div>
+          <DropdownMenuSeparator className="my-1 h-px bg-white/10" />
+          <DropdownMenuItem asChild>
+            <Link href="/profile">Мой профиль</Link>
+          </DropdownMenuItem>
+          <DropdownMenuItem asChild>
+            <Link href="/profile/settings">Настройки профиля</Link>
+          </DropdownMenuItem>
+          <DropdownMenuSeparator className="my-1 h-px bg-white/10" />
+          <div className="px-2 py-2">
+            <NotificationsBell mode="panel" />
+          </div>
+          <DropdownMenuSeparator className="my-1 h-px bg-white/10" />
+          <DropdownMenuItem
+            onSelect={(event) => {
+              event.preventDefault();
+              void signOut({ callbackUrl: "/" });
+            }}
+            className="text-rose-200 focus:bg-rose-500/10 focus:text-rose-100"
+          >
+            Выйти
+          </DropdownMenuItem>
+        </DropdownMenuContent>
+      </DropdownMenu>
+    );
+  }
+
   return (
     <header className="sticky top-0 z-50 border-b border-white/10 bg-[rgba(9,9,11,0.78)] backdrop-blur-xl">
       <div className="mx-auto w-full max-w-7xl px-4 py-3 sm:px-6 lg:px-8">
-        <div className="flex flex-col gap-4 lg:grid lg:grid-cols-[auto_minmax(0,1fr)_auto] lg:items-center lg:gap-5">
-          <div className="flex items-center justify-between gap-4 lg:min-w-[220px]">
-          <Link href="/" className="flex items-center gap-3">
-            <span className="flex h-11 w-11 items-center justify-center rounded-2xl bg-orange-600 text-lg font-semibold text-white shadow-[0_14px_40px_rgba(249,115,22,0.26)]">
-              S
-            </span>
-            <span>
-              <span className="block text-lg font-semibold tracking-tight text-neutral-50">
-                SafeLoot
+        <div className="flex flex-col gap-3 md:grid md:grid-cols-[auto_minmax(0,1fr)_auto] md:items-center md:gap-5">
+          <div className="flex items-center justify-between gap-4 md:min-w-[220px]">
+            <Link href="/" className="flex items-center gap-3">
+              <span className="flex h-11 w-11 items-center justify-center rounded-2xl bg-orange-600 text-lg font-semibold text-white shadow-[0_14px_40px_rgba(249,115,22,0.26)]">
+                S
               </span>
-              <span className="block text-xs tracking-[0.24em] uppercase text-zinc-500">
-                Escrow Market
+              <span>
+                <span className="block text-lg font-semibold tracking-tight text-neutral-50">
+                  SafeLoot
+                </span>
+                <span className="block text-xs tracking-[0.24em] uppercase text-zinc-500">
+                  Escrow Market
+                </span>
               </span>
-            </span>
-          </Link>
+            </Link>
+
+            {status === "loading" ? (
+              <HeaderMobileAuthSkeleton />
+            ) : status === "authenticated" ? (
+              <div className="flex items-center gap-2 md:hidden">
+                {renderProfileMenu(
+                  <button
+                    type="button"
+                    aria-label="Меню профиля"
+                    className="inline-flex h-9 w-9 items-center justify-center rounded-md border border-white/10 bg-white/5 text-zinc-100 shadow-[0_12px_28px_rgba(0,0,0,0.22)] transition hover:bg-white/10"
+                  >
+                    <UserAvatar
+                      src={user?.image ?? session?.user?.image ?? null}
+                      name={displayName}
+                      email={user?.email ?? session?.user?.email ?? null}
+                      className="h-9 w-9 shrink-0 rounded-md border-0 bg-zinc-800/80"
+                      imageClassName="rounded-md object-cover"
+                    />
+                  </button>,
+                  "z-50 w-64",
+                )}
+
+                <Link
+                  href="/chats"
+                  aria-label="Открыть диалоги"
+                  className="relative inline-flex h-9 w-9 items-center justify-center rounded-md border border-white/10 bg-white/5 text-lg text-zinc-100 shadow-[0_12px_28px_rgba(0,0,0,0.22)] transition hover:bg-white/10"
+                >
+                  <span aria-hidden="true">💬</span>
+                </Link>
+
+                {!isBanned ? (
+                  <Link
+                    href="/sell"
+                    className="sell-link inline-flex h-9 w-9 items-center justify-center rounded-md bg-orange-600 text-white shadow-[0_16px_40px_rgba(249,115,22,0.28)] transition hover:-translate-y-0.5 hover:bg-orange-500 md:w-auto md:px-4"
+                    aria-label="Продать"
+                  >
+                    <span aria-hidden="true">+</span>
+                  </Link>
+                ) : null}
+              </div>
+            ) : status === "unauthenticated" ? (
+              <div className="flex items-center gap-2 md:hidden">
+                <Link
+                  href="/login"
+                  className="inline-flex h-9 items-center justify-center rounded-md border border-white/10 bg-white/5 px-3 text-sm font-semibold text-zinc-100 shadow-[0_12px_28px_rgba(0,0,0,0.22)] transition hover:bg-white/10"
+                >
+                  Войти
+                </Link>
+                <Link
+                  href="/register"
+                  className="inline-flex h-9 items-center justify-center rounded-md bg-sky-600 px-3 text-sm font-semibold text-white shadow-[0_16px_40px_rgba(2,132,199,0.28)] transition hover:-translate-y-0.5 hover:bg-sky-500"
+                >
+                  Регистрация
+                </Link>
+              </div>
+            ) : null}
           </div>
 
-          <form className="flex-1 w-full max-w-2xl lg:justify-self-center" onSubmit={handleSearchSubmit}>
+          <form className="mt-2 w-full flex-1 md:mt-0 md:max-w-2xl md:justify-self-center" onSubmit={handleSearchSubmit}>
             <div ref={searchContainerRef} className="relative z-[70] w-full">
               <label className="relative block">
                 <span className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-4 text-zinc-500">
@@ -398,106 +505,75 @@ export function SiteHeader() {
           </form>
 
           {status === "loading" ? (
-            <HeaderAuthSkeleton />
+            <div className="hidden md:flex md:justify-self-end">
+              <HeaderAuthSkeleton />
+            </div>
           ) : (
-            <div className="flex flex-wrap items-center gap-2 lg:justify-self-end">
+            <div className="hidden items-center gap-2 md:flex md:justify-self-end">
               {status === "authenticated" ? (
               <>
-                <DropdownMenu>
-                  <DropdownMenuTrigger asChild>
-                    <button
-                      type="button"
-                      aria-label="Меню профиля"
-                      className="inline-flex min-w-0 max-w-full items-center gap-3 rounded-2xl border border-white/10 bg-white/5 px-3 py-2 text-left text-zinc-300 shadow-[0_12px_28px_rgba(0,0,0,0.22)] transition hover:bg-white/10"
-                    >
-                      <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border border-white/10 bg-white/5 text-zinc-200">
-                        <svg
-                          aria-hidden="true"
-                          viewBox="0 0 24 24"
-                          className="h-4 w-4"
-                          fill="none"
-                          stroke="currentColor"
-                          strokeWidth="1.8"
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                        >
-                          <path d="M3 7.5A2.5 2.5 0 0 1 5.5 5h10A2.5 2.5 0 0 1 18 7.5V8h1.5A1.5 1.5 0 0 1 21 9.5v7a1.5 1.5 0 0 1-1.5 1.5H18v.5a2.5 2.5 0 0 1-2.5 2.5h-10A2.5 2.5 0 0 1 3 18.5z" />
-                          <path d="M18 8v10" />
-                          <circle cx="16" cy="13" r="1" />
-                        </svg>
-                      </span>
-                      <div className="flex min-w-0 flex-col">
-                        <span className="truncate text-sm font-bold text-white">
-                          {availableBalanceLabel}
-                        </span>
-                        <span className="mt-0.5 hidden truncate text-xs text-zinc-500 sm:inline">
-                          Холд: {holdBalanceLabel}
-                        </span>
-                      </div>
-                      <span className="hidden h-8 w-px bg-white/10 sm:block" />
-                      <UserAvatar
-                        src={user?.image ?? session?.user?.image ?? null}
-                        name={displayName}
-                        email={user?.email ?? session?.user?.email ?? null}
-                        className="h-10 w-10 shrink-0 rounded-[0.8rem] border-0 bg-zinc-800/80"
-                      />
-                      <div className="hidden min-w-0 flex-col sm:flex">
-                        <span className="truncate text-sm font-semibold text-white">
-                          {displayName}
-                        </span>
-                        <span className="truncate text-xs text-zinc-500">
-                          Профиль
-                        </span>
-                      </div>
+                {renderProfileMenu(
+                  <button
+                    type="button"
+                    aria-label="Меню профиля"
+                    className="hidden min-w-0 max-w-full items-center gap-3 rounded-2xl border border-white/10 bg-white/5 px-3 py-2 text-left text-zinc-300 shadow-[0_12px_28px_rgba(0,0,0,0.22)] transition hover:bg-white/10 md:flex"
+                  >
+                    <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border border-white/10 bg-white/5 text-zinc-200">
                       <svg
                         aria-hidden="true"
                         viewBox="0 0 24 24"
-                        className="h-4 w-4 shrink-0 text-zinc-500"
+                        className="h-4 w-4"
                         fill="none"
                         stroke="currentColor"
                         strokeWidth="1.8"
                         strokeLinecap="round"
                         strokeLinejoin="round"
                       >
-                        <path d="m6 9 6 6 6-6" />
+                        <path d="M3 7.5A2.5 2.5 0 0 1 5.5 5h10A2.5 2.5 0 0 1 18 7.5V8h1.5A1.5 1.5 0 0 1 21 9.5v7a1.5 1.5 0 0 1-1.5 1.5H18v.5a2.5 2.5 0 0 1-2.5 2.5h-10A2.5 2.5 0 0 1 3 18.5z" />
+                        <path d="M18 8v10" />
+                        <circle cx="16" cy="13" r="1" />
                       </svg>
-                    </button>
-                  </DropdownMenuTrigger>
-                  <DropdownMenuContent align="end" className="w-64">
-                    <DropdownMenuLabel>Аккаунт</DropdownMenuLabel>
-                    <div className="px-3 pb-2">
-                      <p className="truncate text-sm font-semibold text-white">
+                    </span>
+                    <div className="hidden min-w-0 flex-col md:flex">
+                      <span className="truncate text-sm font-bold text-white">
+                        {availableBalanceLabel}
+                      </span>
+                      <span className="mt-0.5 truncate text-xs text-zinc-500">
+                        Холд: {holdBalanceLabel}
+                      </span>
+                    </div>
+                    <span className="hidden h-8 w-px bg-white/10 lg:block" />
+                    <UserAvatar
+                      src={user?.image ?? session?.user?.image ?? null}
+                      name={displayName}
+                      email={user?.email ?? session?.user?.email ?? null}
+                      className="h-10 w-10 shrink-0 rounded-[0.8rem] border-0 bg-zinc-800/80"
+                    />
+                    <div className="hidden min-w-0 flex-col lg:flex">
+                      <span className="truncate text-sm font-semibold text-white">
                         {displayName}
-                      </p>
-                      <p className="truncate text-xs text-zinc-500">
-                        {user?.email ?? session?.user?.email ?? ""}
-                      </p>
+                      </span>
+                      <span className="truncate text-xs text-zinc-500">
+                        Профиль
+                      </span>
                     </div>
-                    <DropdownMenuSeparator className="my-1 h-px bg-white/10" />
-                    <DropdownMenuItem asChild>
-                      <Link href="/profile">Мой профиль</Link>
-                    </DropdownMenuItem>
-                    <DropdownMenuItem asChild>
-                      <Link href="/profile/settings">Настройки профиля</Link>
-                    </DropdownMenuItem>
-                    <DropdownMenuSeparator className="my-1 h-px bg-white/10" />
-                    <div className="px-2 py-2">
-                      <NotificationsBell mode="panel" />
-                    </div>
-                    <DropdownMenuSeparator className="my-1 h-px bg-white/10" />
-                    <DropdownMenuItem
-                      onSelect={(event) => {
-                        event.preventDefault();
-                        void signOut({ callbackUrl: "/" });
-                      }}
-                      className="text-rose-200 focus:bg-rose-500/10 focus:text-rose-100"
+                    <svg
+                      aria-hidden="true"
+                      viewBox="0 0 24 24"
+                      className="h-4 w-4 shrink-0 text-zinc-500"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth="1.8"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
                     >
-                      Выйти
-                    </DropdownMenuItem>
-                  </DropdownMenuContent>
-                </DropdownMenu>
+                      <path d="m6 9 6 6 6-6" />
+                    </svg>
+                  </button>,
+                  "z-50 w-64",
+                )}
 
-                <div className="hidden w-[92px] shrink-0 md:flex">
+                <div className="hidden w-[92px] shrink-0 items-center md:flex">
                   <Select
                     aria-label="Выбор валюты"
                     value={currency}
@@ -515,7 +591,7 @@ export function SiteHeader() {
                 <Link
                   href="/chats"
                   aria-label="Открыть диалоги"
-                  className="relative inline-flex h-10 w-10 items-center justify-center rounded-xl border border-white/10 bg-white/5 text-lg text-zinc-100 shadow-[0_12px_28px_rgba(0,0,0,0.22)] transition hover:bg-white/10"
+                  className="relative inline-flex h-9 w-9 items-center justify-center rounded-md border border-white/10 bg-white/5 text-lg text-zinc-100 shadow-[0_12px_28px_rgba(0,0,0,0.22)] transition hover:bg-white/10 md:h-10 md:w-10 md:rounded-xl"
                 >
                   <span aria-hidden="true">💬</span>
                 </Link>
@@ -528,16 +604,17 @@ export function SiteHeader() {
                   <>
                     <Link
                       href="/sell"
-                      className="sell-link inline-flex h-10 w-10 items-center justify-center rounded-xl bg-orange-600 px-0 text-sm font-semibold text-white shadow-[0_16px_40px_rgba(249,115,22,0.28)] transition hover:-translate-y-0.5 hover:bg-orange-500 sm:w-auto sm:px-4"
+                      className="sell-link inline-flex h-9 w-9 items-center justify-center rounded-md bg-orange-600 text-white shadow-[0_16px_40px_rgba(249,115,22,0.28)] transition hover:-translate-y-0.5 hover:bg-orange-500 md:h-10 md:w-auto md:px-4 md:rounded-xl"
+                      aria-label="Продать"
                     >
-                      <span className="sm:hidden" aria-hidden="true">+</span>
-                      <span className="hidden sm:inline">Продать</span>
+                      <span className="md:hidden" aria-hidden="true">+</span>
+                      <span className="hidden md:inline">Продать</span>
                     </Link>
 
-                    {isAdminRole(session?.user?.role) ? (
+                    {isAdminRole(user?.role) ? (
                       <Link
                         href="/admin"
-                        className="inline-flex h-10 items-center justify-center rounded-xl border border-sky-400/20 bg-sky-500/10 px-4 text-sm font-semibold text-sky-100 shadow-[0_16px_40px_rgba(2,132,199,0.16)] transition hover:-translate-y-0.5 hover:bg-sky-500/20"
+                        className="inline-flex h-10 items-center justify-center rounded-xl border border-white/10 bg-white/5 px-4 text-sm font-semibold text-zinc-100 shadow-[0_12px_28px_rgba(0,0,0,0.22)] transition hover:bg-white/10"
                       >
                         Админ-панель
                       </Link>
