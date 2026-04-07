@@ -37,6 +37,7 @@ import {
   isAdminRole,
 } from "@/lib/access-control";
 import { getAuthSession } from "@/lib/auth";
+import { formatCurrency } from "@/lib/formatters";
 import { prisma } from "@/lib/prisma";
 import { isSuperAdminRole } from "@/lib/roles";
 import { getWithdrawalStatusMeta } from "@/lib/withdrawals";
@@ -512,13 +513,13 @@ export default async function AdminDashboardPage() {
                                 <p>
                                   <span className="text-zinc-500">Доступно:</span>{" "}
                                   <span className="font-semibold text-white">
-                                    {formatAmount(user.availableBalance)} USDT
+                                    {formatCurrency(Number(user.availableBalance))} USDT
                                   </span>
                                 </p>
                                 <p>
                                   <span className="text-zinc-500">Холд:</span>{" "}
                                   <span className="font-semibold text-white">
-                                    {formatAmount(user.holdBalance)} USDT
+                                    {formatCurrency(Number(user.holdBalance))} USDT
                                   </span>
                                 </p>
                               </div>

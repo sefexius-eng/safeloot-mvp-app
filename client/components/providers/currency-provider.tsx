@@ -2,6 +2,8 @@
 
 import { createContext, useContext, useEffect, useState } from "react";
 
+import { formatCurrency } from "@/lib/formatters";
+
 export type CurrencyCode = "USD" | "RUB" | "UAH" | "EUR" | "KZT" | "PLN";
 
 interface CurrencyDefinition {
@@ -14,6 +16,7 @@ interface CurrencyContextValue {
   currency: CurrencyCode;
   setCurrency: (currency: CurrencyCode) => void;
   formatPrice: (basePriceInUsd: string | number) => string;
+  formatBalance: (basePriceInUsd: string | number) => string;
   currencies: CurrencyDefinition[];
   currentRate: number;
   currencySymbol: string;
@@ -49,15 +52,43 @@ function attachCurrencySymbol(currency: CurrencyDefinition, formattedValue: stri
   return `${formattedValue} ${currency.symbol}`;
 }
 
-function formatCurrencyValue(currency: CurrencyCode, basePriceInUsd: string | number) {
+function formatFixedCurrencyValue(amount: number) {
+  return new Intl.NumberFormat("en-US", {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  })
+    .format(Number(formatCurrency(amount)))
+    .replace(/,/g, " ");
+}
+
+function formatCurrencyValue(
+  currency: CurrencyCode,
+  basePriceInUsd: string | number,
+  options?: {
+    clampNegative?: boolean;
+    forceTwoDecimals?: boolean;
+  },
+) {
   const numericPrice = Number(basePriceInUsd);
   const currentCurrency = getCurrencyDefinition(currency);
 
   if (!Number.isFinite(numericPrice)) {
-    return attachCurrencySymbol(currentCurrency, "0");
+    return attachCurrencySymbol(
+      currentCurrency,
+      options?.forceTwoDecimals ? formatCurrency(0) : "0",
+    );
   }
 
-  const convertedValue = numericPrice * currentCurrency.rate;
+  const safePrice = options?.clampNegative ? Math.max(0, numericPrice) : numericPrice;
+  const convertedValue = safePrice * currentCurrency.rate;
+
+  if (options?.forceTwoDecimals) {
+    return attachCurrencySymbol(
+      currentCurrency,
+      formatFixedCurrencyValue(convertedValue),
+    );
+  }
+
   const roundedValue = Math.round((convertedValue + Number.EPSILON) * 100) / 100;
   const hasFraction = Math.abs(roundedValue % 1) > Number.EPSILON;
   const localizedValue = new Intl.NumberFormat("en-US", {
@@ -98,6 +129,13 @@ export function CurrencyProvider({ children }: { children: React.ReactNode }) {
     return formatCurrencyValue(currency, basePriceInUsd);
   }
 
+  function formatBalance(basePriceInUsd: string | number) {
+    return formatCurrencyValue(currency, basePriceInUsd, {
+      clampNegative: true,
+      forceTwoDecimals: true,
+    });
+  }
+
   const currentCurrencyDefinition = getCurrencyDefinition(currency);
 
   return (
@@ -106,6 +144,7 @@ export function CurrencyProvider({ children }: { children: React.ReactNode }) {
         currency,
         setCurrency: handleSetCurrency,
         formatPrice,
+        formatBalance,
         currencies: CURRENCIES,
         currentRate: currentCurrencyDefinition.rate,
         currencySymbol: currentCurrencyDefinition.symbol,

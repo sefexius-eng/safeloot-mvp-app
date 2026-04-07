@@ -7,6 +7,7 @@ import {
   type ProfileTabsReview,
 } from "@/components/profile-tabs";
 import { getAuthSession } from "@/lib/auth";
+import { formatCurrency } from "@/lib/formatters";
 import { prisma } from "@/lib/prisma";
 import { getSellerReviewSummaryBySellerId } from "@/lib/review-summary";
 import { mapWithdrawalListItem } from "@/lib/withdrawals";
@@ -245,7 +246,7 @@ export default async function ProfilePage() {
 
       <ProfilePageClient
         isAuthenticated={Boolean(sellerId)}
-        availableBalance={sellerProfile?.availableBalance.toFixed(2) ?? "0"}
+        availableBalance={formatCurrency(Number(sellerProfile?.availableBalance ?? 0))}
         withdrawals={withdrawals.map(mapWithdrawalListItem)}
       />
 

@@ -5,6 +5,7 @@ import { BannedModal } from "@/components/banned-modal";
 import { SiteHeader } from "@/components/layout/site-header";
 import { AuthSessionProvider } from "@/components/providers/session-provider";
 import { getAuthSession } from "@/lib/auth";
+import { getSiteUrl } from "@/lib/site-url";
 import "./globals.css";
 
 const geistSans = Geist({
@@ -18,6 +19,7 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
+  metadataBase: new URL(getSiteUrl()),
   title: "SafeLoot Market",
   description: "Маркетплейс игровых товаров с безопасной сделкой и escrow.",
 };

@@ -26,7 +26,7 @@ interface CurrentUser {
 
 export function ProfileDashboard() {
   const { status } = useSession();
-  const { formatPrice } = useCurrency();
+  const { formatBalance } = useCurrency();
   const [user, setUser] = useState<CurrentUser | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [errorMessage, setErrorMessage] = useState("");
@@ -216,7 +216,7 @@ export function ProfileDashboard() {
             Доступно к выводу
           </p>
           <p className="mt-4 text-4xl font-semibold tracking-tight text-white md:text-5xl">
-            {formatPrice(user.availableBalance)}
+            {formatBalance(user.availableBalance)}
           </p>
           <p className="mt-3 text-sm leading-7 text-zinc-300">
             Баланс, который продавец может использовать после вывода из внутренней системы.
@@ -228,7 +228,7 @@ export function ProfileDashboard() {
             В холде (Escrow)
           </p>
           <p className="mt-4 text-4xl font-semibold tracking-tight text-white md:text-5xl">
-            {formatPrice(user.holdBalance)}
+            {formatBalance(user.holdBalance)}
           </p>
           <p className="mt-3 text-sm leading-7 text-zinc-300">
             Средства по завершенным сделкам, зафиксированные во внутреннем escrow-балансе.

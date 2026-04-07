@@ -1,4 +1,5 @@
 import Link from "next/link";
+import type { Metadata } from "next";
 
 import { getOrCreateConversation } from "@/app/actions/chat";
 import CensoredText from "@/components/censored-text";
@@ -8,8 +9,11 @@ import { UserAvatar } from "@/components/ui/user-avatar";
 import { FormattedPrice } from "@/components/ui/formatted-price";
 import { getCurrentSessionUser } from "@/lib/access-control";
 import { getAuthSession } from "@/lib/auth";
+import { formatCurrency } from "@/lib/formatters";
 import { getProductById } from "@/lib/marketplace";
+import { prisma } from "@/lib/prisma";
 import type { SellerReviewSummary } from "@/lib/review-summary";
+import { getSiteUrl } from "@/lib/site-url";
 
 type SellerRank = "BRONZE" | "SILVER" | "GOLD";
 
@@ -17,6 +21,22 @@ interface ProductPageProps {
   params: Promise<{
     id: string;
   }>;
+}
+
+const DEFAULT_OG_IMAGE_PATH = "/opengraph-image";
+
+function resolveMetadataImageUrl(imageUrl?: string | null) {
+  const siteUrl = getSiteUrl();
+
+  if (!imageUrl?.trim()) {
+    return new URL(DEFAULT_OG_IMAGE_PATH, siteUrl).toString();
+  }
+
+  try {
+    return new URL(imageUrl).toString();
+  } catch {
+    return new URL(imageUrl.startsWith("/") ? imageUrl : `/${imageUrl}`, siteUrl).toString();
+  }
 }
 
 interface ProductDetail {
@@ -96,6 +116,67 @@ function getGalleryGridClassName(imageCount: number) {
   }
 
   return "grid-cols-1 md:grid-cols-2 xl:grid-cols-3";
+}
+
+export async function generateMetadata({ params }: ProductPageProps): Promise<Metadata> {
+  const { id } = await params;
+  const product = await prisma.product.findUnique({
+    where: {
+      id,
+    },
+    select: {
+      title: true,
+      images: true,
+      price: true,
+      seller: {
+        select: {
+          name: true,
+        },
+      },
+      game: {
+        select: {
+          name: true,
+        },
+      },
+    },
+  });
+
+  if (!product) {
+    return {
+      title: "Товар не найден | SafeLoot",
+      description: "Карточка товара недоступна или была удалена с SafeLoot.",
+    };
+  }
+
+  const sellerName = product.seller.name?.trim() || "Проверенный продавец";
+  const productTitle = product.title.trim() || "Товар";
+  const gameName = product.game.name.trim() || "игры";
+  const formattedPrice = formatCurrency(Number(product.price));
+  const imageUrl = resolveMetadataImageUrl(product.images[0]);
+
+  return {
+    title: `${productTitle} | SafeLoot`,
+    description: `Купить ${productTitle} для игры ${gameName}. Продавец: ${sellerName}. Цена: ${formattedPrice} USDT. Безопасная сделка на SafeLoot.`,
+    openGraph: {
+      title: `${productTitle} - ${formattedPrice} USDT`,
+      description: `Безопасная покупка на SafeLoot. Продавец: ${sellerName}.`,
+      images: [
+        {
+          url: imageUrl,
+          width: 1200,
+          height: 630,
+          alt: productTitle,
+        },
+      ],
+      type: "website",
+    },
+    twitter: {
+      card: "summary_large_image",
+      title: `${productTitle} - ${formattedPrice} USDT`,
+      description: "Безопасная покупка на SafeLoot.",
+      images: [imageUrl],
+    },
+  };
 }
 
 export default async function ProductPage({ params }: ProductPageProps) {

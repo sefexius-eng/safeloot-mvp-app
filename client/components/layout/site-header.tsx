@@ -61,7 +61,7 @@ function HeaderAuthSkeleton() {
 export function SiteHeader() {
   const router = useRouter();
   const { data: session, status } = useSession();
-  const { currencies, currency, setCurrency, formatPrice } = useCurrency();
+  const { currencies, currency, setCurrency, formatBalance } = useCurrency();
   const [user, setUser] = useState<CurrentUser | null>(null);
   const [refreshToken, setRefreshToken] = useState(0);
   const [query, setQuery] = useState("");
@@ -243,8 +243,8 @@ export function SiteHeader() {
     session?.user?.name?.trim() ||
     session?.user?.email?.split("@")[0] ||
     "Профиль";
-  const availableBalanceLabel = formatPrice(user?.availableBalance ?? "0");
-  const holdBalanceLabel = formatPrice(user?.holdBalance ?? "0");
+  const availableBalanceLabel = formatBalance(user?.availableBalance ?? "0");
+  const holdBalanceLabel = formatBalance(user?.holdBalance ?? "0");
 
   return (
     <header className="sticky top-0 z-50 border-b border-white/10 bg-[rgba(9,9,11,0.78)] backdrop-blur-xl">

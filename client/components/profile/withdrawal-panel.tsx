@@ -52,6 +52,7 @@ export function WithdrawalPanel({
     currency,
     currentRate: exchangeRate,
     currencySymbol,
+    formatBalance,
     formatPrice,
   } = useCurrency();
   const [internalIsModalOpen, setInternalIsModalOpen] = useState(false);
@@ -103,7 +104,7 @@ export function WithdrawalPanel({
 
     if (exceedsBalance) {
       setErrorMessage(
-        `Сумма вывода не должна превышать доступный баланс: ${formatPrice(availableBalance)}.`,
+        `Сумма вывода не должна превышать доступный баланс: ${formatBalance(availableBalance)}.`,
       );
       return;
     }
@@ -197,7 +198,7 @@ export function WithdrawalPanel({
           <DialogHeader>
             <DialogTitle>Новая заявка на вывод</DialogTitle>
             <DialogDescription>
-              Доступно к выводу: {formatPrice(availableBalance)}.
+              Доступно к выводу: {formatBalance(availableBalance)}.
             </DialogDescription>
           </DialogHeader>
 
@@ -219,7 +220,7 @@ export function WithdrawalPanel({
                 disabled={isPending}
               />
               <p className="mt-2 text-xs text-zinc-500">
-                Максимум по балансу: {formatPrice(availableBalance)}
+                Максимум по балансу: {formatBalance(availableBalance)}
               </p>
             </div>
 
@@ -257,7 +258,7 @@ export function WithdrawalPanel({
 
             {exceedsBalance ? (
               <div className="rounded-[1.25rem] border border-red-500/15 bg-red-500/10 p-4 text-sm leading-7 text-red-200">
-                Сумма вывода не должна превышать доступный баланс: {formatPrice(availableBalance)}.
+                Сумма вывода не должна превышать доступный баланс: {formatBalance(availableBalance)}.
               </div>
             ) : null}
 
