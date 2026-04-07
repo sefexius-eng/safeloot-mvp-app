@@ -11,7 +11,6 @@ export interface ChatSidebarConversation {
   updatedAt: string;
   otherParty: {
     id: string;
-    email: string;
     name: string | null;
     image: string | null;
   };
@@ -62,7 +61,7 @@ export function ChatSidebar({ conversations }: ChatSidebarProps) {
         ) : (
           conversations.map((chat) => {
             const isActive = pathname.includes(chat.id);
-            const displayName = chat.otherParty.name?.trim() || chat.otherParty.email;
+            const displayName = chat.otherParty.name?.trim() || "Пользователь";
             const messagePreview = chat.lastMessage
               ? chat.lastMessage.text ||
                 (chat.lastMessage.hasImage ? "[Скриншот]" : "Новое сообщение")
@@ -80,7 +79,6 @@ export function ChatSidebar({ conversations }: ChatSidebarProps) {
                 <UserAvatar
                   src={chat.otherParty.image}
                   name={displayName}
-                  email={chat.otherParty.email}
                   className="h-12 w-12 shrink-0 border-gray-700 bg-zinc-800/80"
                   imageClassName="rounded-full object-cover"
                 />

@@ -44,7 +44,6 @@ const ACCEPTED_CHAT_IMAGE_TYPES = new Set([
 
 interface ChatUserIdentity {
   id: string;
-  email: string;
   name: string | null;
   image: string | null;
 }
@@ -106,7 +105,7 @@ interface ChatResponse {
 interface TypingUser {
   senderId: string;
   role: "BUYER" | "SELLER";
-  email: string;
+  name: string | null;
 }
 
 interface ChatTypingResponse {
@@ -217,8 +216,11 @@ function formatReviewTime(value: string) {
   }).format(new Date(value));
 }
 
-function getUserDisplayName(user: { name?: string | null; email: string }) {
-  return user.name?.trim() || user.email.split("@")[0] || "Пользователь";
+function getUserDisplayName(
+  user: { name?: string | null },
+  fallbackLabel = "Пользователь",
+) {
+  return user.name?.trim() || fallbackLabel;
 }
 
 function isUserOnline(lastSeen?: string | null) {
@@ -1102,22 +1104,29 @@ export function ActiveOrderView({ orderId }: ActiveOrderViewProps) {
       ? "Покупатель"
       : null;
   const interlocutorDisplayName = interlocutor
-    ? getUserDisplayName(interlocutor)
+    ? getUserDisplayName(interlocutor, interlocutorRole ?? "Собеседник")
     : "";
   const interlocutorIsOnline = interlocutor
     ? isUserOnline(interlocutor.lastSeen)
     : false;
   const emptyStateTargetLabel = interlocutorRole?.toLowerCase() ?? "участнику сделки";
   const currentUserDisplayName = currentParticipant
-    ? getUserDisplayName(currentParticipant)
+    ? getUserDisplayName(currentParticipant, currentUserDealRole)
     : session?.user?.name?.trim() || "Вы";
   const remoteTypingUser = remoteTypingUsers[0] ?? null;
   const typingParticipant = remoteTypingUser
     ? getOrderParticipantById(order, remoteTypingUser.senderId)
     : null;
   const typingDisplayName = typingParticipant
-    ? getUserDisplayName(typingParticipant)
-    : "Собеседник";
+    ? getUserDisplayName(
+        typingParticipant,
+        remoteTypingUser?.role === "SELLER" ? "Продавец" : "Покупатель",
+      )
+    : remoteTypingUser
+      ? remoteTypingUser.role === "SELLER"
+        ? "Продавец"
+        : "Покупатель"
+      : "Собеседник";
   const isRemoteTyping = remoteTypingUsers.length > 0;
   const isSpectator =
     isAdminRole(currentUserAccountRole as Role) &&
@@ -1161,7 +1170,6 @@ export function ActiveOrderView({ orderId }: ActiveOrderViewProps) {
                 <UserAvatar
                   src={interlocutor.image}
                   name={interlocutorDisplayName}
-                  email={interlocutor.email}
                   className="h-10 w-10 shrink-0 border-white/10 bg-zinc-800/80"
                   imageClassName="rounded-full object-cover"
                 />
@@ -1224,8 +1232,7 @@ export function ActiveOrderView({ orderId }: ActiveOrderViewProps) {
                   >
                     <UserAvatar
                       src={participant.image}
-                      name={getUserDisplayName(participant)}
-                      email={participant.email}
+                      name={getUserDisplayName(participant, role)}
                       className="h-10 w-10 shrink-0 border-white/10 bg-zinc-800/80"
                       imageClassName="rounded-full object-cover"
                     />
@@ -1235,7 +1242,7 @@ export function ActiveOrderView({ orderId }: ActiveOrderViewProps) {
                       </p>
                       <div className="flex min-w-0 items-center gap-2 text-sm font-semibold text-white">
                         <p className="truncate">
-                          <CensoredText text={getUserDisplayName(participant)} />
+                          <CensoredText text={getUserDisplayName(participant, role)} />
                         </p>
                         <TeamBadge role={participant.role} />
                       </div>
@@ -1276,16 +1283,16 @@ export function ActiveOrderView({ orderId }: ActiveOrderViewProps) {
               const isOwnMessage = message.senderId === currentUserId;
               const isSellerMessage = message.senderId === order.sellerId;
               const author = resolveMessageAuthor(order, message);
-              const authorLabel = isOwnMessage ? "Вы" : getUserDisplayName(author);
+              const authorFallbackLabel = isSellerMessage ? "Продавец" : "Покупатель";
+              const authorLabel = isOwnMessage
+                ? "Вы"
+                : getUserDisplayName(author, authorFallbackLabel);
               const authorAvatar = isOwnMessage
                 ? currentParticipant?.image ?? session?.user?.image ?? author.image
                 : author.image;
               const authorName = isOwnMessage
                 ? currentUserDisplayName
-                : getUserDisplayName(author);
-              const authorEmail = isOwnMessage
-                ? currentParticipant?.email ?? session?.user?.email ?? author.email
-                : author.email;
+                : getUserDisplayName(author, authorFallbackLabel);
 
               return (
                 <div
@@ -1298,7 +1305,6 @@ export function ActiveOrderView({ orderId }: ActiveOrderViewProps) {
                     <UserAvatar
                       src={authorAvatar}
                       name={authorName}
-                      email={authorEmail}
                       className={[
                         "h-8 w-8 shrink-0 border-white/10",
                         isOwnMessage
@@ -1381,7 +1387,6 @@ export function ActiveOrderView({ orderId }: ActiveOrderViewProps) {
                     <UserAvatar
                       src={typingParticipant.image}
                       name={typingDisplayName}
-                      email={typingParticipant.email}
                       className="h-8 w-8 shrink-0 border-sky-500/20 bg-sky-500/10 text-sky-200"
                       imageClassName="rounded-full object-cover"
                     />

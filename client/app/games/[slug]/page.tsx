@@ -134,7 +134,6 @@ async function getGameCatalog(
       seller: {
         select: {
           id: true,
-          email: true,
           name: true,
           image: true,
           lastSeen: true,
@@ -155,7 +154,7 @@ async function getGameCatalog(
     activeCategorySlug: activeCategory?.slug ?? null,
     products: products.map((product) => ({
       ...product,
-      price: product.price.toFixed(8),
+      price: product.price.toFixed(2),
       seller: {
         ...product.seller,
         lastSeen: product.seller.lastSeen.toISOString(),

@@ -176,7 +176,7 @@ export default async function ProfilePage() {
             id: product.id,
             title: product.title,
             description: product.description,
-            price: product.price.toFixed(8),
+            price: product.price.toFixed(2),
             isActive: product.isActive,
             sellerId: product.sellerId,
             createdAt: product.createdAt.toISOString(),
@@ -245,7 +245,7 @@ export default async function ProfilePage() {
 
       <ProfilePageClient
         isAuthenticated={Boolean(sellerId)}
-        availableBalance={sellerProfile?.availableBalance.toFixed(8) ?? "0"}
+        availableBalance={sellerProfile?.availableBalance.toFixed(2) ?? "0"}
         withdrawals={withdrawals.map(mapWithdrawalListItem)}
       />
 

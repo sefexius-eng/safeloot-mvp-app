@@ -102,7 +102,6 @@ async function getPublicSellerProfile(id: string) {
     },
     select: {
       id: true,
-      email: true,
       name: true,
       image: true,
       lastSeen: true,
@@ -162,7 +161,6 @@ async function getPublicSellerProfile(id: string) {
           author: {
             select: {
               id: true,
-              email: true,
               name: true,
               image: true,
             },
@@ -201,10 +199,9 @@ async function getPublicSellerProfile(id: string) {
     (product) =>
       ({
         ...product,
-        price: product.price.toFixed(8),
+        price: product.price.toFixed(2),
         seller: {
           id: seller.id,
-          email: seller.email,
           name: seller.name,
           image: seller.image,
           lastSeen: seller.lastSeen.toISOString(),
@@ -232,7 +229,7 @@ export default async function PublicUserPage({ params }: PublicUserPageProps) {
     notFound();
   }
 
-  const displayName = seller.name?.trim() || seller.email.split("@")[0];
+  const displayName = seller.name?.trim() || "Продавец";
   const sellerIsOnline = isSellerOnline(seller.lastSeen);
 
   return (
@@ -244,7 +241,6 @@ export default async function PublicUserPage({ params }: PublicUserPageProps) {
               <UserAvatar
                 src={seller.image}
                 name={displayName}
-                email={seller.email}
                 className="h-24 w-24 shrink-0 border-white/10 bg-zinc-900/80 text-2xl"
                 imageClassName="rounded-full object-cover"
               />
@@ -272,8 +268,6 @@ export default async function PublicUserPage({ params }: PublicUserPageProps) {
                 </span>
                 <TeamBadge role={seller.role} className="md:text-[11px]" />
               </h1>
-              <p className="mt-2 truncate text-sm text-zinc-400">{seller.email}</p>
-
               <div className="mt-4 flex flex-wrap items-center gap-3 text-sm">
                 <span
                   className={`inline-flex rounded-full border px-3 py-1.5 font-medium ${getRankClassName(seller.rank)}`}
@@ -368,7 +362,7 @@ export default async function PublicUserPage({ params }: PublicUserPageProps) {
         ) : (
           <div className="space-y-4">
             {seller.reviewsReceived.map((review) => {
-              const authorName = review.author.name?.trim() || review.author.email;
+              const authorName = review.author.name?.trim() || "Покупатель";
 
               return (
                 <article
@@ -380,7 +374,6 @@ export default async function PublicUserPage({ params }: PublicUserPageProps) {
                       <UserAvatar
                         src={review.author.image}
                         name={authorName}
-                        email={review.author.email}
                         className="h-12 w-12 shrink-0 border-white/10 bg-zinc-900/80"
                         imageClassName="rounded-full object-cover"
                       />

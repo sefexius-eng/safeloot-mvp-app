@@ -373,32 +373,99 @@ export function SiteHeader() {
             <div className="flex flex-wrap items-center gap-2 lg:justify-self-end">
               {status === "authenticated" ? (
               <>
-                <div className="inline-flex items-center gap-3 rounded-2xl border border-white/10 bg-white/5 px-3 py-2 text-zinc-300 shadow-[0_12px_28px_rgba(0,0,0,0.22)]">
-                  <span className="flex h-9 w-9 items-center justify-center rounded-xl border border-white/10 bg-white/5 text-zinc-200">
-                    <svg
-                      aria-hidden="true"
-                      viewBox="0 0 24 24"
-                      className="h-4 w-4"
-                      fill="none"
-                      stroke="currentColor"
-                      strokeWidth="1.8"
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <button
+                      type="button"
+                      aria-label="Меню профиля"
+                      className="inline-flex min-w-0 max-w-full items-center gap-3 rounded-2xl border border-white/10 bg-white/5 px-3 py-2 text-left text-zinc-300 shadow-[0_12px_28px_rgba(0,0,0,0.22)] transition hover:bg-white/10"
                     >
-                      <path d="M3 7.5A2.5 2.5 0 0 1 5.5 5h10A2.5 2.5 0 0 1 18 7.5V8h1.5A1.5 1.5 0 0 1 21 9.5v7a1.5 1.5 0 0 1-1.5 1.5H18v.5a2.5 2.5 0 0 1-2.5 2.5h-10A2.5 2.5 0 0 1 3 18.5z" />
-                      <path d="M18 8v10" />
-                      <circle cx="16" cy="13" r="1" />
-                    </svg>
-                  </span>
-                  <div className="flex min-w-0 flex-col">
-                    <span className="truncate text-sm font-bold text-white">
-                      {availableBalanceLabel}
-                    </span>
-                    <span className="mt-0.5 truncate text-xs text-zinc-500">
-                      Холд: {holdBalanceLabel}
-                    </span>
-                  </div>
-                </div>
+                      <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border border-white/10 bg-white/5 text-zinc-200">
+                        <svg
+                          aria-hidden="true"
+                          viewBox="0 0 24 24"
+                          className="h-4 w-4"
+                          fill="none"
+                          stroke="currentColor"
+                          strokeWidth="1.8"
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                        >
+                          <path d="M3 7.5A2.5 2.5 0 0 1 5.5 5h10A2.5 2.5 0 0 1 18 7.5V8h1.5A1.5 1.5 0 0 1 21 9.5v7a1.5 1.5 0 0 1-1.5 1.5H18v.5a2.5 2.5 0 0 1-2.5 2.5h-10A2.5 2.5 0 0 1 3 18.5z" />
+                          <path d="M18 8v10" />
+                          <circle cx="16" cy="13" r="1" />
+                        </svg>
+                      </span>
+                      <div className="flex min-w-0 flex-col">
+                        <span className="truncate text-sm font-bold text-white">
+                          {availableBalanceLabel}
+                        </span>
+                        <span className="mt-0.5 truncate text-xs text-zinc-500">
+                          Холд: {holdBalanceLabel}
+                        </span>
+                      </div>
+                      <span className="hidden h-8 w-px bg-white/10 sm:block" />
+                      <UserAvatar
+                        src={user?.image ?? session?.user?.image ?? null}
+                        name={displayName}
+                        email={user?.email ?? session?.user?.email ?? null}
+                        className="h-10 w-10 shrink-0 rounded-[0.8rem] border-0 bg-zinc-800/80"
+                      />
+                      <div className="hidden min-w-0 flex-col sm:flex">
+                        <span className="truncate text-sm font-semibold text-white">
+                          {displayName}
+                        </span>
+                        <span className="truncate text-xs text-zinc-500">
+                          Профиль
+                        </span>
+                      </div>
+                      <svg
+                        aria-hidden="true"
+                        viewBox="0 0 24 24"
+                        className="h-4 w-4 shrink-0 text-zinc-500"
+                        fill="none"
+                        stroke="currentColor"
+                        strokeWidth="1.8"
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                      >
+                        <path d="m6 9 6 6 6-6" />
+                      </svg>
+                    </button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent className="w-64">
+                    <DropdownMenuLabel>Аккаунт</DropdownMenuLabel>
+                    <div className="px-3 pb-2">
+                      <p className="truncate text-sm font-semibold text-white">
+                        {displayName}
+                      </p>
+                      <p className="truncate text-xs text-zinc-500">
+                        {user?.email ?? session?.user?.email ?? ""}
+                      </p>
+                    </div>
+                    <DropdownMenuSeparator className="my-1 h-px bg-white/10" />
+                    <DropdownMenuItem asChild>
+                      <Link href="/profile">Мой профиль</Link>
+                    </DropdownMenuItem>
+                    <DropdownMenuItem asChild>
+                      <Link href="/profile/settings">Настройки профиля</Link>
+                    </DropdownMenuItem>
+                    <DropdownMenuSeparator className="my-1 h-px bg-white/10" />
+                    <div className="px-2 py-2">
+                      <NotificationsBell mode="panel" />
+                    </div>
+                    <DropdownMenuSeparator className="my-1 h-px bg-white/10" />
+                    <DropdownMenuItem
+                      onSelect={(event) => {
+                        event.preventDefault();
+                        void signOut({ callbackUrl: "/" });
+                      }}
+                      className="text-rose-200 focus:bg-rose-500/10 focus:text-rose-100"
+                    >
+                      Выйти
+                    </DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
 
                 <div className="w-[92px] shrink-0">
                   <Select
@@ -447,54 +514,6 @@ export function SiteHeader() {
                   </>
                 )}
 
-                <DropdownMenu>
-                  <DropdownMenuTrigger asChild>
-                    <button
-                      type="button"
-                      aria-label="Меню профиля"
-                      className="inline-flex h-10 w-10 items-center justify-center rounded-xl border border-white/10 bg-white/5 p-0.5 shadow-[0_12px_28px_rgba(0,0,0,0.22)] transition hover:bg-white/10"
-                    >
-                      <UserAvatar
-                        src={user?.image ?? session?.user?.image ?? null}
-                        name={displayName}
-                        email={user?.email ?? session?.user?.email ?? null}
-                        className="h-full w-full rounded-[0.8rem] border-0 bg-zinc-800/80"
-                      />
-                    </button>
-                  </DropdownMenuTrigger>
-                  <DropdownMenuContent className="w-64">
-                    <DropdownMenuLabel>Аккаунт</DropdownMenuLabel>
-                    <div className="px-3 pb-2">
-                      <p className="truncate text-sm font-semibold text-white">
-                        {displayName}
-                      </p>
-                      <p className="truncate text-xs text-zinc-500">
-                        {user?.email ?? session?.user?.email ?? ""}
-                      </p>
-                    </div>
-                    <DropdownMenuSeparator className="my-1 h-px bg-white/10" />
-                    <DropdownMenuItem asChild>
-                      <Link href="/profile">Мой профиль</Link>
-                    </DropdownMenuItem>
-                    <DropdownMenuItem asChild>
-                      <Link href="/profile/settings">Настройки профиля</Link>
-                    </DropdownMenuItem>
-                    <DropdownMenuSeparator className="my-1 h-px bg-white/10" />
-                    <div className="px-2 py-2">
-                      <NotificationsBell mode="panel" />
-                    </div>
-                    <DropdownMenuSeparator className="my-1 h-px bg-white/10" />
-                    <DropdownMenuItem
-                      onSelect={(event) => {
-                        event.preventDefault();
-                        void signOut({ callbackUrl: "/" });
-                      }}
-                      className="text-rose-200 focus:bg-rose-500/10 focus:text-rose-100"
-                    >
-                      Выйти
-                    </DropdownMenuItem>
-                  </DropdownMenuContent>
-                </DropdownMenu>
               </>
               ) : status === "unauthenticated" ? (
               <>

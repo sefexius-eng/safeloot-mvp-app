@@ -44,7 +44,7 @@ function formatEditablePrice(value: number) {
     return "";
   }
 
-  return value.toFixed(8).replace(/\.0+$|0+$/g, "").replace(/\.$/, "");
+  return value.toFixed(2).replace(/\.0+$|0+$/g, "").replace(/\.$/, "");
 }
 
 export function EditProductForm({ product, games }: EditProductFormProps) {
@@ -68,8 +68,8 @@ export function EditProductForm({ product, games }: EditProductFormProps) {
   const localPriceValue = Number(formState.price);
   const previewBasePrice =
     Number.isFinite(localPriceValue) && localPriceValue > 0 && currentRate > 0
-      ? Math.round(((localPriceValue / currentRate) + Number.EPSILON) * 100000000) /
-        100000000
+      ? Math.round(((localPriceValue / currentRate) + Number.EPSILON) * 100) /
+        100
       : 0;
 
   useEffect(() => {

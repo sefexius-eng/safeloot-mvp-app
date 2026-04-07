@@ -39,7 +39,6 @@ interface ProductDetail {
   };
   seller: {
     id: string;
-    email: string;
     name: string | null;
     image: string | null;
     rank: SellerRank;
@@ -133,7 +132,7 @@ export default async function ProductPage({ params }: ProductPageProps) {
     );
   }
 
-  const sellerName = product.seller.name?.trim() || product.seller.email;
+  const sellerName = product.seller.name?.trim() || "Продавец";
   const rankStyle = rankStyles[product.seller.rank];
   const categoryLabel = product.category.name;
   const canStartConversation = currentUser?.id !== product.seller.id;
@@ -233,14 +232,12 @@ export default async function ProductPage({ params }: ProductPageProps) {
                     <UserAvatar
                       src={product.seller.image}
                       name={sellerName}
-                      email={product.seller.email}
                       className="h-12 w-12 shrink-0"
                     />
                     <div className="min-w-0 flex-1">
                       <p className="truncate text-xl font-semibold text-white transition group-hover:text-orange-200 group-hover:underline">
                         <CensoredText text={sellerName} />
                       </p>
-                      <p className="mt-1 truncate text-sm text-zinc-400">{product.seller.email}</p>
                       <SellerRatingBadge
                         summary={product.seller.reviewSummary}
                         className="mt-3"

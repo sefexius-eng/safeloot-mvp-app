@@ -32,7 +32,6 @@ interface ConversationMessage {
   updatedAt: string;
   sender: {
     id: string;
-    email: string;
     name?: string | null;
     image?: string | null;
   };
@@ -41,7 +40,7 @@ interface ConversationMessage {
 interface TypingUser {
   senderId: string;
   role: "BUYER" | "SELLER";
-  email: string;
+  name: string | null;
 }
 
 interface ConversationResponse {
@@ -65,6 +64,17 @@ function formatMessageTime(value: string) {
     hour: "2-digit",
     minute: "2-digit",
   }).format(new Date(value));
+}
+
+function getConversationUserLabel(name?: string | null) {
+  return name?.trim() || "Пользователь";
+}
+
+function getTypingUserLabel(typingUser: TypingUser) {
+  return (
+    typingUser.name?.trim() ||
+    (typingUser.role === "SELLER" ? "Продавец" : "Покупатель")
+  );
 }
 
 function readFileAsDataUrl(file: Blob) {
@@ -547,7 +557,7 @@ export function ConversationRoomView({ conversationId }: ConversationRoomViewPro
               const isOwnMessage = message.senderId === currentUserId;
               const authorLabel = isOwnMessage
                 ? "Вы"
-                : message.sender.name?.trim() || message.sender.email;
+                : getConversationUserLabel(message.sender.name);
 
               return (
                 <div
@@ -592,7 +602,7 @@ export function ConversationRoomView({ conversationId }: ConversationRoomViewPro
         {remoteTypingUsers.length > 0 ? (
           <div className="mb-4 rounded-[1.25rem] border border-sky-500/15 bg-sky-500/8 px-4 py-3 text-sm text-sky-100">
             <CensoredText
-              text={`${remoteTypingUsers.map((typingUser) => typingUser.email).join(", ")} печатает...`}
+              text={`${remoteTypingUsers.map((typingUser) => getTypingUserLabel(typingUser)).join(", ")} печатает...`}
             />
           </div>
         ) : null}

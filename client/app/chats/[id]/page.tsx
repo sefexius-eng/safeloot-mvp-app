@@ -86,7 +86,9 @@ export default async function ChatRoomPage({ params }: ChatPageProps) {
   const statusMeta = conversation.latestOrder
     ? getOrderStatusMeta(conversation.latestOrder.status)
     : null;
-  const otherPartyName = conversation.otherParty.name?.trim() || conversation.otherParty.email;
+  const otherPartyName =
+    conversation.otherParty.name?.trim() ||
+    (conversation.otherParty.role === "SELLER" ? "Продавец" : "Покупатель");
   const canBuyProduct =
     conversation.product &&
     !conversation.latestOrder &&
@@ -101,7 +103,6 @@ export default async function ChatRoomPage({ params }: ChatPageProps) {
             <UserAvatar
               src={conversation.otherParty.image}
               name={otherPartyName}
-              email={conversation.otherParty.email}
               className="h-12 w-12 shrink-0 border-gray-700 bg-zinc-800/80"
               imageClassName="rounded-full object-cover"
             />

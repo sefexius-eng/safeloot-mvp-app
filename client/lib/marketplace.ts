@@ -14,7 +14,7 @@ import {
 } from "@/lib/review-summary";
 import { isAdminRole } from "@/lib/roles";
 
-const MONEY_SCALE = 8;
+const MONEY_SCALE = 2;
 const COMMISSION_RATE = 0.05;
 const COMMISSION_RATE_DECIMAL = new Prisma.Decimal(COMMISSION_RATE.toString());
 const TYPING_TTL_MS = 5000;
@@ -25,6 +25,12 @@ const MAX_PRODUCT_IMAGE_COUNT = 3;
 const MAX_PRODUCT_IMAGE_BASE64_LENGTH = 2_000_000;
 const PRODUCT_IMAGE_BASE64_PATTERN =
   /^data:image\/webp;base64,[A-Za-z0-9+/=]+$/;
+const ZERO_MONEY = new Prisma.Decimal(0);
+const TERMINAL_ORDER_STATUSES = [
+  OrderStatus.COMPLETED,
+  OrderStatus.REFUNDED,
+  OrderStatus.CANCELLED,
+] as const;
 
 const chatTypingState = new Map<string, Map<string, number>>();
 
@@ -40,18 +46,73 @@ function sanitizeProductText(value?: string) {
   return normalizeText(stripHtmlTags(normalizeText(value)));
 }
 
+function roundMoney(value: Prisma.Decimal.Value) {
+  return new Prisma.Decimal(value).toDecimalPlaces(
+    MONEY_SCALE,
+    Prisma.Decimal.ROUND_HALF_UP,
+  );
+}
+
+function roundMoneyNumber(value: Prisma.Decimal.Value) {
+  return Number(roundMoney(value).toFixed(MONEY_SCALE));
+}
+
+function ensureOrderIsNotTerminal(
+  orderId: string,
+  status: OrderStatus,
+  action: string,
+) {
+  if (
+    TERMINAL_ORDER_STATUSES.includes(
+      status as (typeof TERMINAL_ORDER_STATUSES)[number],
+    )
+  ) {
+    throw new Error(`Order ${orderId} cannot be ${action} from status ${status}.`);
+  }
+}
+
+async function ensureSufficientUserBalance(
+  transactionClient: Prisma.TransactionClient,
+  input: {
+    userId: string;
+    balanceField: "holdBalance" | "availableBalance";
+    requiredAmount: Prisma.Decimal;
+    errorMessage: string;
+  },
+) {
+  const user = await transactionClient.user.findUnique({
+    where: {
+      id: input.userId,
+    },
+    select: {
+      id: true,
+      holdBalance: true,
+      availableBalance: true,
+    },
+  });
+
+  if (!user) {
+    throw new Error(`User with id ${input.userId} was not found.`);
+  }
+
+  if (user[input.balanceField].comparedTo(input.requiredAmount) < 0) {
+    throw new Error(input.errorMessage);
+  }
+}
+
 function calculateCommissionBreakdown(amount: Prisma.Decimal) {
-  const fee = amount
+  const normalizedAmount = roundMoney(amount);
+  const fee = normalizedAmount
     .mul(COMMISSION_RATE_DECIMAL)
     .toDecimalPlaces(MONEY_SCALE, Prisma.Decimal.ROUND_HALF_UP);
-  const sellerPayout = amount
+  const sellerPayout = normalizedAmount
     .sub(fee)
     .toDecimalPlaces(MONEY_SCALE, Prisma.Decimal.ROUND_HALF_UP);
 
   return {
     fee,
     sellerPayout,
-    feeAsNumber: Number(fee.toFixed(MONEY_SCALE)),
+    feeAsNumber: roundMoneyNumber(fee),
   };
 }
 
@@ -236,7 +297,7 @@ function normalizeOptionalText(value?: string | null) {
 }
 
 function formatMoney(value: Prisma.Decimal) {
-  return value.toFixed(MONEY_SCALE);
+  return roundMoney(value).toFixed(MONEY_SCALE);
 }
 
 async function createUserNotification(
@@ -432,8 +493,8 @@ function getTypingUsers(conversation: {
   id: string;
   buyerId: string;
   sellerId: string;
-  buyer: { email: string };
-  seller: { email: string };
+  buyer: { name: string | null };
+  seller: { name: string | null };
 }) {
   const now = Date.now();
   const currentConversationTyping =
@@ -455,14 +516,14 @@ function getTypingUsers(conversation: {
   const typingUsers: Array<{
     senderId: string;
     role: "BUYER" | "SELLER";
-    email: string;
+    name: string | null;
   }> = [];
 
   if (currentConversationTyping.has(conversation.buyerId)) {
     typingUsers.push({
       senderId: conversation.buyerId,
       role: "BUYER",
-      email: conversation.buyer.email,
+      name: conversation.buyer.name,
     });
   }
 
@@ -470,7 +531,7 @@ function getTypingUsers(conversation: {
     typingUsers.push({
       senderId: conversation.sellerId,
       role: "SELLER",
-      email: conversation.seller.email,
+      name: conversation.seller.name,
     });
   }
 
@@ -500,6 +561,7 @@ export function mapMarketplaceErrorToStatusCode(message: string) {
     message.includes("cannot be refunded") ||
     message.includes("cannot be disputed") ||
     message.includes("cannot be resolved") ||
+    message.includes("Недостаточно средств") ||
     message.includes("Checkout is not available") ||
     message.includes("could not be")
   ) {
@@ -534,7 +596,6 @@ export async function listProducts() {
       seller: {
         select: {
           id: true,
-          email: true,
           name: true,
           image: true,
           lastSeen: true,
@@ -653,7 +714,6 @@ export async function getProductById(
       seller: {
         select: {
           id: true,
-          email: true,
           name: true,
           image: true,
           lastSeen: true,
@@ -1205,6 +1265,8 @@ export async function createOrder(input: {
     throw new Error("Вы не можете купить свой собственный товар");
   }
 
+  const orderPrice = roundMoney(product.price);
+
   const order = await prisma.$transaction(
     async (transactionClient) => {
       const existingPendingOrder = await transactionClient.order.findFirst({
@@ -1230,7 +1292,7 @@ export async function createOrder(input: {
           buyerId,
           sellerId: product.sellerId,
           productId: product.id,
-          price: product.price,
+          price: orderPrice,
           status: OrderStatus.PENDING,
         },
         select: {
@@ -1314,7 +1376,6 @@ export async function getOrderById(
       buyer: {
         select: {
           id: true,
-          email: true,
           name: true,
           image: true,
           lastSeen: true,
@@ -1324,7 +1385,6 @@ export async function getOrderById(
       seller: {
         select: {
           id: true,
-          email: true,
           name: true,
           image: true,
           lastSeen: true,
@@ -1411,6 +1471,7 @@ export async function confirmOrder(input: { orderId?: string; buyerId: string })
         orderId,
         existingOrder,
       );
+      const escrowAmount = roundMoney(checkoutOrder.price);
 
       const updatedOrder = await transactionClient.order.updateMany({
         where: {
@@ -1434,7 +1495,7 @@ export async function confirmOrder(input: { orderId?: string; buyerId: string })
         },
         data: {
           holdBalance: {
-            increment: checkoutOrder.price,
+            increment: escrowAmount,
           },
         },
       });
@@ -1443,7 +1504,7 @@ export async function confirmOrder(input: { orderId?: string; buyerId: string })
         data: {
           userId: platformAdmin.id,
           orderId: checkoutOrder.id,
-          amount: checkoutOrder.price,
+          amount: escrowAmount,
           type: TransactionType.ESCROW_HOLD,
           status: TransactionStatus.COMPLETED,
         },
@@ -1500,6 +1561,8 @@ export async function completeOrder(input: { orderId: string; buyerId: string })
         throw new Error("Only the buyer can complete this order.");
       }
 
+      ensureOrderIsNotTerminal(order.id, order.status, "completed");
+
       if (
         order.status !== OrderStatus.PAID &&
         order.status !== OrderStatus.DISPUTED
@@ -1509,8 +1572,9 @@ export async function completeOrder(input: { orderId: string; buyerId: string })
         );
       }
 
+      const orderAmount = roundMoney(order.price);
       const { fee, sellerPayout, feeAsNumber } = calculateCommissionBreakdown(
-        order.price,
+        orderAmount,
       );
       const platformAdmin = await getPlatformAdminAccount(transactionClient);
       const escrowHoldTransaction = await findCompletedEscrowHoldTransaction(
@@ -1540,13 +1604,20 @@ export async function completeOrder(input: { orderId: string; buyerId: string })
       }
 
       if (escrowHoldTransaction) {
+        await ensureSufficientUserBalance(transactionClient, {
+          userId: platformAdmin.id,
+          balanceField: "holdBalance",
+          requiredAmount: orderAmount,
+          errorMessage: "Недостаточно средств в escrow-холде платформы для завершения заказа.",
+        });
+
         await transactionClient.user.update({
           where: {
             id: platformAdmin.id,
           },
           data: {
             holdBalance: {
-              decrement: order.price,
+              decrement: orderAmount,
             },
             platformRevenue: {
               increment: feeAsNumber,
@@ -1637,6 +1708,8 @@ export async function refundOrder(input: { orderId: string; sellerId: string }) 
         throw new Error("Only the seller can refund this order.");
       }
 
+      ensureOrderIsNotTerminal(order.id, order.status, "refunded");
+
       if (
         order.status !== OrderStatus.PAID &&
         order.status !== OrderStatus.DISPUTED
@@ -1646,10 +1719,7 @@ export async function refundOrder(input: { orderId: string; sellerId: string }) 
         );
       }
 
-      const refundAmount = order.price.toDecimalPlaces(
-        MONEY_SCALE,
-        Prisma.Decimal.ROUND_HALF_UP,
-      );
+      const refundAmount = roundMoney(order.price);
       const platformAdmin = await getPlatformAdminAccount(transactionClient);
       const escrowHoldTransaction = await findCompletedEscrowHoldTransaction(
         transactionClient,
@@ -1668,7 +1738,7 @@ export async function refundOrder(input: { orderId: string; sellerId: string }) 
         },
         data: {
           status: OrderStatus.REFUNDED,
-          platformFee: new Prisma.Decimal(0),
+          platformFee: ZERO_MONEY,
           commission: 0,
         },
       });
@@ -1678,6 +1748,13 @@ export async function refundOrder(input: { orderId: string; sellerId: string }) 
       }
 
       if (escrowHoldTransaction) {
+        await ensureSufficientUserBalance(transactionClient, {
+          userId: platformAdmin.id,
+          balanceField: "holdBalance",
+          requiredAmount: refundAmount,
+          errorMessage: "Недостаточно средств в escrow-холде платформы для возврата средств.",
+        });
+
         await transactionClient.user.update({
           where: {
             id: platformAdmin.id,
@@ -1818,10 +1895,7 @@ export async function resolveOrderDisputeToBuyer(input: { orderId: string }) {
         );
       }
 
-      const refundAmount = order.price.toDecimalPlaces(
-        MONEY_SCALE,
-        Prisma.Decimal.ROUND_HALF_UP,
-      );
+      const refundAmount = roundMoney(order.price);
       const platformAdmin = await getPlatformAdminAccount(transactionClient);
       const escrowHoldTransaction = await findCompletedEscrowHoldTransaction(
         transactionClient,
@@ -1838,7 +1912,7 @@ export async function resolveOrderDisputeToBuyer(input: { orderId: string }) {
         },
         data: {
           status: OrderStatus.REFUNDED,
-          platformFee: new Prisma.Decimal(0),
+          platformFee: ZERO_MONEY,
           commission: 0,
         },
       });
@@ -1848,6 +1922,13 @@ export async function resolveOrderDisputeToBuyer(input: { orderId: string }) {
       }
 
       if (escrowHoldTransaction) {
+        await ensureSufficientUserBalance(transactionClient, {
+          userId: platformAdmin.id,
+          balanceField: "holdBalance",
+          requiredAmount: refundAmount,
+          errorMessage: "Недостаточно средств в escrow-холде платформы для возврата средств.",
+        });
+
         await transactionClient.user.update({
           where: {
             id: platformAdmin.id,
@@ -1912,8 +1993,9 @@ export async function resolveOrderDisputeToSeller(input: { orderId: string }) {
         );
       }
 
+      const orderAmount = roundMoney(order.price);
       const { fee, sellerPayout, feeAsNumber } = calculateCommissionBreakdown(
-        order.price,
+        orderAmount,
       );
       const platformAdmin = await getPlatformAdminAccount(transactionClient);
       const escrowHoldTransaction = await findCompletedEscrowHoldTransaction(
@@ -1941,13 +2023,20 @@ export async function resolveOrderDisputeToSeller(input: { orderId: string }) {
       }
 
       if (escrowHoldTransaction) {
+        await ensureSufficientUserBalance(transactionClient, {
+          userId: platformAdmin.id,
+          balanceField: "holdBalance",
+          requiredAmount: orderAmount,
+          errorMessage: "Недостаточно средств в escrow-холде платформы для завершения заказа.",
+        });
+
         await transactionClient.user.update({
           where: {
             id: platformAdmin.id,
           },
           data: {
             holdBalance: {
-              decrement: order.price,
+              decrement: orderAmount,
             },
             platformRevenue: {
               increment: feeAsNumber,
@@ -2013,7 +2102,6 @@ async function getConversationContextById(conversationId: string) {
       productId: true,
       buyer: {
         select: {
-          email: true,
           name: true,
           image: true,
           role: true,
@@ -2021,7 +2109,6 @@ async function getConversationContextById(conversationId: string) {
       },
       seller: {
         select: {
-          email: true,
           name: true,
           image: true,
           role: true,
@@ -2236,7 +2323,6 @@ export async function listConversationsByUser(userId: string) {
       buyer: {
         select: {
           id: true,
-          email: true,
           name: true,
           image: true,
           role: true,
@@ -2245,7 +2331,6 @@ export async function listConversationsByUser(userId: string) {
       seller: {
         select: {
           id: true,
-          email: true,
           name: true,
           image: true,
           role: true,
@@ -2288,7 +2373,6 @@ export async function listConversationsByUser(userId: string) {
       updatedAt: conversation.updatedAt.toISOString(),
       otherParty: {
         id: otherParty.id,
-        email: otherParty.email,
         name: otherParty.name,
         image: otherParty.image,
         accountRole: otherParty.role,
@@ -2347,14 +2431,12 @@ export async function getConversationRoom(conversationId: string, userId: string
     otherParty: normalizedUserId === conversation.buyerId
       ? {
           role: "SELLER" as const,
-          email: conversation.seller.email,
           name: conversation.seller.name,
           image: conversation.seller.image,
           accountRole: conversation.seller.role,
         }
       : {
           role: "BUYER" as const,
-          email: conversation.buyer.email,
           name: conversation.buyer.name,
           image: conversation.buyer.image,
           accountRole: conversation.buyer.role,
@@ -2396,16 +2478,6 @@ export async function getConversationMessages(
       id: true,
       buyerId: true,
       sellerId: true,
-      buyer: {
-        select: {
-          email: true,
-        },
-      },
-      seller: {
-        select: {
-          email: true,
-        },
-      },
       productId: true,
       messages: {
         orderBy: {
@@ -2422,7 +2494,6 @@ export async function getConversationMessages(
           sender: {
             select: {
               id: true,
-              email: true,
               name: true,
               image: true,
             },
@@ -2491,16 +2562,6 @@ export async function createConversationMessage(input: {
       id: true,
       buyerId: true,
       sellerId: true,
-      buyer: {
-        select: {
-          email: true,
-        },
-      },
-      seller: {
-        select: {
-          email: true,
-        },
-      },
     },
   });
 
@@ -2533,7 +2594,6 @@ export async function createConversationMessage(input: {
           sender: {
             select: {
               id: true,
-              email: true,
               name: true,
               image: true,
             },
@@ -2712,7 +2772,6 @@ export async function getChatMessages(
           sender: {
             select: {
               id: true,
-              email: true,
               name: true,
               image: true,
             },

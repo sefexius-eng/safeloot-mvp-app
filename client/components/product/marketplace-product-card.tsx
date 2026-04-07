@@ -32,7 +32,6 @@ export interface MarketplaceProductCardData {
   };
   seller: {
     id: string;
-    email: string;
     name: string | null;
     image: string | null;
     lastSeen: string | null;
@@ -69,7 +68,7 @@ function getRankClassName(rank: SellerRank) {
 }
 
 function getSellerDisplayName(seller: MarketplaceProductCardData["seller"]) {
-  return seller.name?.trim() || seller.email;
+  return seller.name?.trim() || "Продавец";
 }
 
 function isSellerOnline(lastSeen?: string | null) {
@@ -141,7 +140,6 @@ export function MarketplaceProductCard({ product }: MarketplaceProductCardProps)
             <UserAvatar
               src={product.seller.image}
               name={sellerDisplayName}
-              email={product.seller.email}
               className="h-12 w-12 shrink-0 border-transparent bg-zinc-900/80"
               imageClassName="rounded-full border border-gray-700/50 object-cover"
             />

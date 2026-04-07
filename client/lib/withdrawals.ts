@@ -84,7 +84,7 @@ export function getWithdrawalStatusMeta(status: string): {
 }
 
 function formatWithdrawalAmount(value: Prisma.Decimal) {
-  return value.toFixed(8);
+  return value.toFixed(2);
 }
 
 export function mapWithdrawalListItem(withdrawal: {

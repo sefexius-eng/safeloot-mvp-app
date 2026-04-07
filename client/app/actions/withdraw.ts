@@ -15,7 +15,7 @@ import {
   normalizeWithdrawalMethod,
 } from "@/lib/withdrawals";
 
-const MONEY_SCALE = 8;
+const MONEY_SCALE = 2;
 
 export interface WithdrawalActionResult {
   ok: boolean;
