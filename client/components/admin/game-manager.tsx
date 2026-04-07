@@ -2,7 +2,7 @@
 
 import type { Role } from "@prisma/client";
 import { useRouter } from "next/navigation";
-import { useEffect, useState, useTransition } from "react";
+import { useEffect, useRef, useState, useTransition } from "react";
 
 import {
   createCatalogGame,
@@ -16,6 +16,7 @@ import {
 } from "@/app/admin/actions";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { generateSlug } from "@/lib/generate-slug";
 
 interface GameManagerProps {
   games: CatalogGameSummary[];
@@ -27,6 +28,15 @@ interface CategoryDraft {
   slug: string;
 }
 
+const ACCEPTED_POSTER_IMAGE_TYPES = new Set([
+  "image/jpeg",
+  "image/png",
+  "image/webp",
+]);
+const MAX_POSTER_WIDTH = 1200;
+const MAX_POSTER_HEIGHT = 1500;
+const POSTER_WEBP_QUALITY = 0.84;
+
 const POSTER_GRADIENTS = [
   "linear-gradient(160deg, rgba(249,115,22,0.85), rgba(234,88,12,0.28) 45%, rgba(12,10,9,0.92))",
   "linear-gradient(160deg, rgba(14,165,233,0.82), rgba(59,130,246,0.26) 48%, rgba(2,6,23,0.94))",
@@ -35,13 +45,73 @@ const POSTER_GRADIENTS = [
   "linear-gradient(160deg, rgba(250,204,21,0.76), rgba(234,88,12,0.28) 40%, rgba(17,24,39,0.94))",
 ];
 
-function buildCatalogGameSlug(value: string) {
-  return value
-    .trim()
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, "-")
-    .replace(/^-+|-+$/g, "")
-    .slice(0, 64);
+function readFileAsDataUrl(file: Blob) {
+  return new Promise<string>((resolve, reject) => {
+    const reader = new FileReader();
+
+    reader.onload = () => {
+      if (typeof reader.result === "string") {
+        resolve(reader.result);
+        return;
+      }
+
+      reject(new Error("Не удалось прочитать изображение."));
+    };
+
+    reader.onerror = () => {
+      reject(new Error("Не удалось прочитать изображение."));
+    };
+
+    reader.readAsDataURL(file);
+  });
+}
+
+function loadImage(source: string) {
+  return new Promise<HTMLImageElement>((resolve, reject) => {
+    const image = new window.Image();
+
+    image.onload = () => resolve(image);
+    image.onerror = () => reject(new Error("Не удалось обработать изображение."));
+    image.src = source;
+  });
+}
+
+async function compressPosterToWebpBase64(file: File) {
+  if (!ACCEPTED_POSTER_IMAGE_TYPES.has(file.type)) {
+    throw new Error("Поддерживаются только JPG, PNG и WebP.");
+  }
+
+  const source = await readFileAsDataUrl(file);
+  const image = await loadImage(source);
+  const scale = Math.min(
+    MAX_POSTER_WIDTH / image.width,
+    MAX_POSTER_HEIGHT / image.height,
+    1,
+  );
+  const targetWidth = Math.max(1, Math.round(image.width * scale));
+  const targetHeight = Math.max(1, Math.round(image.height * scale));
+  const canvas = document.createElement("canvas");
+
+  canvas.width = targetWidth;
+  canvas.height = targetHeight;
+
+  const context = canvas.getContext("2d");
+
+  if (!context) {
+    throw new Error("Не удалось подготовить изображение постера.");
+  }
+
+  context.drawImage(image, 0, 0, targetWidth, targetHeight);
+
+  const webpBlob = await new Promise<Blob | null>((resolve) => {
+    canvas.toBlob(resolve, "image/webp", POSTER_WEBP_QUALITY);
+  });
+
+  if (!webpBlob) {
+    throw new Error("Не удалось сжать изображение постера.");
+  }
+
+  return readFileAsDataUrl(webpBlob);
 }
 
 function getPosterGradient(key: string) {
@@ -69,11 +139,13 @@ function buildCategoryDrafts(games: CatalogGameSummary[]) {
 }
 
 function shouldSyncSlug(currentName: string, currentSlug: string) {
-  return !currentSlug.trim() || currentSlug === buildCatalogGameSlug(currentName);
+  return !currentSlug.trim() || currentSlug === generateSlug(currentName);
 }
 
 export function GameManager({ games: initialGames, currentUserRole }: GameManagerProps) {
   const router = useRouter();
+  const createPosterInputRef = useRef<HTMLInputElement | null>(null);
+  const editPosterInputRefs = useRef<Record<string, HTMLInputElement | null>>({});
   const [games, setGames] = useState(initialGames);
   const [formState, setFormState] = useState({
     name: "",
@@ -101,6 +173,8 @@ export function GameManager({ games: initialGames, currentUserRole }: GameManage
   const [savingCategoryId, setSavingCategoryId] = useState<string | null>(null);
   const [deletingCategoryId, setDeletingCategoryId] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
+  const [isProcessingCreatePoster, setIsProcessingCreatePoster] = useState(false);
+  const [processingPosterGameId, setProcessingPosterGameId] = useState<string | null>(null);
   const canDeleteContent = currentUserRole === "SUPER_ADMIN";
 
   useEffect(() => {
@@ -128,6 +202,81 @@ export function GameManager({ games: initialGames, currentUserRole }: GameManage
       ...currentDrafts,
       [nextGame.id]: nextGame.imageUrl ?? "",
     }));
+  }
+
+  async function handleCreatePosterSelection(file: File) {
+    setFeedback(null);
+    setIsProcessingCreatePoster(true);
+
+    try {
+      const compressedPoster = await compressPosterToWebpBase64(file);
+
+      setFormState((currentState) => ({
+        ...currentState,
+        imageUrl: compressedPoster,
+      }));
+    } finally {
+      setIsProcessingCreatePoster(false);
+    }
+  }
+
+  function handleCreatePosterFileChange(event: React.ChangeEvent<HTMLInputElement>) {
+    const file = event.target.files?.[0];
+
+    event.target.value = "";
+
+    if (!file) {
+      return;
+    }
+
+    void handleCreatePosterSelection(file).catch((error) => {
+      setFeedback({
+        type: "error",
+        message:
+          error instanceof Error
+            ? error.message
+            : "Не удалось подготовить обложку игры.",
+      });
+    });
+  }
+
+  async function handleEditPosterSelection(gameId: string, file: File) {
+    setFeedback(null);
+    setProcessingPosterGameId(gameId);
+
+    try {
+      const compressedPoster = await compressPosterToWebpBase64(file);
+
+      setImageDrafts((currentDrafts) => ({
+        ...currentDrafts,
+        [gameId]: compressedPoster,
+      }));
+    } finally {
+      setProcessingPosterGameId(null);
+    }
+  }
+
+  function handleEditPosterFileChange(
+    gameId: string,
+    event: React.ChangeEvent<HTMLInputElement>,
+  ) {
+    const file = event.target.files?.[0];
+
+    event.target.value = "";
+
+    if (!file) {
+      return;
+    }
+
+    void handleEditPosterSelection(gameId, file).catch((error) => {
+      setFeedback({
+        type: "error",
+        message:
+          error instanceof Error
+            ? error.message
+            : "Не удалось подготовить обложку игры.",
+      });
+    });
   }
 
   function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
@@ -420,12 +569,12 @@ export function GameManager({ games: initialGames, currentUserRole }: GameManage
                 name: nextName,
                 slug: isSlugDirty
                   ? currentState.slug
-                  : buildCatalogGameSlug(nextName),
+                  : generateSlug(nextName),
               }));
             }}
             placeholder="Counter-Strike 2"
             className="border-white/10 bg-white/5 text-zinc-100 placeholder:text-zinc-500 focus:border-orange-500/45 focus:bg-white/8"
-            disabled={isPending}
+            disabled={isPending || isProcessingCreatePoster}
           />
         </label>
 
@@ -437,34 +586,80 @@ export function GameManager({ games: initialGames, currentUserRole }: GameManage
               setIsSlugDirty(true);
               setFormState((currentState) => ({
                 ...currentState,
-                slug: buildCatalogGameSlug(event.target.value),
+                slug: generateSlug(event.target.value),
               }));
             }}
             placeholder="counter-strike-2"
             className="border-white/10 bg-white/5 text-zinc-100 placeholder:text-zinc-500 focus:border-orange-500/45 focus:bg-white/8"
-            disabled={isPending}
+            disabled={isPending || isProcessingCreatePoster}
           />
         </label>
 
-        <label className="space-y-2">
-          <span className="text-sm font-semibold text-zinc-200">URL постера / логотипа</span>
-          <Input
-            value={formState.imageUrl}
-            onChange={(event) => {
-              setFormState((currentState) => ({
-                ...currentState,
-                imageUrl: event.target.value,
-              }));
-            }}
-            placeholder="/game-cover/cs2 или https://example.com/game-cover.jpg"
-            className="border-white/10 bg-white/5 text-zinc-100 placeholder:text-zinc-500 focus:border-orange-500/45 focus:bg-white/8"
-            disabled={isPending}
+        <div className="space-y-2">
+          <span className="text-sm font-semibold text-zinc-200">Обложка игры</span>
+          <input
+            ref={createPosterInputRef}
+            type="file"
+            accept="image/jpeg,image/png,image/webp"
+            onChange={handleCreatePosterFileChange}
+            className="sr-only"
           />
-        </label>
+          <div className="rounded-[1.5rem] border border-white/10 bg-white/5 p-4">
+            <div className="flex flex-wrap items-center gap-3">
+              <Button
+                type="button"
+                onClick={() => createPosterInputRef.current?.click()}
+                disabled={isPending || isProcessingCreatePoster}
+                className="bg-sky-600 text-white shadow-[0_16px_40px_rgba(2,132,199,0.24)] hover:bg-sky-500"
+              >
+                {isProcessingCreatePoster ? "Подготавливаем..." : "Выбрать файл"}
+              </Button>
+              <button
+                type="button"
+                onClick={() => {
+                  setFormState((currentState) => ({
+                    ...currentState,
+                    imageUrl: "",
+                  }));
+                }}
+                className="inline-flex h-10 items-center justify-center rounded-2xl border border-white/10 bg-white/5 px-4 text-sm font-semibold text-zinc-200 transition hover:bg-white/10"
+                disabled={isPending || isProcessingCreatePoster || !formState.imageUrl.trim()}
+              >
+                Очистить
+              </button>
+            </div>
+            <div className="mt-4 flex items-start gap-4">
+              <div className="relative aspect-[4/5] w-24 overflow-hidden rounded-[1.25rem] border border-white/10 bg-black/20">
+                {formState.imageUrl.trim() ? (
+                  <img
+                    src={formState.imageUrl}
+                    alt="Превью новой игры"
+                    className="h-full w-full object-cover"
+                  />
+                ) : (
+                  <div
+                    className="absolute inset-0"
+                    style={{
+                      background: getPosterGradient(formState.slug || formState.name || "new-game"),
+                    }}
+                  />
+                )}
+              </div>
+              <p className="text-sm leading-7 text-zinc-400">
+                Загрузите JPG, PNG или WebP. Обложка конвертируется в WebP и сразу показывается в превью до сохранения игры.
+              </p>
+            </div>
+          </div>
+        </div>
 
         <Button
           type="submit"
-          disabled={isPending || !formState.name.trim() || !formState.slug.trim()}
+          disabled={
+            isPending ||
+            isProcessingCreatePoster ||
+            !formState.name.trim() ||
+            !formState.slug.trim()
+          }
           className="h-12 rounded-2xl bg-orange-600 px-5 text-sm font-semibold text-white shadow-[0_16px_40px_rgba(249,115,22,0.28)] hover:bg-orange-500"
         >
           {isPending ? "Добавляем..." : "Добавить игру"}
@@ -499,7 +694,9 @@ export function GameManager({ games: initialGames, currentUserRole }: GameManage
             const isSavingGame = savingGameId === game.id;
             const isDeletingGame = deletingGameId === game.id;
             const isAddingCategory = addingCategoryGameId === game.id;
+            const isProcessingPoster = processingPosterGameId === game.id;
             const categoryDraft = newCategoryDrafts[game.id] ?? createEmptyCategoryDraft();
+            const posterPreviewUrl = (imageDrafts[game.id] ?? game.imageUrl ?? "").trim();
 
             return (
               <article
@@ -508,12 +705,11 @@ export function GameManager({ games: initialGames, currentUserRole }: GameManage
               >
                 <div className="grid gap-4 md:grid-cols-[180px_minmax(0,1fr)] md:items-start">
                   <div className="relative aspect-[4/5] overflow-hidden rounded-[1.5rem] border border-white/10 bg-black/20">
-                    {game.imageUrl?.trim() ? (
-                      <div
-                        className="absolute inset-0 bg-cover bg-center"
-                        style={{
-                          backgroundImage: `url(${game.imageUrl})`,
-                        }}
+                    {posterPreviewUrl ? (
+                      <img
+                        src={posterPreviewUrl}
+                        alt={`Обложка ${game.name}`}
+                        className="absolute inset-0 h-full w-full object-cover"
                       />
                     ) : (
                       <div
@@ -547,30 +743,42 @@ export function GameManager({ games: initialGames, currentUserRole }: GameManage
                       </span>
                     </div>
 
-                    <label className="space-y-2">
-                      <span className="text-sm font-semibold text-zinc-200">URL обложки</span>
-                      <Input
-                        value={imageDrafts[game.id] ?? ""}
-                        onChange={(event) => {
-                          setImageDrafts((currentDrafts) => ({
-                            ...currentDrafts,
-                            [game.id]: event.target.value,
-                          }));
+                    <div className="space-y-2">
+                      <span className="text-sm font-semibold text-zinc-200">Обложка игры</span>
+                      <input
+                        ref={(node) => {
+                          editPosterInputRefs.current[game.id] = node;
                         }}
-                        placeholder="/game-cover/cs2 или https://example.com/game-cover.jpg"
-                        className="border-white/10 bg-white/5 text-zinc-100 placeholder:text-zinc-500 focus:border-orange-500/45 focus:bg-white/8"
-                        disabled={isSavingGame || isDeletingGame}
+                        type="file"
+                        accept="image/jpeg,image/png,image/webp"
+                        onChange={(event) => handleEditPosterFileChange(game.id, event)}
+                        className="sr-only"
                       />
-                    </label>
+                      <div className="rounded-[1.35rem] border border-white/10 bg-black/20 p-4">
+                        <div className="flex flex-wrap items-center gap-3">
+                          <Button
+                            type="button"
+                            onClick={() => editPosterInputRefs.current[game.id]?.click()}
+                            disabled={isSavingGame || isDeletingGame || isProcessingPoster}
+                            className="bg-sky-600 text-white shadow-[0_16px_40px_rgba(2,132,199,0.24)] hover:bg-sky-500"
+                          >
+                            {isProcessingPoster ? "Подготавливаем..." : "Выбрать файл"}
+                          </Button>
+                          <p className="text-sm leading-7 text-zinc-400">
+                            После выбора превью слева обновится сразу. Затем нажмите «Сохранить обложку».
+                          </p>
+                        </div>
+                      </div>
+                    </div>
 
                     <div className="flex flex-wrap gap-3">
                       <Button
                         type="button"
                         onClick={() => handleImageSave(game.id)}
-                        disabled={isSavingGame || isDeletingGame}
+                        disabled={isSavingGame || isDeletingGame || isProcessingPoster}
                         className="h-11 rounded-2xl bg-sky-600 px-5 text-sm font-semibold text-white shadow-[0_16px_40px_rgba(2,132,199,0.24)] hover:bg-sky-500"
                       >
-                        {isSavingGame ? "Сохраняем..." : "Сохранить URL"}
+                        {isSavingGame ? "Сохраняем..." : "Сохранить обложку"}
                       </Button>
                       <button
                         type="button"
@@ -581,7 +789,7 @@ export function GameManager({ games: initialGames, currentUserRole }: GameManage
                           }));
                         }}
                         className="inline-flex h-11 items-center justify-center rounded-2xl border border-white/10 bg-white/5 px-5 text-sm font-semibold text-zinc-200 transition hover:bg-white/10"
-                        disabled={isSavingGame || isDeletingGame}
+                        disabled={isSavingGame || isDeletingGame || isProcessingPoster}
                       >
                         Очистить
                       </button>
@@ -645,7 +853,7 @@ export function GameManager({ games: initialGames, currentUserRole }: GameManage
                                                   currentDraft.name,
                                                   currentDraft.slug,
                                                 )
-                                                  ? buildCatalogGameSlug(nextName)
+                                                  ? generateSlug(nextName)
                                                   : currentDraft.slug,
                                               },
                                             };
@@ -661,7 +869,7 @@ export function GameManager({ games: initialGames, currentUserRole }: GameManage
                                             ...currentDrafts,
                                             [category.id]: {
                                               name: editDraft.name,
-                                              slug: buildCatalogGameSlug(event.target.value),
+                                              slug: generateSlug(event.target.value),
                                             },
                                           }));
                                         }}
@@ -753,7 +961,7 @@ export function GameManager({ games: initialGames, currentUserRole }: GameManage
                                     currentDraft.name,
                                     currentDraft.slug,
                                   )
-                                    ? buildCatalogGameSlug(nextName)
+                                    ? generateSlug(nextName)
                                     : currentDraft.slug,
                                 },
                               };
@@ -770,7 +978,7 @@ export function GameManager({ games: initialGames, currentUserRole }: GameManage
                               ...currentDrafts,
                               [game.id]: {
                                 name: categoryDraft.name,
-                                slug: buildCatalogGameSlug(event.target.value),
+                                slug: generateSlug(event.target.value),
                               },
                             }));
                           }}

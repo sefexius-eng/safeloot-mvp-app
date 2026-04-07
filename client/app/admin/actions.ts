@@ -15,6 +15,7 @@ import {
 } from "@/lib/profile-badges";
 import { prisma } from "@/lib/prisma";
 import { isSuperAdminRole, isTeamRole, ROLE_OPTIONS } from "@/lib/roles";
+import { generateSlug } from "@/lib/generate-slug";
 
 export interface AdminActionResult {
   ok: boolean;
@@ -53,21 +54,25 @@ export interface CatalogCategoryActionResult extends AdminActionResult {
 }
 
 const CATALOG_EDITOR_ROLES: Role[] = ["MODERATOR", "ADMIN", "SUPER_ADMIN"];
+const MAX_CATALOG_GAME_IMAGE_BASE64_LENGTH = 1_600_000;
 
-function normalizeCatalogSlug(value: string) {
-  return value
-    .trim()
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, "-")
-    .replace(/^-+|-+$/g, "")
-    .slice(0, 64);
-}
-
-function normalizeCatalogGameImageUrl(value: string) {
+function normalizeCatalogGameImage(value: string) {
   const trimmedValue = value.trim();
 
   if (!trimmedValue) {
     return null;
+  }
+
+  if (trimmedValue.startsWith("data:image/")) {
+    if (!trimmedValue.startsWith("data:image/webp;base64,")) {
+      throw new Error("Обложка игры должна быть в формате WebP.");
+    }
+
+    if (trimmedValue.length > MAX_CATALOG_GAME_IMAGE_BASE64_LENGTH) {
+      throw new Error("Обложка игры получилась слишком большой. Попробуйте другое изображение.");
+    }
+
+    return trimmedValue;
   }
 
   if (trimmedValue.startsWith("/")) {
@@ -79,7 +84,7 @@ function normalizeCatalogGameImageUrl(value: string) {
   try {
     parsedUrl = new URL(trimmedValue);
   } catch {
-    throw new Error("Укажите корректный URL изображения.");
+    throw new Error("Выберите корректное изображение для обложки игры.");
   }
 
   if (parsedUrl.protocol !== "http:" && parsedUrl.protocol !== "https:") {
@@ -710,7 +715,7 @@ export async function createCatalogGame(
   await requireCatalogWriteAccess();
 
   const normalizedName = name.trim();
-  const normalizedSlug = normalizeCatalogSlug(slug || name);
+  const normalizedSlug = generateSlug(slug || name);
 
   if (!normalizedName) {
     return {
@@ -729,12 +734,12 @@ export async function createCatalogGame(
   let normalizedImageUrl: string | null;
 
   try {
-    normalizedImageUrl = normalizeCatalogGameImageUrl(imageUrl);
+    normalizedImageUrl = normalizeCatalogGameImage(imageUrl);
   } catch (error) {
     return {
       ok: false,
       message:
-        error instanceof Error ? error.message : "Не удалось обработать URL изображения.",
+        error instanceof Error ? error.message : "Не удалось обработать изображение игры.",
     };
   }
 
@@ -801,12 +806,12 @@ export async function updateCatalogGameImage(
   let normalizedImageUrl: string | null;
 
   try {
-    normalizedImageUrl = normalizeCatalogGameImageUrl(imageUrl);
+    normalizedImageUrl = normalizeCatalogGameImage(imageUrl);
   } catch (error) {
     return {
       ok: false,
       message:
-        error instanceof Error ? error.message : "Не удалось обработать URL изображения.",
+        error instanceof Error ? error.message : "Не удалось обработать изображение игры.",
     };
   }
 
@@ -854,7 +859,7 @@ export async function updateCatalogGameImage(
     ok: true,
     message: normalizedImageUrl
       ? "Обложка игры обновлена."
-      : "URL обложки очищен, теперь используется fallback-оформление.",
+      : "Обложка очищена, теперь используется fallback-оформление.",
     game: gameSummary,
   };
 }
@@ -925,7 +930,7 @@ export async function createCategory(
 
   const normalizedGameId = gameId.trim();
   const normalizedName = name.trim();
-  const normalizedSlug = normalizeCatalogSlug(slug || name);
+  const normalizedSlug = generateSlug(slug || name);
 
   if (!normalizedGameId) {
     return {
@@ -1024,7 +1029,7 @@ export async function updateCategory(
 
   const normalizedCategoryId = id.trim();
   const normalizedName = name.trim();
-  const normalizedSlug = normalizeCatalogSlug(slug || name);
+  const normalizedSlug = generateSlug(slug || name);
 
   if (!normalizedCategoryId) {
     return {
