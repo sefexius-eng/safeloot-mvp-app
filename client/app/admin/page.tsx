@@ -8,6 +8,7 @@ import {
   AdminToggleBanButton,
   AdminWithdrawalActionButtons,
 } from "@/components/admin/admin-action-buttons";
+import { PromoCodeManager } from "@/components/admin/promo-code-manager";
 import { AdminRoleSelect } from "@/components/admin/admin-role-select";
 import {
   AdminSafeModeToggle,
@@ -145,7 +146,7 @@ export default async function AdminDashboardPage() {
     redirect("/");
   }
 
-  const [users, products, orders, pendingWithdrawals, disputedOrders] = await Promise.all([
+  const [users, products, orders, pendingWithdrawals, disputedOrders, activePromoCodes] = await Promise.all([
     prisma.user.findMany({
       select: {
         id: true,
@@ -260,6 +261,21 @@ export default async function AdminDashboardPage() {
         createdAt: "desc",
       },
     }),
+    isSuperAdminRole(currentUser.role)
+      ? prisma.promoCode.findMany({
+          select: {
+            id: true,
+            code: true,
+            amount: true,
+            maxUses: true,
+            usedCount: true,
+            createdAt: true,
+          },
+          orderBy: {
+            createdAt: "desc",
+          },
+        })
+      : Promise.resolve([]),
   ]);
 
   const adminCount = users.filter(
@@ -279,6 +295,10 @@ export default async function AdminDashboardPage() {
   const disputedOrdersCount = disputedOrders.length;
   const canUseSafeMode = isAdminRole(currentUser.role);
   const canManageRoles = isSuperAdminRole(currentUser.role);
+  const canManagePromoCodes = isSuperAdminRole(currentUser.role);
+  const visiblePromoCodes = activePromoCodes.filter(
+    (promoCode) => promoCode.usedCount < promoCode.maxUses,
+  );
 
   return (
     <main className="mx-auto flex w-full max-w-[92rem] flex-col gap-8 px-4 py-10 sm:px-6 lg:px-8 lg:py-14">
@@ -363,6 +383,15 @@ export default async function AdminDashboardPage() {
               <CardTitle className="text-xl">Секции дашборда</CardTitle>
             </CardHeader>
             <CardContent className="space-y-3">
+              {canManagePromoCodes ? (
+                <a
+                  href="#promocodes"
+                  className="flex items-center justify-between rounded-[1.25rem] border border-white/10 bg-white/5 px-4 py-3 text-sm font-semibold text-zinc-100 transition hover:bg-white/10"
+                >
+                  <span>Промокоды</span>
+                  <Badge variant="info">{visiblePromoCodes.length}</Badge>
+                </a>
+              ) : null}
               <a
                 href="#users"
                 className="flex items-center justify-between rounded-[1.25rem] border border-white/10 bg-white/5 px-4 py-3 text-sm font-semibold text-zinc-100 transition hover:bg-white/10"
@@ -410,6 +439,30 @@ export default async function AdminDashboardPage() {
         </aside>
 
         <div className="space-y-8">
+          {canManagePromoCodes ? (
+            <section id="promocodes" className="scroll-mt-24">
+              <Card>
+                <CardHeader className="border-b border-white/10">
+                  <div className="flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
+                    <div>
+                      <CardDescription>Promo Code Generator</CardDescription>
+                      <CardTitle>Генератор промокодов</CardTitle>
+                    </div>
+                    <Badge variant="info">Активных кодов: {visiblePromoCodes.length}</Badge>
+                  </div>
+                </CardHeader>
+                <CardContent className="pt-6">
+                  <PromoCodeManager
+                    activePromoCodes={visiblePromoCodes.map((promoCode) => ({
+                      ...promoCode,
+                      createdAt: promoCode.createdAt.toISOString(),
+                    }))}
+                  />
+                </CardContent>
+              </Card>
+            </section>
+          ) : null}
+
           <section id="users" className="scroll-mt-24">
             <Card>
               <CardHeader className="border-b border-white/10">

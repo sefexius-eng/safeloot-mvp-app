@@ -7,6 +7,7 @@ import { useEffect, useState, useTransition } from "react";
 import { toggleAllProductsVisibility } from "@/app/actions/product";
 import CensoredText from "@/components/censored-text";
 import { useCurrency } from "@/components/providers/currency-provider";
+import { PromoCodePanel } from "@/components/profile/promo-code-panel";
 import { ProfileProductActions } from "@/components/profile/profile-product-actions";
 import { RatingStars } from "@/components/reviews/rating-stars";
 import { SellerRatingBadge } from "@/components/reviews/seller-rating-badge";
@@ -147,6 +148,8 @@ export function ProfileTabs({ products: initialProducts, reviews }: ProfileTabsP
           Переключайтесь между товарами и отзывами, чтобы поддерживать актуальную витрину и отвечать покупателям прямо из кабинета.
         </p>
       </div>
+
+      <PromoCodePanel />
 
       <div className="mt-6 flex flex-wrap gap-2 border-b border-white/10">
         <button
