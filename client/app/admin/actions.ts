@@ -24,13 +24,29 @@ export interface CatalogGameSummary {
   imageUrl: string | null;
   productCount: number;
   categoryCount: number;
+  categories: CatalogCategorySummary[];
 }
 
 export interface CatalogGameActionResult extends AdminActionResult {
   game?: CatalogGameSummary;
 }
 
-function normalizeCatalogGameSlug(value: string) {
+export interface CatalogCategorySummary {
+  id: string;
+  gameId: string;
+  name: string;
+  slug: string;
+  productCount: number;
+}
+
+export interface CatalogCategoryActionResult extends AdminActionResult {
+  category?: CatalogCategorySummary;
+  game?: CatalogGameSummary;
+}
+
+const CATALOG_EDITOR_ROLES: Role[] = ["MODERATOR", "ADMIN", "SUPER_ADMIN"];
+
+function normalizeCatalogSlug(value: string) {
   return value
     .trim()
     .toLowerCase()
@@ -65,11 +81,38 @@ function normalizeCatalogGameImageUrl(value: string) {
   return parsedUrl.toString();
 }
 
+function mapCatalogCategorySummary(category: {
+  id: string;
+  gameId: string;
+  name: string;
+  slug: string;
+  _count: {
+    products: number;
+  };
+}): CatalogCategorySummary {
+  return {
+    id: category.id,
+    gameId: category.gameId,
+    name: category.name,
+    slug: category.slug,
+    productCount: category._count.products,
+  };
+}
+
 function mapCatalogGameSummary(game: {
   id: string;
   name: string;
   slug: string;
   imageUrl: string | null;
+  categories: Array<{
+    id: string;
+    gameId: string;
+    name: string;
+    slug: string;
+    _count: {
+      products: number;
+    };
+  }>;
   _count: {
     products: number;
     categories: number;
@@ -82,7 +125,46 @@ function mapCatalogGameSummary(game: {
     imageUrl: game.imageUrl,
     productCount: game._count.products,
     categoryCount: game._count.categories,
+    categories: game.categories.map(mapCatalogCategorySummary),
   };
+}
+
+async function getCatalogGameSummaryById(gameId: string) {
+  const game = await prisma.game.findUnique({
+    where: {
+      id: gameId,
+    },
+    select: {
+      id: true,
+      name: true,
+      slug: true,
+      imageUrl: true,
+      categories: {
+        select: {
+          id: true,
+          gameId: true,
+          name: true,
+          slug: true,
+          _count: {
+            select: {
+              products: true,
+            },
+          },
+        },
+        orderBy: {
+          name: "asc",
+        },
+      },
+      _count: {
+        select: {
+          products: true,
+          categories: true,
+        },
+      },
+    },
+  });
+
+  return game ? mapCatalogGameSummary(game) : null;
 }
 
 async function requireAdminAccess() {
@@ -109,6 +191,43 @@ async function requireSuperAdminAccess() {
   }
 
   return currentUser;
+}
+
+async function requireCatalogWriteAccess() {
+  const session = await getAuthSession();
+  const currentUser = await getCurrentSessionUser(session);
+
+  if (
+    !currentUser ||
+    currentUser.isBanned ||
+    !CATALOG_EDITOR_ROLES.includes(currentUser.role)
+  ) {
+    throw new Error("Access Denied");
+  }
+
+  return currentUser;
+}
+
+async function requireCatalogDeleteAccess() {
+  const session = await getAuthSession();
+  const currentUser = await getCurrentSessionUser(session);
+
+  if (!currentUser || currentUser.isBanned || currentUser.role !== "SUPER_ADMIN") {
+    throw new Error("Access Denied: Only SUPER_ADMIN can delete content");
+  }
+
+  return currentUser;
+}
+
+function revalidateCatalogPaths(gameSlug?: string) {
+  revalidatePath("/");
+  revalidatePath("/admin");
+  revalidatePath("/sell");
+  revalidatePath("/games/[slug]", "page");
+
+  if (gameSlug) {
+    revalidatePath(`/games/${gameSlug}`);
+  }
 }
 
 export async function changeUserRole(
@@ -384,10 +503,10 @@ export async function createCatalogGame(
   slug: string,
   imageUrl: string,
 ): Promise<CatalogGameActionResult> {
-  await requireAdminAccess();
+  await requireCatalogWriteAccess();
 
   const normalizedName = name.trim();
-  const normalizedSlug = normalizeCatalogGameSlug(slug || name);
+  const normalizedSlug = normalizeCatalogSlug(slug || name);
 
   if (!normalizedName) {
     return {
@@ -439,27 +558,24 @@ export async function createCatalogGame(
     },
     select: {
       id: true,
-      name: true,
-      slug: true,
-      imageUrl: true,
-      _count: {
-        select: {
-          products: true,
-          categories: true,
-        },
-      },
     },
   });
 
-  revalidatePath("/");
-  revalidatePath("/admin");
-  revalidatePath("/sell");
-  revalidatePath("/games/[slug]", "page");
+  revalidateCatalogPaths();
+
+  const gameSummary = await getCatalogGameSummaryById(game.id);
+
+  if (!gameSummary) {
+    return {
+      ok: false,
+      message: "Не удалось загрузить данные новой игры.",
+    };
+  }
 
   return {
     ok: true,
     message: "Игра добавлена в каталог.",
-    game: mapCatalogGameSummary(game),
+    game: gameSummary,
   };
 }
 
@@ -467,7 +583,7 @@ export async function updateCatalogGameImage(
   gameId: string,
   imageUrl: string,
 ): Promise<CatalogGameActionResult> {
-  await requireAdminAccess();
+  await requireCatalogWriteAccess();
 
   const normalizedGameId = gameId.trim();
 
@@ -516,29 +632,362 @@ export async function updateCatalogGameImage(
     },
     select: {
       id: true,
-      name: true,
-      slug: true,
-      imageUrl: true,
-      _count: {
-        select: {
-          products: true,
-          categories: true,
-        },
-      },
     },
   });
 
-  revalidatePath("/");
-  revalidatePath("/admin");
-  revalidatePath("/sell");
-  revalidatePath("/games/[slug]", "page");
-  revalidatePath(`/games/${existingGame.slug}`);
+  revalidateCatalogPaths(existingGame.slug);
+
+  const gameSummary = await getCatalogGameSummaryById(game.id);
+
+  if (!gameSummary) {
+    return {
+      ok: false,
+      message: "Не удалось загрузить обновлённые данные игры.",
+    };
+  }
 
   return {
     ok: true,
     message: normalizedImageUrl
       ? "Обложка игры обновлена."
       : "URL обложки очищен, теперь используется fallback-оформление.",
-    game: mapCatalogGameSummary(game),
+    game: gameSummary,
+  };
+}
+
+export async function deleteCatalogGame(
+  gameId: string,
+): Promise<AdminActionResult> {
+  await requireCatalogDeleteAccess();
+
+  const normalizedGameId = gameId.trim();
+
+  if (!normalizedGameId) {
+    return {
+      ok: false,
+      message: "Не удалось определить игру.",
+    };
+  }
+
+  const existingGame = await prisma.game.findUnique({
+    where: {
+      id: normalizedGameId,
+    },
+    select: {
+      id: true,
+      slug: true,
+      _count: {
+        select: {
+          products: true,
+        },
+      },
+    },
+  });
+
+  if (!existingGame) {
+    return {
+      ok: false,
+      message: "Игра не найдена.",
+    };
+  }
+
+  if (existingGame._count.products > 0) {
+    return {
+      ok: false,
+      message: "Нельзя удалить игру, пока к ней привязаны товары.",
+    };
+  }
+
+  await prisma.game.delete({
+    where: {
+      id: normalizedGameId,
+    },
+  });
+
+  revalidateCatalogPaths(existingGame.slug);
+
+  return {
+    ok: true,
+    message: "Игра удалена из каталога.",
+  };
+}
+
+export async function createCategory(
+  gameId: string,
+  name: string,
+  slug: string,
+): Promise<CatalogCategoryActionResult> {
+  await requireCatalogWriteAccess();
+
+  const normalizedGameId = gameId.trim();
+  const normalizedName = name.trim();
+  const normalizedSlug = normalizeCatalogSlug(slug || name);
+
+  if (!normalizedGameId) {
+    return {
+      ok: false,
+      message: "Не удалось определить игру.",
+    };
+  }
+
+  if (!normalizedName) {
+    return {
+      ok: false,
+      message: "Введите название подкатегории.",
+    };
+  }
+
+  if (!normalizedSlug) {
+    return {
+      ok: false,
+      message: "Введите корректный slug подкатегории латиницей.",
+    };
+  }
+
+  const game = await prisma.game.findUnique({
+    where: {
+      id: normalizedGameId,
+    },
+    select: {
+      id: true,
+      slug: true,
+    },
+  });
+
+  if (!game) {
+    return {
+      ok: false,
+      message: "Игра не найдена.",
+    };
+  }
+
+  const existingCategory = await prisma.category.findUnique({
+    where: {
+      gameId_slug: {
+        gameId: normalizedGameId,
+        slug: normalizedSlug,
+      },
+    },
+    select: {
+      id: true,
+    },
+  });
+
+  if (existingCategory) {
+    return {
+      ok: false,
+      message: "Подкатегория с таким slug уже существует для этой игры.",
+    };
+  }
+
+  const category = await prisma.category.create({
+    data: {
+      gameId: normalizedGameId,
+      name: normalizedName,
+      slug: normalizedSlug,
+    },
+    select: {
+      id: true,
+      gameId: true,
+      name: true,
+      slug: true,
+      _count: {
+        select: {
+          products: true,
+        },
+      },
+    },
+  });
+
+  revalidateCatalogPaths(game.slug);
+
+  const gameSummary = await getCatalogGameSummaryById(normalizedGameId);
+
+  return {
+    ok: true,
+    message: "Подкатегория добавлена.",
+    category: mapCatalogCategorySummary(category),
+    game: gameSummary ?? undefined,
+  };
+}
+
+export async function updateCategory(
+  id: string,
+  name: string,
+  slug: string,
+): Promise<CatalogCategoryActionResult> {
+  await requireCatalogWriteAccess();
+
+  const normalizedCategoryId = id.trim();
+  const normalizedName = name.trim();
+  const normalizedSlug = normalizeCatalogSlug(slug || name);
+
+  if (!normalizedCategoryId) {
+    return {
+      ok: false,
+      message: "Не удалось определить подкатегорию.",
+    };
+  }
+
+  if (!normalizedName) {
+    return {
+      ok: false,
+      message: "Введите название подкатегории.",
+    };
+  }
+
+  if (!normalizedSlug) {
+    return {
+      ok: false,
+      message: "Введите корректный slug подкатегории латиницей.",
+    };
+  }
+
+  const existingCategory = await prisma.category.findUnique({
+    where: {
+      id: normalizedCategoryId,
+    },
+    select: {
+      id: true,
+      gameId: true,
+      game: {
+        select: {
+          slug: true,
+        },
+      },
+    },
+  });
+
+  if (!existingCategory) {
+    return {
+      ok: false,
+      message: "Подкатегория не найдена.",
+    };
+  }
+
+  const duplicateCategory = await prisma.category.findFirst({
+    where: {
+      gameId: existingCategory.gameId,
+      slug: normalizedSlug,
+      NOT: {
+        id: normalizedCategoryId,
+      },
+    },
+    select: {
+      id: true,
+    },
+  });
+
+  if (duplicateCategory) {
+    return {
+      ok: false,
+      message: "Подкатегория с таким slug уже существует для этой игры.",
+    };
+  }
+
+  const category = await prisma.category.update({
+    where: {
+      id: normalizedCategoryId,
+    },
+    data: {
+      name: normalizedName,
+      slug: normalizedSlug,
+    },
+    select: {
+      id: true,
+      gameId: true,
+      name: true,
+      slug: true,
+      _count: {
+        select: {
+          products: true,
+        },
+      },
+    },
+  });
+
+  revalidateCatalogPaths(existingCategory.game.slug);
+
+  const gameSummary = await getCatalogGameSummaryById(existingCategory.gameId);
+
+  return {
+    ok: true,
+    message: "Подкатегория обновлена.",
+    category: mapCatalogCategorySummary(category),
+    game: gameSummary ?? undefined,
+  };
+}
+
+export async function deleteCategory(
+  id: string,
+): Promise<CatalogCategoryActionResult> {
+  await requireCatalogDeleteAccess();
+
+  const normalizedCategoryId = id.trim();
+
+  if (!normalizedCategoryId) {
+    return {
+      ok: false,
+      message: "Не удалось определить подкатегорию.",
+    };
+  }
+
+  const existingCategory = await prisma.category.findUnique({
+    where: {
+      id: normalizedCategoryId,
+    },
+    select: {
+      id: true,
+      gameId: true,
+      name: true,
+      slug: true,
+      game: {
+        select: {
+          slug: true,
+        },
+      },
+      _count: {
+        select: {
+          products: true,
+        },
+      },
+    },
+  });
+
+  if (!existingCategory) {
+    return {
+      ok: false,
+      message: "Подкатегория не найдена.",
+    };
+  }
+
+  if (existingCategory._count.products > 0) {
+    return {
+      ok: false,
+      message: "Нельзя удалить подкатегорию, пока к ней привязаны товары.",
+    };
+  }
+
+  await prisma.category.delete({
+    where: {
+      id: normalizedCategoryId,
+    },
+  });
+
+  revalidateCatalogPaths(existingCategory.game.slug);
+
+  const gameSummary = await getCatalogGameSummaryById(existingCategory.gameId);
+
+  return {
+    ok: true,
+    message: "Подкатегория удалена.",
+    category: {
+      id: existingCategory.id,
+      gameId: existingCategory.gameId,
+      name: existingCategory.name,
+      slug: existingCategory.slug,
+      productCount: existingCategory._count.products,
+    },
+    game: gameSummary ?? undefined,
   };
 }

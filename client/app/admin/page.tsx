@@ -284,6 +284,22 @@ export default async function AdminDashboardPage() {
         name: true,
         slug: true,
         imageUrl: true,
+        categories: {
+          select: {
+            id: true,
+            gameId: true,
+            name: true,
+            slug: true,
+            _count: {
+              select: {
+                products: true,
+              },
+            },
+          },
+          orderBy: {
+            name: "asc",
+          },
+        },
         _count: {
           select: {
             categories: true,
@@ -506,6 +522,7 @@ export default async function AdminDashboardPage() {
                 </CardHeader>
                 <CardContent className="pt-6">
                   <GameManager
+                    currentUserRole={currentUser.role}
                     games={catalogGames.map((game) => ({
                       id: game.id,
                       name: game.name,
@@ -513,6 +530,13 @@ export default async function AdminDashboardPage() {
                       imageUrl: game.imageUrl,
                       productCount: game._count.products,
                       categoryCount: game._count.categories,
+                      categories: game.categories.map((category) => ({
+                        id: category.id,
+                        gameId: category.gameId,
+                        name: category.name,
+                        slug: category.slug,
+                        productCount: category._count.products,
+                      })),
                     }))}
                   />
                 </CardContent>
