@@ -61,7 +61,7 @@ export default async function ProfileSettingsPage() {
           Настройки профиля
         </h1>
         <p className="mt-4 max-w-3xl text-sm leading-7 text-zinc-300 md:text-base">
-          Обновите никнейм, аватар и ссылку на баннер для Steam-подобной шапки профиля. Аватар сжимается на клиенте и сохраняется в базе как Base64 WebP, а баннер можно подтянуть по внешнему URL.
+          Обновите никнейм, аватар и баннер для Steam-подобной шапки профиля. Медиа сжимаются на клиенте и сохраняются в базе как Base64 WebP, а превью обновляется сразу после выбора файла.
         </p>
 
         <div className="mt-6 flex flex-wrap gap-3">

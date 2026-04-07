@@ -28,8 +28,18 @@ interface ProfileSettingsFormProps {
 }
 
 const ACCEPTED_IMAGE_TYPES = new Set(["image/jpeg", "image/png", "image/webp"]);
-const MAX_IMAGE_DIMENSION = 200;
-const WEBP_QUALITY = 0.82;
+const MAX_AVATAR_DIMENSION = 200;
+const MAX_BANNER_WIDTH = 1600;
+const MAX_BANNER_HEIGHT = 640;
+const AVATAR_WEBP_QUALITY = 0.82;
+const BANNER_WEBP_QUALITY = 0.84;
+
+interface ImageCompressionOptions {
+  maxWidth: number;
+  maxHeight: number;
+  quality: number;
+  subjectLabel: string;
+}
 
 function readFileAsDataUrl(file: Blob) {
   return new Promise<string>((resolve, reject) => {
@@ -62,7 +72,10 @@ function loadImage(source: string) {
   });
 }
 
-async function compressImageToWebpBase64(file: File) {
+async function compressImageToWebpBase64(
+  file: File,
+  { maxWidth, maxHeight, quality, subjectLabel }: ImageCompressionOptions,
+) {
   if (!ACCEPTED_IMAGE_TYPES.has(file.type)) {
     throw new Error("Поддерживаются только JPG, PNG и WebP.");
   }
@@ -70,8 +83,8 @@ async function compressImageToWebpBase64(file: File) {
   const source = await readFileAsDataUrl(file);
   const image = await loadImage(source);
   const scale = Math.min(
-    MAX_IMAGE_DIMENSION / image.width,
-    MAX_IMAGE_DIMENSION / image.height,
+    maxWidth / image.width,
+    maxHeight / image.height,
     1,
   );
   const targetWidth = Math.max(1, Math.round(image.width * scale));
@@ -84,13 +97,13 @@ async function compressImageToWebpBase64(file: File) {
   const context = canvas.getContext("2d");
 
   if (!context) {
-    throw new Error("Не удалось подготовить холст для аватара.");
+    throw new Error(`Не удалось подготовить холст для ${subjectLabel}.`);
   }
 
   context.drawImage(image, 0, 0, targetWidth, targetHeight);
 
   const webpBlob = await new Promise<Blob | null>((resolve) => {
-    canvas.toBlob(resolve, "image/webp", WEBP_QUALITY);
+    canvas.toBlob(resolve, "image/webp", quality);
   });
 
   if (!webpBlob) {
@@ -98,6 +111,24 @@ async function compressImageToWebpBase64(file: File) {
   }
 
   return readFileAsDataUrl(webpBlob);
+}
+
+function compressAvatarToWebpBase64(file: File) {
+  return compressImageToWebpBase64(file, {
+    maxWidth: MAX_AVATAR_DIMENSION,
+    maxHeight: MAX_AVATAR_DIMENSION,
+    quality: AVATAR_WEBP_QUALITY,
+    subjectLabel: "аватара",
+  });
+}
+
+function compressBannerToWebpBase64(file: File) {
+  return compressImageToWebpBase64(file, {
+    maxWidth: MAX_BANNER_WIDTH,
+    maxHeight: MAX_BANNER_HEIGHT,
+    quality: BANNER_WEBP_QUALITY,
+    subjectLabel: "баннера",
+  });
 }
 
 export function ProfileSettingsForm({
@@ -118,11 +149,13 @@ export function ProfileSettingsForm({
   const [savedBannerUrl, setSavedBannerUrl] = useState(initialBannerUrl ?? "");
   const [errorMessage, setErrorMessage] = useState("");
   const [successMessage, setSuccessMessage] = useState("");
-  const [isProcessingImage, setIsProcessingImage] = useState(false);
+  const [isProcessingAvatar, setIsProcessingAvatar] = useState(false);
+  const [isProcessingBanner, setIsProcessingBanner] = useState(false);
   const [isPending, startTransition] = useTransition();
 
   const displayName = name.trim() || initialEmail.split("@")[0] || "Профиль";
   const normalizedBannerUrl = bannerUrl.trim();
+  const isProcessingImage = isProcessingAvatar || isProcessingBanner;
   const hasChanges =
     name.trim() !== savedName ||
     image !== savedImage ||
@@ -132,13 +165,13 @@ export function ProfileSettingsForm({
   async function handleAvatarSelection(file: File) {
     setErrorMessage("");
     setSuccessMessage("");
-    setIsProcessingImage(true);
+    setIsProcessingAvatar(true);
 
     try {
-      const compressedImage = await compressImageToWebpBase64(file);
+      const compressedImage = await compressAvatarToWebpBase64(file);
       setImage(compressedImage);
     } finally {
-      setIsProcessingImage(false);
+      setIsProcessingAvatar(false);
     }
   }
 
@@ -164,6 +197,37 @@ export function ProfileSettingsForm({
     setErrorMessage("");
     setSuccessMessage("");
     setImage(null);
+  }
+
+  async function handleBannerSelection(file: File) {
+    setErrorMessage("");
+    setSuccessMessage("");
+    setIsProcessingBanner(true);
+
+    try {
+      const compressedBanner = await compressBannerToWebpBase64(file);
+      setBannerUrl(compressedBanner);
+    } finally {
+      setIsProcessingBanner(false);
+    }
+  }
+
+  function handleBannerFileChange(event: React.ChangeEvent<HTMLInputElement>) {
+    const file = event.target.files?.[0];
+
+    event.target.value = "";
+
+    if (!file) {
+      return;
+    }
+
+    void handleBannerSelection(file).catch((error) => {
+      setErrorMessage(
+        error instanceof Error
+          ? error.message
+          : "Не удалось подготовить баннер.",
+      );
+    });
   }
 
   async function saveProfile() {
@@ -202,19 +266,19 @@ export function ProfileSettingsForm({
   }
 
   return (
-    <div className="grid gap-6 lg:grid-cols-[360px_minmax(0,1fr)]">
-      <Card className="overflow-hidden border-white/10 bg-[radial-gradient(circle_at_top_left,rgba(251,146,60,0.22),transparent_35%),rgba(9,9,11,0.9)]">
+    <div className="grid gap-6 lg:grid-cols-[minmax(400px,440px)_minmax(0,1fr)]">
+      <Card className="w-full min-w-[320px] overflow-visible border-white/10 bg-[radial-gradient(circle_at_top_left,rgba(251,146,60,0.22),transparent_35%),rgba(9,9,11,0.9)]">
         <CardHeader>
           <p className="text-xs font-semibold tracking-[0.24em] uppercase text-orange-200/80">
             Preview
           </p>
           <CardTitle>Как профиль выглядит сейчас</CardTitle>
           <CardDescription>
-            В предпросмотре видно новую Steam-подобную шапку. Аватар автоматически сжимается до {MAX_IMAGE_DIMENSION}x{MAX_IMAGE_DIMENSION}, а баннер тянется по внешней ссылке.
+            В предпросмотре видно новую Steam-подобную шапку. Аватар автоматически сжимается до {MAX_AVATAR_DIMENSION}x{MAX_AVATAR_DIMENSION}, а баннер загружается файлом и сразу появляется слева.
           </CardDescription>
         </CardHeader>
 
-        <CardContent className="space-y-6">
+        <CardContent className="space-y-6 px-5 pb-6 sm:px-6">
           <ProfileHero
             eyebrow="Preview"
             displayName={displayName}
@@ -242,7 +306,7 @@ export function ProfileSettingsForm({
             </div>
           ) : null}
 
-          <div className="rounded-[1.5rem] border border-white/10 bg-white/5 p-4 text-sm leading-7 text-zinc-300">
+          <div className="rounded-[1.5rem] border border-white/10 bg-white/5 p-4 text-sm leading-7 break-words text-zinc-300">
             Такой же баннер, аватар и никнейм будут использоваться в личном кабинете и на публичной странице продавца после сохранения.
           </div>
         </CardContent>
@@ -255,7 +319,7 @@ export function ProfileSettingsForm({
           </p>
           <CardTitle>Настройки профиля</CardTitle>
           <CardDescription>
-            Укажите удобный никнейм, загрузите новый аватар и добавьте ссылку на баннер. Достижения теперь приходят как из админки, так и автоматически по статистике продавца.
+            Укажите удобный никнейм, загрузите новый аватар и добавьте баннер файлом. Достижения теперь приходят как из админки, так и автоматически по статистике продавца.
           </CardDescription>
         </CardHeader>
 
@@ -282,24 +346,18 @@ export function ProfileSettingsForm({
           </div>
 
           <div className="space-y-3">
-            <label htmlFor="profile-banner-url" className="text-sm font-semibold text-zinc-200">
+            <label htmlFor="profile-banner" className="text-sm font-semibold text-zinc-200">
               Баннер профиля
             </label>
-            <Input
-              id="profile-banner-url"
-              name="bannerUrl"
-              type="url"
-              inputMode="url"
-              value={bannerUrl}
-              onChange={(event) => {
-                setBannerUrl(event.target.value);
-                setErrorMessage("");
-                setSuccessMessage("");
-              }}
-              placeholder="https://cdn.example.com/profile-banner.webp"
+            <input
+              id="profile-banner"
+              type="file"
+              accept="image/jpeg,image/png,image/webp"
+              onChange={handleBannerFileChange}
+              className="block w-full rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-sm text-zinc-200 file:mr-4 file:rounded-xl file:border-0 file:bg-sky-600 file:px-4 file:py-2 file:font-semibold file:text-white file:transition hover:file:bg-sky-500"
             />
             <p className="text-sm leading-7 text-zinc-500">
-              Подойдет прямая ссылка на изображение из внешнего стораджа или CDN. Если оставить поле пустым, в профиле останется фирменный градиентный фон.
+              Поддерживаются JPG, PNG и WebP. Баннер автоматически конвертируется в WebP и сразу показывается в превью. Если очистить поле, в профиле останется фирменный градиентный фон.
             </p>
           </div>
 
@@ -368,8 +426,11 @@ export function ProfileSettingsForm({
             </Button>
           </div>
 
-          {isProcessingImage ? (
-            <p className="text-sm text-zinc-400">Подготавливаем изображение для загрузки...</p>
+          {isProcessingAvatar ? (
+            <p className="text-sm text-zinc-400">Подготавливаем аватар для загрузки...</p>
+          ) : null}
+          {isProcessingBanner ? (
+            <p className="text-sm text-zinc-400">Подготавливаем баннер для загрузки...</p>
           ) : null}
         </CardContent>
       </Card>

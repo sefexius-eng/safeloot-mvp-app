@@ -14,6 +14,7 @@ export interface UpdateUserProfileResult {
 }
 
 const MAX_IMAGE_BASE64_LENGTH = 350_000;
+const MAX_BANNER_BASE64_LENGTH = 1_600_000;
 const MAX_BANNER_URL_LENGTH = 2_048;
 
 function normalizeBannerUrl(rawBannerUrl: string) {
@@ -23,6 +24,27 @@ function normalizeBannerUrl(rawBannerUrl: string) {
     return {
       ok: true as const,
       value: null,
+    };
+  }
+
+  if (normalizedBannerUrl.startsWith("data:image/")) {
+    if (!normalizedBannerUrl.startsWith("data:image/webp;base64,")) {
+      return {
+        ok: false as const,
+        message: "Баннер должен быть в формате WebP.",
+      };
+    }
+
+    if (normalizedBannerUrl.length > MAX_BANNER_BASE64_LENGTH) {
+      return {
+        ok: false as const,
+        message: "Баннер получился слишком большим. Попробуйте другое изображение.",
+      };
+    }
+
+    return {
+      ok: true as const,
+      value: normalizedBannerUrl,
     };
   }
 
@@ -53,7 +75,7 @@ function normalizeBannerUrl(rawBannerUrl: string) {
   } catch {
     return {
       ok: false as const,
-      message: "Введите корректную ссылку на баннер.",
+      message: "Выберите корректное изображение для баннера.",
     };
   }
 }

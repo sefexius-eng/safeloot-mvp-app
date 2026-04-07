@@ -36,23 +36,25 @@ export function ProfileHero({
   return (
     <section
       className={cn(
-        "overflow-hidden rounded-[2.25rem] border border-white/10 bg-zinc-950/80 p-4 shadow-[0_24px_80px_rgba(0,0,0,0.28)] backdrop-blur md:p-5",
+        "rounded-[2.25rem] border border-white/10 bg-zinc-950/80 p-4 shadow-[0_24px_80px_rgba(0,0,0,0.28)] backdrop-blur md:p-5",
         className,
       )}
     >
-      <div className="relative w-full h-48 overflow-hidden rounded-xl bg-muted md:h-64">
-        {bannerUrl ? (
-          <img
-            src={bannerUrl}
-            alt=""
-            className="absolute inset-0 h-full w-full object-cover"
-          />
-        ) : null}
+      <div className="relative mb-16 md:mb-20">
+        <div className="relative h-48 w-full overflow-hidden rounded-xl bg-muted md:h-64">
+          {bannerUrl ? (
+            <img
+              src={bannerUrl}
+              alt=""
+              className="absolute inset-0 h-full w-full object-cover"
+            />
+          ) : null}
 
-        <div className="absolute inset-0 bg-[radial-gradient(circle_at_20%_20%,rgba(249,115,22,0.34),transparent_32%),radial-gradient(circle_at_82%_18%,rgba(56,189,248,0.24),transparent_28%),linear-gradient(135deg,rgba(24,24,27,0.36)_0%,rgba(15,23,42,0.66)_48%,rgba(9,9,11,0.96)_100%)]" />
-        <div className="absolute inset-0 bg-[linear-gradient(180deg,rgba(9,9,11,0.08)_0%,rgba(9,9,11,0.26)_45%,rgba(9,9,11,0.9)_100%)]" />
+          <div className="absolute inset-0 bg-[radial-gradient(circle_at_20%_20%,rgba(249,115,22,0.34),transparent_32%),radial-gradient(circle_at_82%_18%,rgba(56,189,248,0.24),transparent_28%),linear-gradient(135deg,rgba(24,24,27,0.36)_0%,rgba(15,23,42,0.66)_48%,rgba(9,9,11,0.96)_100%)]" />
+          <div className="absolute inset-0 bg-[linear-gradient(180deg,rgba(9,9,11,0.08)_0%,rgba(9,9,11,0.26)_45%,rgba(9,9,11,0.9)_100%)]" />
+        </div>
 
-        <div className="absolute -bottom-12 left-6 md:-bottom-16 md:left-8">
+        <div className="absolute -bottom-12 left-6 z-10 md:-bottom-16 md:left-8">
           <div className="relative">
             <UserAvatar
               src={avatarSrc}
@@ -69,14 +71,14 @@ export function ProfileHero({
         </div>
       </div>
 
-      <div className="flex flex-col gap-6 px-6 pb-6 pt-16 md:px-8 md:pb-8 md:pt-20 xl:flex-row xl:items-end xl:justify-between">
-        <div className="min-w-0 flex-1 pl-[6.5rem] md:pl-40">
+      <div className="flex flex-col gap-6 px-6 pb-6 md:px-8 md:pb-8 xl:flex-row xl:items-end xl:justify-between">
+        <div className="min-w-0 flex-1">
           <p className="text-sm font-semibold tracking-[0.24em] uppercase text-zinc-500">
             {eyebrow}
           </p>
 
           <div className="mt-3 flex flex-wrap items-center gap-3">
-            <h1 className="min-w-0 text-3xl font-semibold tracking-tight text-white md:text-5xl md:leading-[1.02]">
+            <h1 className="min-w-0 break-words text-3xl font-semibold tracking-tight text-white [overflow-wrap:anywhere] md:text-5xl md:leading-[1.02]">
               {displayName}
             </h1>
             {roleBadge}

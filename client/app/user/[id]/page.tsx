@@ -240,7 +240,7 @@ export default async function PublicUserPage({ params }: PublicUserPageProps) {
       <ProfileHero
         eyebrow="Публичный профиль продавца"
         displayName={
-          <span className="block truncate">
+          <span className="block break-words [overflow-wrap:anywhere]">
             <CensoredText text={displayName} />
           </span>
         }
