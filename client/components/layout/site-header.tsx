@@ -465,6 +465,7 @@ export function SiteHeader() {
                 <input
                   type="search"
                   name="search"
+                  autoComplete="off"
                   value={query}
                   onChange={(event) => {
                     setQuery(event.target.value);

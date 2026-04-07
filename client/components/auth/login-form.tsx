@@ -84,6 +84,9 @@ export function LoginForm() {
           <span className="text-sm font-semibold text-zinc-200">Email</span>
           <Input
             type="email"
+            name="email"
+            id="email"
+            autoComplete="email"
             value={email}
             onChange={(event) => setEmail(event.target.value)}
             placeholder="you@example.com"
@@ -96,6 +99,9 @@ export function LoginForm() {
           <span className="text-sm font-semibold text-zinc-200">Пароль</span>
           <Input
             type="password"
+            name="password"
+            id="password"
+            autoComplete="current-password"
             value={password}
             onChange={(event) => setPassword(event.target.value)}
             placeholder="Минимум 6 символов"
