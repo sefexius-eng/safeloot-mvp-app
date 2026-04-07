@@ -496,16 +496,8 @@ export function ProfileSettingsForm({
                 />
               </div>
 
-              <div className="flex items-start justify-between gap-4 rounded-[1.25rem] border border-dashed border-white/10 bg-black/20 px-4 py-3 opacity-75">
-                <div className="min-w-0">
-                  <label htmlFor="profile-telegram-notifications" className="text-sm font-semibold text-zinc-100">
-                    Telegram-бот
-                  </label>
-                  <p className="mt-1 text-sm leading-6 text-zinc-400">
-                    В разработке
-                  </p>
-                </div>
-                <Switch id="profile-telegram-notifications" checked={false} disabled />
+              <div className="rounded-[1.25rem] border border-dashed border-white/10 bg-black/20 px-4 py-3 text-sm leading-6 text-zinc-400">
+                Telegram-бот (В разработке)
               </div>
             </div>
           </section>

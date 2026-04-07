@@ -48,7 +48,8 @@ export function BuyProductDialog({ product }: BuyProductDialogProps) {
         throw new Error(result.message || "Не удалось создать заказ.");
       }
 
-      router.push(`/payment-mock?orderId=${result.orderId}`);
+      window.dispatchEvent(new Event("safeloot:balances-refresh"));
+      router.push(`/orders/${result.orderId}`);
     } catch (error) {
       setErrorMessage(
         error instanceof Error ? error.message : "Не удалось создать заказ.",
@@ -69,7 +70,7 @@ export function BuyProductDialog({ product }: BuyProductDialogProps) {
         <DialogHeader>
           <DialogTitle>Подтверждение покупки</DialogTitle>
           <DialogDescription>
-            Проверьте детали заказа перед переходом на защищенную платежную страницу.
+            Проверьте детали заказа перед моментальным переводом средств в Escrow.
           </DialogDescription>
         </DialogHeader>
 
@@ -91,22 +92,26 @@ export function BuyProductDialog({ product }: BuyProductDialogProps) {
 
         <div className="rounded-[1.5rem] border border-sky-500/15 bg-sky-500/8 p-4 text-sm text-sky-100">
           <div className="flex items-start gap-3">
-            <div className="flex gap-2 pt-0.5">
-              <span className="flex h-9 w-12 items-center justify-center rounded-xl border border-white/10 bg-slate-950/70 text-[10px] font-semibold tracking-[0.18em] text-white">
-                VISA
-              </span>
-              <span className="flex h-9 w-12 items-center justify-center rounded-xl border border-white/10 bg-slate-950/70 text-[10px] font-semibold tracking-[0.12em] text-white">
-                MC
-              </span>
-              <span className="flex h-9 w-12 items-center justify-center rounded-xl border border-white/10 bg-slate-950/70 text-[10px] font-semibold tracking-[0.12em] text-white">
-                MIR
-              </span>
+            <div className="flex h-11 w-11 items-center justify-center rounded-2xl border border-white/10 bg-slate-950/70 text-white">
+              <svg
+                aria-hidden="true"
+                viewBox="0 0 24 24"
+                className="h-5 w-5"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="1.8"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              >
+                <path d="M12 3v18" />
+                <path d="M17 8H9.5a2.5 2.5 0 0 0 0 5H14.5a2.5 2.5 0 0 1 0 5H6" />
+              </svg>
             </div>
 
             <div className="min-w-0 flex-1">
-              <p className="font-semibold text-white">Оплата банковскими картами</p>
+              <p className="font-semibold text-white">Оплата с доступного баланса</p>
               <p className="mt-2 leading-7 text-sky-100/80">
-                На следующем шаге будет доступна оплата картой. Поддерживаются платежи в RUB, UAH и USD.
+                Сумма будет сразу списана с вашего available balance и переведена в escrow-холд платформы внутри защищенной транзакции.
               </p>
             </div>
           </div>
@@ -155,7 +160,7 @@ export function BuyProductDialog({ product }: BuyProductDialogProps) {
                 Создаем заказ...
               </span>
             ) : (
-              "Перейти к оплате"
+              "Оплатить с баланса"
             )}
           </Button>
         </DialogFooter>

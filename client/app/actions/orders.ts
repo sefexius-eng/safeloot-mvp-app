@@ -80,6 +80,8 @@ export async function createPendingOrder(
       buyerId: currentUser.id,
     });
 
+    revalidateOrderPaths(result.orderId);
+
     return {
       ok: true,
       orderId: result.orderId,

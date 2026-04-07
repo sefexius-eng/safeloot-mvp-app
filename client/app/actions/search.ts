@@ -11,38 +11,39 @@ export interface SearchGameResult {
   imageUrl: string | null;
 }
 
-export interface SearchProductResult {
-  id: string;
-  title: string;
-  imageUrl: string | null;
-  gameName: string;
-}
-
-export interface SearchSellerResult {
+export interface SearchCategoryResult {
   id: string;
   name: string;
+  slug: string;
+  gameName: string;
+  gameSlug: string;
+  gameImageUrl: string | null;
+}
+
+export interface SearchCatalogResult {
+  games: SearchGameResult[];
+  categories: SearchCategoryResult[];
+}
+
+export interface SearchUserResult {
+  id: string;
+  name: string;
+  email: string;
   image: string | null;
   role: Role;
 }
 
-export interface SearchMarketplaceResult {
-  games: SearchGameResult[];
-  products: SearchProductResult[];
-  sellers: SearchSellerResult[];
-}
-
-export async function searchMarketplace(query: string): Promise<SearchMarketplaceResult> {
+export async function searchCatalog(query: string): Promise<SearchCatalogResult> {
   const normalizedQuery = query.trim();
 
   if (!normalizedQuery) {
     return {
       games: [],
-      products: [],
-      sellers: [],
+      categories: [],
     };
   }
 
-  const [games, products, sellers] = await Promise.all([
+  const [games, categories] = await Promise.all([
     prisma.game.findMany({
       where: {
         name: {
@@ -61,62 +62,87 @@ export async function searchMarketplace(query: string): Promise<SearchMarketplac
         imageUrl: true,
       },
     }),
-    prisma.product.findMany({
-      where: {
-        isActive: true,
-        title: {
-          contains: normalizedQuery,
-          mode: "insensitive",
-        },
-      },
-      take: 5,
-      orderBy: {
-        updatedAt: "desc",
-      },
-      select: {
-        id: true,
-        title: true,
-        images: true,
-        game: {
-          select: {
-            name: true,
-          },
-        },
-      },
-    }),
-    prisma.user.findMany({
+    prisma.category.findMany({
       where: {
         name: {
           contains: normalizedQuery,
           mode: "insensitive",
         },
       },
-      take: 5,
+      take: 6,
       orderBy: {
         name: "asc",
       },
       select: {
         id: true,
         name: true,
-        image: true,
-        role: true,
+        slug: true,
+        game: {
+          select: {
+            slug: true,
+            name: true,
+            imageUrl: true,
+          },
+        },
       },
     }),
   ]);
 
   return {
     games,
-    products: products.map((product) => ({
-      id: product.id,
-      title: product.title,
-      imageUrl: product.images[0] ?? null,
-      gameName: product.game.name,
-    })),
-    sellers: sellers.map((seller) => ({
-      id: seller.id,
-      name: seller.name?.trim() || "Продавец",
-      image: seller.image,
-      role: seller.role,
+    categories: categories.map((category) => ({
+      id: category.id,
+      name: category.name,
+      slug: category.slug,
+      gameName: category.game.name,
+      gameSlug: category.game.slug,
+      gameImageUrl: category.game.imageUrl,
     })),
   };
+}
+
+export async function searchUsers(query: string): Promise<SearchUserResult[]> {
+  const normalizedQuery = query.trim();
+
+  if (!normalizedQuery) {
+    return [];
+  }
+
+  const users = await prisma.user.findMany({
+    where: {
+      OR: [
+        {
+          name: {
+            contains: normalizedQuery,
+            mode: "insensitive",
+          },
+        },
+        {
+          email: {
+            contains: normalizedQuery,
+            mode: "insensitive",
+          },
+        },
+      ],
+    },
+    take: 8,
+    orderBy: {
+      name: "asc",
+    },
+    select: {
+      id: true,
+      name: true,
+      email: true,
+      image: true,
+      role: true,
+    },
+  });
+
+  return users.map((user) => ({
+    id: user.id,
+    name: user.name?.trim() || user.email.split("@")[0],
+    email: user.email,
+    image: user.image,
+    role: user.role,
+  }));
 }

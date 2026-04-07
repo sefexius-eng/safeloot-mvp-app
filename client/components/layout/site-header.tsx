@@ -7,16 +7,15 @@ import { signOut, useSession } from "next-auth/react";
 import type { Role } from "@prisma/client";
 
 import {
-  searchMarketplace,
+  searchCatalog,
+  type SearchCategoryResult,
+  type SearchCatalogResult,
   type SearchGameResult,
-  type SearchMarketplaceResult,
-  type SearchProductResult,
-  type SearchSellerResult,
 } from "@/app/actions/search";
+import { UserSearchDialog } from "@/components/layout/user-search-dialog";
 import { NotificationsBell } from "@/components/notifications-bell";
 import { TopupBalanceDialogMenuItem } from "@/components/payment/topup-balance-dialog";
 import { useCurrency } from "@/components/providers/currency-provider";
-import { Badge } from "@/components/ui/badge";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -28,7 +27,7 @@ import {
 import { Select } from "@/components/ui/select";
 import { UserAvatar } from "@/components/ui/user-avatar";
 import catalogSeedData from "@/lib/catalog-seed-data.json";
-import { getRoleLabel, isAdminRole, isTeamRole } from "@/lib/roles";
+import { isAdminRole } from "@/lib/roles";
 
 const BALANCE_REFRESH_EVENT = "safeloot:balances-refresh";
 const LAST_SEEN_UPDATE_INTERVAL_MS = 5 * 60 * 1000;
@@ -36,10 +35,9 @@ const PROFILE_REFRESH_INTERVAL_MS = 5000;
 const SEARCH_DEBOUNCE_MS = 250;
 const POPULAR_GAMES = catalogSeedData.popularGames;
 
-const EMPTY_SEARCH_RESULTS: SearchMarketplaceResult = {
+const EMPTY_SEARCH_RESULTS: SearchCatalogResult = {
   games: [],
-  products: [],
-  sellers: [],
+  categories: [],
 };
 
 function SearchGameIcon({
@@ -111,9 +109,10 @@ export function SiteHeader() {
   const [user, setUser] = useState<CurrentUser | null>(null);
   const [refreshToken, setRefreshToken] = useState(0);
   const [query, setQuery] = useState("");
-  const [results, setResults] = useState<SearchMarketplaceResult>(EMPTY_SEARCH_RESULTS);
+  const [results, setResults] = useState<SearchCatalogResult>(EMPTY_SEARCH_RESULTS);
   const [isSearchOpen, setIsSearchOpen] = useState(false);
   const [isSearching, setIsSearching] = useState(false);
+  const [isUserSearchOpen, setIsUserSearchOpen] = useState(false);
   const searchContainerRef = useRef<HTMLDivElement | null>(null);
   const lastSeenIntervalRef = useRef<number | null>(null);
   const isBanned = Boolean(session?.user?.isBanned);
@@ -232,7 +231,7 @@ export function SiteHeader() {
     const timeoutId = window.setTimeout(async () => {
       try {
         setIsSearching(true);
-        const nextResults = await searchMarketplace(query);
+        const nextResults = await searchCatalog(query);
 
         if (isActive) {
           setResults(nextResults);
@@ -276,32 +275,11 @@ export function SiteHeader() {
     router.push(`/games/${game.slug}`);
   }
 
-  function handleSelectProduct(product: SearchProductResult) {
-    setQuery(product.title);
+  function handleSelectCategory(category: SearchCategoryResult) {
+    setQuery(category.name);
     setResults(EMPTY_SEARCH_RESULTS);
     setIsSearchOpen(false);
-    router.push(`/product/${product.id}`);
-  }
-
-  function handleSelectSeller(seller: SearchSellerResult) {
-    setQuery(seller.name);
-    setResults(EMPTY_SEARCH_RESULTS);
-    setIsSearchOpen(false);
-    router.push(`/profile/${seller.id}`);
-  }
-
-  function getSearchRoleBadgeVariant(role: Role) {
-    switch (role) {
-      case "MODERATOR":
-        return "info" as const;
-      case "ADMIN":
-        return "warning" as const;
-      case "SUPER_ADMIN":
-        return "destructive" as const;
-      case "USER":
-      default:
-        return "secondary" as const;
-    }
+    router.push(`/games/${category.gameSlug}?category=${category.slug}`);
   }
 
   function renderSearchSection(props: {
@@ -324,8 +302,7 @@ export function SiteHeader() {
 
   const hasSearchResults =
     results.games.length > 0 ||
-    results.products.length > 0 ||
-    results.sellers.length > 0;
+    results.categories.length > 0;
 
   function handleSearchSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -335,13 +312,8 @@ export function SiteHeader() {
       return;
     }
 
-    if (results.products[0]) {
-      handleSelectProduct(results.products[0]);
-      return;
-    }
-
-    if (results.sellers[0]) {
-      handleSelectSeller(results.sellers[0]);
+    if (results.categories[0]) {
+      handleSelectCategory(results.categories[0]);
     }
   }
 
@@ -376,14 +348,10 @@ export function SiteHeader() {
           <DropdownMenuItem asChild>
             <Link href="/profile/settings">Настройки профиля</Link>
           </DropdownMenuItem>
+          <DropdownMenuItem onSelect={() => setIsUserSearchOpen(true)}>
+            Найти пользователя
+          </DropdownMenuItem>
           <TopupBalanceDialogMenuItem />
-          <DropdownMenuSeparator className="my-1 h-px bg-white/10" />
-          <div className="px-2 py-2">
-            <NotificationsBell
-              mode="panel"
-              pushNotificationsEnabled={Boolean(user?.pushNotifications)}
-            />
-          </div>
           <DropdownMenuSeparator className="my-1 h-px bg-white/10" />
           <DropdownMenuItem
             onSelect={(event) => {
@@ -504,7 +472,7 @@ export function SiteHeader() {
                   onFocus={() => {
                     setIsSearchOpen(true);
                   }}
-                  placeholder="Поиск по играм, товарам и продавцам"
+                  placeholder="Поиск по играм и категориям"
                   className="h-12 w-full rounded-2xl border border-white/10 bg-white/5 pl-12 pr-4 text-sm text-zinc-100 shadow-[0_12px_30px_rgba(0,0,0,0.22)] outline-none transition placeholder:text-zinc-500 focus:border-orange-500/40 focus:bg-white/8 focus:ring-4 focus:ring-orange-500/10"
                 />
               </label>
@@ -545,7 +513,7 @@ export function SiteHeader() {
                     </div>
                   ) : isSearching ? (
                     <div className="px-4 py-3 text-sm text-zinc-400">
-                      Ищем игры, товары и продавцов...
+                      Ищем игры и категории...
                     </div>
                   ) : hasSearchResults ? (
                     <div className="divide-y divide-white/10">
@@ -572,55 +540,21 @@ export function SiteHeader() {
                       })}
 
                       {renderSearchSection({
-                        title: "Товары",
-                        items: results.products.map((product) => (
+                        title: "Категории",
+                        items: results.categories.map((category) => (
                           <button
-                            key={product.id}
+                            key={category.id}
                             type="button"
-                            onClick={() => handleSelectProduct(product)}
+                            onClick={() => handleSelectCategory(category)}
                             className="flex w-full items-center gap-3 px-4 py-3 text-left transition hover:bg-white/5"
                           >
-                            <SearchGameIcon name={product.title} imageUrl={product.imageUrl} />
+                            <SearchGameIcon name={category.name} imageUrl={category.gameImageUrl} />
                             <span className="min-w-0 flex-1">
                               <span className="block truncate text-sm font-semibold text-white">
-                                {product.title}
+                                {category.name}
                               </span>
                               <span className="block truncate text-xs uppercase tracking-[0.18em] text-zinc-500">
-                                {product.gameName}
-                              </span>
-                            </span>
-                          </button>
-                        )),
-                      })}
-
-                      {renderSearchSection({
-                        title: "Продавцы",
-                        items: results.sellers.map((seller) => (
-                          <button
-                            key={seller.id}
-                            type="button"
-                            onClick={() => handleSelectSeller(seller)}
-                            className="flex w-full items-center gap-3 px-4 py-3 text-left transition hover:bg-white/5"
-                          >
-                            <UserAvatar
-                              src={seller.image}
-                              name={seller.name}
-                              className="h-9 w-9 shrink-0 rounded-xl border-white/10 bg-zinc-800/80"
-                              imageClassName="rounded-xl object-cover"
-                            />
-                            <span className="min-w-0 flex-1">
-                              <span className="flex flex-wrap items-center gap-2">
-                                <span className="truncate text-sm font-semibold text-white">
-                                  {seller.name}
-                                </span>
-                                {isTeamRole(seller.role) ? (
-                                  <Badge variant={getSearchRoleBadgeVariant(seller.role)} className="px-2 py-0.5 text-[10px] tracking-[0.14em]">
-                                    {getRoleLabel(seller.role)}
-                                  </Badge>
-                                ) : null}
-                              </span>
-                              <span className="block truncate text-xs uppercase tracking-[0.18em] text-zinc-500">
-                                Публичный профиль продавца
+                                {category.gameName}
                               </span>
                             </span>
                           </button>
@@ -755,6 +689,16 @@ export function SiteHeader() {
                   </>
                 )}
 
+
+                <NotificationsBell
+                  mode="silent"
+                  pushNotificationsEnabled={Boolean(user?.pushNotifications)}
+                />
+
+                <UserSearchDialog
+                  open={isUserSearchOpen}
+                  onOpenChange={setIsUserSearchOpen}
+                />
               </>
               ) : status === "unauthenticated" ? (
               <>

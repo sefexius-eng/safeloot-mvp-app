@@ -22,7 +22,7 @@ const NOTIFICATIONS_POLL_INTERVAL_MS = 20000;
 const ANNOUNCED_NOTIFICATIONS_STORAGE_KEY = "safeloot:announced-notifications";
 
 interface NotificationsBellProps {
-  mode?: "trigger" | "panel";
+  mode?: "trigger" | "panel" | "silent";
   pushNotificationsEnabled?: boolean;
 }
 
@@ -216,6 +216,10 @@ export function NotificationsBell({
   }
 
   const unreadCount = notifications.length;
+
+  if (mode === "silent") {
+    return null;
+  }
 
   const content = (
     <>

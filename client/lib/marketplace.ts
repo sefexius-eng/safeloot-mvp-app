@@ -1271,42 +1271,51 @@ export async function createOrder(input: {
     throw new Error("buyerId is required.");
   }
 
-  const [buyer, product] = await Promise.all([
-    prisma.user.findUnique({
-      where: { id: buyerId },
-      select: { id: true },
-    }),
-    prisma.product.findUnique({
-      where: { id: productId },
-      select: {
-        id: true,
-        price: true,
-        sellerId: true,
-        isActive: true,
-      },
-    }),
-  ]);
+  const emailDeliveryQueue: NotificationEmailDeliveryInput[] = [];
 
-  if (!buyer) {
-    throw new Error(`Buyer with id ${buyerId} was not found.`);
-  }
-
-  if (!product) {
-    throw new Error(`Product with id ${productId} was not found.`);
-  }
-
-  if (!product.isActive) {
-    throw new Error("Товар скрыт продавцом и недоступен для покупки.");
-  }
-
-  if (product.sellerId === buyerId) {
-    throw new Error("Вы не можете купить свой собственный товар");
-  }
-
-  const orderPrice = roundMoney(product.price);
-
-  const order = await prisma.$transaction(
+  const result = await prisma.$transaction(
     async (transactionClient) => {
+      const [buyer, product] = await Promise.all([
+        transactionClient.user.findUnique({
+          where: { id: buyerId },
+          select: {
+            id: true,
+            availableBalance: true,
+          },
+        }),
+        transactionClient.product.findUnique({
+          where: { id: productId },
+          select: {
+            id: true,
+            price: true,
+            sellerId: true,
+            isActive: true,
+          },
+        }),
+      ]);
+
+      if (!buyer) {
+        throw new Error(`Buyer with id ${buyerId} was not found.`);
+      }
+
+      if (!product) {
+        throw new Error(`Product with id ${productId} was not found.`);
+      }
+
+      if (!product.isActive) {
+        throw new Error("Товар скрыт продавцом и недоступен для покупки.");
+      }
+
+      if (product.sellerId === buyerId) {
+        throw new Error("Вы не можете купить свой собственный товар");
+      }
+
+      const orderPrice = roundMoney(product.price);
+
+      if (buyer.availableBalance.comparedTo(orderPrice) < 0) {
+        throw new Error("Недостаточно средств");
+      }
+
       const existingPendingOrder = await transactionClient.order.findFirst({
         where: {
           buyerId,
@@ -1315,37 +1324,116 @@ export async function createOrder(input: {
         },
         select: {
           id: true,
+          sellerId: true,
         },
         orderBy: {
           createdAt: "desc",
         },
       });
 
-      if (existingPendingOrder) {
-        return existingPendingOrder;
-      }
-
-      return transactionClient.order.create({
-        data: {
-          buyerId,
-          sellerId: product.sellerId,
-          productId: product.id,
-          price: orderPrice,
-          status: OrderStatus.PENDING,
+      const debitedBuyer = await transactionClient.user.updateMany({
+        where: {
+          id: buyerId,
+          availableBalance: {
+            gte: orderPrice,
+          },
         },
-        select: {
-          id: true,
+        data: {
+          availableBalance: {
+            decrement: orderPrice,
+          },
         },
       });
+
+      if (debitedBuyer.count !== 1) {
+        throw new Error("Недостаточно средств");
+      }
+
+      let orderId = existingPendingOrder?.id;
+
+      if (existingPendingOrder) {
+        const updatedOrder = await transactionClient.order.updateMany({
+          where: {
+            id: existingPendingOrder.id,
+            status: OrderStatus.PENDING,
+          },
+          data: {
+            sellerId: product.sellerId,
+            price: orderPrice,
+            status: OrderStatus.PAID,
+          },
+        });
+
+        if (updatedOrder.count !== 1) {
+          throw new Error(`Order ${existingPendingOrder.id} could not be funded.`);
+        }
+      } else {
+        const createdOrder = await transactionClient.order.create({
+          data: {
+            buyerId,
+            sellerId: product.sellerId,
+            productId: product.id,
+            price: orderPrice,
+            status: OrderStatus.PAID,
+          },
+          select: {
+            id: true,
+          },
+        });
+
+        orderId = createdOrder.id;
+      }
+
+      if (!orderId) {
+        throw new Error("Не удалось создать заказ.");
+      }
+
+      const platformAdmin = await getPlatformAdminAccount(transactionClient);
+
+      await transactionClient.user.update({
+        where: {
+          id: platformAdmin.id,
+        },
+        data: {
+          holdBalance: {
+            increment: orderPrice,
+          },
+        },
+      });
+
+      await transactionClient.transaction.create({
+        data: {
+          userId: platformAdmin.id,
+          orderId,
+          amount: orderPrice,
+          type: TransactionType.ESCROW_HOLD,
+          status: TransactionStatus.COMPLETED,
+        },
+      });
+
+      await createUserNotification(transactionClient, {
+        userId: product.sellerId,
+        title: "Новый заказ!",
+        message: "У вас купили товар. Перейдите к сделке.",
+        link: `/orders/${orderId}`,
+      }, emailDeliveryQueue);
+
+      return {
+        orderId,
+        status: OrderStatus.PAID,
+      };
     },
     {
       isolationLevel: Prisma.TransactionIsolationLevel.Serializable,
     },
   );
 
+  await sendNotificationEmails(emailDeliveryQueue);
+
   return {
-    orderId: order.id,
-    hosted_url: `/payment-mock?orderId=${order.id}`,
+    orderId: result.orderId,
+    status: result.status,
+    hosted_url: `/orders/${result.orderId}`,
   };
 }
 
