@@ -9,12 +9,20 @@ import {
   hasActiveAdminAccess,
 } from "@/lib/access-control";
 import { getAuthSession } from "@/lib/auth";
+import {
+  getInvalidManageableProfileBadgeIds,
+  normalizeManageableProfileBadgeIds,
+} from "@/lib/profile-badges";
 import { prisma } from "@/lib/prisma";
 import { isSuperAdminRole, isTeamRole, ROLE_OPTIONS } from "@/lib/roles";
 
 export interface AdminActionResult {
   ok: boolean;
   message?: string;
+}
+
+export interface AdminBadgesActionResult extends AdminActionResult {
+  badges?: string[];
 }
 
 export interface CatalogGameSummary {
@@ -351,6 +359,68 @@ export async function toggleBanUser(
 
   return {
     ok: true,
+  };
+}
+
+export async function updateUserBadges(
+  userId: string,
+  badgeIds: string[],
+): Promise<AdminBadgesActionResult> {
+  await requireAdminAccess();
+
+  const normalizedUserId = userId.trim();
+
+  if (!normalizedUserId) {
+    return {
+      ok: false,
+      message: "Не удалось определить пользователя.",
+    };
+  }
+
+  const invalidBadgeIds = getInvalidManageableProfileBadgeIds(badgeIds);
+
+  if (invalidBadgeIds.length > 0) {
+    return {
+      ok: false,
+      message: "Передан недопустимый бейдж.",
+    };
+  }
+
+  const normalizedBadgeIds = normalizeManageableProfileBadgeIds(badgeIds);
+
+  const user = await prisma.user.findUnique({
+    where: {
+      id: normalizedUserId,
+    },
+    select: {
+      id: true,
+    },
+  });
+
+  if (!user) {
+    return {
+      ok: false,
+      message: "Пользователь не найден.",
+    };
+  }
+
+  await prisma.user.update({
+    where: {
+      id: normalizedUserId,
+    },
+    data: {
+      badges: normalizedBadgeIds,
+    },
+  });
+
+  revalidatePath("/admin");
+  revalidatePath("/profile");
+  revalidatePath("/profile/settings");
+  revalidatePath(`/user/${normalizedUserId}`);
+
+  return {
+    ok: true,
+    badges: normalizedBadgeIds,
   };
 }
 

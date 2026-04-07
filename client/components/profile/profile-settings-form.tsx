@@ -1,11 +1,13 @@
 "use client";
 
-import Image from "next/image";
+import type { Role } from "@prisma/client";
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { useSession } from "next-auth/react";
 
 import { updateUserProfile } from "@/app/actions/profile";
+import { ProfileHero } from "@/components/profile/profile-hero";
+import { ProfileRoleBadge } from "@/components/profile/profile-role-badge";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -17,9 +19,12 @@ import {
 import { Input } from "@/components/ui/input";
 
 interface ProfileSettingsFormProps {
+  initialBadges: string[];
+  initialBannerUrl: string | null;
   initialEmail: string;
   initialName: string;
   initialImage: string | null;
+  initialRole: Role;
 }
 
 const ACCEPTED_IMAGE_TYPES = new Set(["image/jpeg", "image/png", "image/webp"]);
@@ -96,24 +101,32 @@ async function compressImageToWebpBase64(file: File) {
 }
 
 export function ProfileSettingsForm({
+  initialBadges,
+  initialBannerUrl,
   initialEmail,
   initialImage,
   initialName,
+  initialRole,
 }: ProfileSettingsFormProps) {
   const router = useRouter();
   const { update } = useSession();
   const [name, setName] = useState(initialName);
   const [image, setImage] = useState<string | null>(initialImage);
+  const [bannerUrl, setBannerUrl] = useState(initialBannerUrl ?? "");
   const [savedName, setSavedName] = useState(initialName);
   const [savedImage, setSavedImage] = useState<string | null>(initialImage);
+  const [savedBannerUrl, setSavedBannerUrl] = useState(initialBannerUrl ?? "");
   const [errorMessage, setErrorMessage] = useState("");
   const [successMessage, setSuccessMessage] = useState("");
   const [isProcessingImage, setIsProcessingImage] = useState(false);
   const [isPending, startTransition] = useTransition();
 
   const displayName = name.trim() || initialEmail.split("@")[0] || "Профиль";
-  const avatarLetter = displayName.slice(0, 1).toUpperCase() || "S";
-  const hasChanges = name.trim() !== savedName || image !== savedImage;
+  const normalizedBannerUrl = bannerUrl.trim();
+  const hasChanges =
+    name.trim() !== savedName ||
+    image !== savedImage ||
+    normalizedBannerUrl !== savedBannerUrl;
   const isSaveDisabled = !name.trim() || !hasChanges || isPending || isProcessingImage;
 
   async function handleAvatarSelection(file: File) {
@@ -158,7 +171,7 @@ export function ProfileSettingsForm({
     setSuccessMessage("");
 
     try {
-      const result = await updateUserProfile(name, image);
+      const result = await updateUserProfile(name, image, bannerUrl);
 
       if (!result.ok) {
         setErrorMessage(result.message || "Не удалось сохранить профиль.");
@@ -167,11 +180,14 @@ export function ProfileSettingsForm({
 
       const nextName = result.name ?? name.trim();
       const nextImage = result.image ?? null;
+      const nextBannerUrl = result.bannerUrl ?? null;
 
       setName(nextName);
       setImage(nextImage);
+      setBannerUrl(nextBannerUrl ?? "");
       setSavedName(nextName);
       setSavedImage(nextImage);
+      setSavedBannerUrl(nextBannerUrl ?? "");
 
       await update();
       router.refresh();
@@ -194,38 +210,40 @@ export function ProfileSettingsForm({
           </p>
           <CardTitle>Как профиль выглядит сейчас</CardTitle>
           <CardDescription>
-            Аватар автоматически сжимается до {MAX_IMAGE_DIMENSION}x{MAX_IMAGE_DIMENSION} и сохраняется в формате WebP прямо в базе данных.
+            В предпросмотре видно новую Steam-подобную шапку. Аватар автоматически сжимается до {MAX_IMAGE_DIMENSION}x{MAX_IMAGE_DIMENSION}, а баннер тянется по внешней ссылке.
           </CardDescription>
         </CardHeader>
 
         <CardContent className="space-y-6">
-          <div className="relative flex h-40 w-40 items-center justify-center overflow-hidden rounded-[2rem] border border-white/10 bg-white/10 text-5xl font-semibold text-white shadow-[0_20px_60px_rgba(0,0,0,0.24)]">
-            {image ? (
-              <Image
-                src={image}
-                alt={`Аватар ${displayName}`}
-                fill
-                unoptimized
-                className="object-cover"
-                sizes="160px"
-              />
-            ) : (
-              avatarLetter
-            )}
-          </div>
+          <ProfileHero
+            eyebrow="Preview"
+            displayName={displayName}
+            avatarName={displayName}
+            avatarSrc={image}
+            bannerUrl={normalizedBannerUrl || null}
+            roleBadge={<ProfileRoleBadge role={initialRole} />}
+            badges={initialBadges}
+            details={
+              <>
+                <span className="rounded-full border border-white/10 bg-white/5 px-3 py-1.5 text-zinc-300">
+                  {initialEmail}
+                </span>
+                <span className="rounded-full border border-orange-500/20 bg-orange-500/10 px-3 py-1.5 text-orange-100">
+                  Баннер и аватар обновятся после сохранения
+                </span>
+              </>
+            }
+            className="border-white/10 bg-black/20 p-3 shadow-none"
+          />
 
-          <div>
-            <p className="text-xs font-semibold tracking-[0.24em] uppercase text-zinc-500">
-              Публичный никнейм
-            </p>
-            <p className="mt-3 text-3xl font-semibold tracking-tight text-white">
-              {displayName}
-            </p>
-            <p className="mt-2 text-sm text-zinc-400">{initialEmail}</p>
-          </div>
+          {initialBadges.length === 0 ? (
+            <div className="rounded-[1.5rem] border border-dashed border-white/10 bg-white/5 px-4 py-4 text-sm leading-7 text-zinc-400">
+              У профиля пока нет достижений. Автобейджи подтянутся сами после нужных метрик продавца, а ручные можно выдать из админки.
+            </div>
+          ) : null}
 
           <div className="rounded-[1.5rem] border border-white/10 bg-white/5 p-4 text-sm leading-7 text-zinc-300">
-            Такой же аватар и никнейм будут использоваться в кабинете и в шапке сайта после сохранения.
+            Такой же баннер, аватар и никнейм будут использоваться в личном кабинете и на публичной странице продавца после сохранения.
           </div>
         </CardContent>
       </Card>
@@ -237,7 +255,7 @@ export function ProfileSettingsForm({
           </p>
           <CardTitle>Настройки профиля</CardTitle>
           <CardDescription>
-            Укажите удобный никнейм и загрузите новый аватар. Файл обрабатывается локально в браузере и не сохраняется на диск сервера.
+            Укажите удобный никнейм, загрузите новый аватар и добавьте ссылку на баннер. Достижения теперь приходят как из админки, так и автоматически по статистике продавца.
           </CardDescription>
         </CardHeader>
 
@@ -260,6 +278,28 @@ export function ProfileSettingsForm({
             />
             <p className="text-sm text-zinc-500">
               До 40 символов. Если ник пустой, сохранить изменения нельзя.
+            </p>
+          </div>
+
+          <div className="space-y-3">
+            <label htmlFor="profile-banner-url" className="text-sm font-semibold text-zinc-200">
+              Баннер профиля
+            </label>
+            <Input
+              id="profile-banner-url"
+              name="bannerUrl"
+              type="url"
+              inputMode="url"
+              value={bannerUrl}
+              onChange={(event) => {
+                setBannerUrl(event.target.value);
+                setErrorMessage("");
+                setSuccessMessage("");
+              }}
+              placeholder="https://cdn.example.com/profile-banner.webp"
+            />
+            <p className="text-sm leading-7 text-zinc-500">
+              Подойдет прямая ссылка на изображение из внешнего стораджа или CDN. Если оставить поле пустым, в профиле останется фирменный градиентный фон.
             </p>
           </div>
 
@@ -312,6 +352,19 @@ export function ProfileSettingsForm({
               className="border border-white/10 bg-white/5 text-zinc-200 shadow-none hover:bg-white/10"
             >
               Удалить аватар
+            </Button>
+
+            <Button
+              type="button"
+              onClick={() => {
+                setBannerUrl("");
+                setErrorMessage("");
+                setSuccessMessage("");
+              }}
+              disabled={!bannerUrl.trim() || isPending || isProcessingImage}
+              className="border border-white/10 bg-white/5 text-zinc-200 shadow-none hover:bg-white/10"
+            >
+              Очистить баннер
             </Button>
           </div>
 

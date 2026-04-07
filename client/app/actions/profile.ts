@@ -9,20 +9,66 @@ export interface UpdateUserProfileResult {
   ok: boolean;
   name?: string;
   image?: string | null;
+  bannerUrl?: string | null;
   message?: string;
 }
 
 const MAX_IMAGE_BASE64_LENGTH = 350_000;
+const MAX_BANNER_URL_LENGTH = 2_048;
+
+function normalizeBannerUrl(rawBannerUrl: string) {
+  const normalizedBannerUrl = rawBannerUrl.trim();
+
+  if (!normalizedBannerUrl) {
+    return {
+      ok: true as const,
+      value: null,
+    };
+  }
+
+  if (normalizedBannerUrl.length > MAX_BANNER_URL_LENGTH) {
+    return {
+      ok: false as const,
+      message: "Ссылка на баннер слишком длинная.",
+    };
+  }
+
+  try {
+    const parsedBannerUrl = new URL(normalizedBannerUrl);
+
+    if (
+      parsedBannerUrl.protocol !== "https:" &&
+      parsedBannerUrl.protocol !== "http:"
+    ) {
+      return {
+        ok: false as const,
+        message: "Ссылка на баннер должна начинаться с http:// или https://.",
+      };
+    }
+
+    return {
+      ok: true as const,
+      value: parsedBannerUrl.toString(),
+    };
+  } catch {
+    return {
+      ok: false as const,
+      message: "Введите корректную ссылку на баннер.",
+    };
+  }
+}
 
 export async function updateUserProfile(
   name: string,
   imageBase64: string | null,
+  bannerUrl: string,
 ): Promise<UpdateUserProfileResult> {
   const session = await getAuthSession();
-  const email = session?.user?.email?.trim().toLowerCase();
+  const userId = session?.user?.id?.trim();
   const normalizedName = name.trim();
+  const normalizedBannerUrl = normalizeBannerUrl(bannerUrl);
 
-  if (!email) {
+  if (!userId) {
     return {
       ok: false,
       message: "Нужно войти в аккаунт, чтобы обновить профиль.",
@@ -57,27 +103,39 @@ export async function updateUserProfile(
     };
   }
 
+  if (!normalizedBannerUrl.ok) {
+    return {
+      ok: false,
+      message: normalizedBannerUrl.message,
+    };
+  }
+
   const updatedUser = await prisma.user.update({
     where: {
-      email,
+      id: userId,
     },
     data: {
       name: normalizedName,
       image: imageBase64,
+      bannerUrl: normalizedBannerUrl.value,
     },
     select: {
+      id: true,
       name: true,
       image: true,
+      bannerUrl: true,
     },
   });
 
   revalidatePath("/");
   revalidatePath("/profile");
   revalidatePath("/profile/settings");
+  revalidatePath(`/user/${updatedUser.id}`);
 
   return {
     ok: true,
     name: updatedUser.name ?? normalizedName,
     image: updatedUser.image,
+    bannerUrl: updatedUser.bannerUrl,
   };
 }

@@ -1,6 +1,8 @@
 import Link from "next/link";
 
 import { ProfilePageClient } from "@/app/profile/profile-page-client";
+import { ProfileHero } from "@/components/profile/profile-hero";
+import { ProfileRoleBadge } from "@/components/profile/profile-role-badge";
 import {
   ProfileTabs,
   type ProfileTabsProduct,
@@ -8,7 +10,9 @@ import {
 } from "@/components/profile-tabs";
 import { getAuthSession } from "@/lib/auth";
 import { formatCurrency } from "@/lib/formatters";
+import { mergeProfileBadgeIds } from "@/lib/profile-badges";
 import { prisma } from "@/lib/prisma";
+import { getSellerAutomaticBadgeDataBySellerId } from "@/lib/seller-achievements";
 import { mapWithdrawalListItem } from "@/lib/withdrawals";
 
 export const dynamic = "force-dynamic";
@@ -67,10 +71,6 @@ function formatAmount(value: unknown) {
 export default async function ProfilePage() {
   const session = await getAuthSession();
   const sellerId = session?.user?.id?.trim() ?? "";
-  const displayName =
-    session?.user?.name?.trim() ||
-    session?.user?.email?.split("@")[0] ||
-    "Продавец";
   const profileData = sellerId
     ? await Promise.all([
         prisma.order.findMany({
@@ -93,6 +93,11 @@ export default async function ProfilePage() {
           },
           select: {
             id: true,
+            name: true,
+            image: true,
+            role: true,
+            bannerUrl: true,
+            badges: true,
             availableBalance: true,
             products: {
               select: {
@@ -156,12 +161,23 @@ export default async function ProfilePage() {
             createdAt: "desc",
           },
         }),
+        getSellerAutomaticBadgeDataBySellerId(sellerId),
       ])
     : null;
 
   const sales = profileData?.[0] ?? [];
   const sellerProfile = profileData?.[1] ?? null;
   const withdrawals = profileData?.[2] ?? [];
+  const automaticBadgeData = profileData?.[3] ?? null;
+  const sellerDisplayName =
+    sellerProfile?.name?.trim() ||
+    session?.user?.name?.trim() ||
+    session?.user?.email?.split("@")[0] ||
+    "Продавец";
+  const effectiveBadges = mergeProfileBadgeIds(
+    sellerProfile?.badges,
+    automaticBadgeData?.automaticBadgeIds,
+  );
 
   const profileProducts = sellerProfile
     ? sellerProfile.products.map(
@@ -198,33 +214,48 @@ export default async function ProfilePage() {
 
   return (
     <main className="mx-auto flex w-full max-w-7xl flex-col gap-8 px-4 py-10 sm:px-6 lg:px-8 lg:py-14">
-      <section>
-        <p className="text-sm font-semibold tracking-[0.24em] uppercase text-zinc-500">
-          Seller Dashboard
-        </p>
-        <h1 className="mt-3 text-3xl font-semibold tracking-tight text-white md:text-5xl md:leading-[1.05]">
-          Личный кабинет продавца
-        </h1>
-        <div className="mt-6 flex flex-wrap items-center gap-3">
-          <div className="inline-flex items-center rounded-full border border-white/10 bg-white/5 px-4 py-2 text-sm text-zinc-300">
-            Аккаунт: <span className="ml-2 font-semibold text-white">{displayName}</span>
-          </div>
-          {sellerProfile?.id ? (
+      <ProfileHero
+        eyebrow="Seller Dashboard"
+        displayName={sellerDisplayName}
+        avatarName={sellerDisplayName}
+        avatarSrc={sellerProfile?.image ?? session?.user?.image ?? null}
+        bannerUrl={sellerProfile?.bannerUrl ?? null}
+        roleBadge={<ProfileRoleBadge role={sellerProfile?.role ?? session?.user?.role} />}
+        badges={effectiveBadges}
+        details={
+          <>
+            {session?.user?.email ? (
+              <span className="inline-flex items-center rounded-full border border-white/10 bg-white/5 px-4 py-2 text-zinc-300">
+                Аккаунт: <span className="ml-2 font-semibold text-white">{session.user.email}</span>
+              </span>
+            ) : null}
+            <span className="rounded-full border border-white/10 bg-white/5 px-4 py-2 text-zinc-300">
+              Лотов: <span className="ml-2 font-semibold text-white">{profileProducts.length}</span>
+            </span>
+            <span className="rounded-full border border-white/10 bg-white/5 px-4 py-2 text-zinc-300">
+              Отзывов: <span className="ml-2 font-semibold text-white">{profileReviews.length}</span>
+            </span>
+          </>
+        }
+        actions={
+          <>
+            {sellerProfile?.id ? (
+              <Link
+                href={`/user/${sellerProfile.id}`}
+                className="inline-flex h-11 items-center justify-center rounded-2xl border border-white/10 bg-white/5 px-5 text-sm font-semibold text-zinc-200 transition hover:-translate-y-0.5 hover:bg-white/10"
+              >
+                Посмотреть мою витрину
+              </Link>
+            ) : null}
             <Link
-              href={`/user/${sellerProfile.id}`}
-              className="inline-flex h-11 items-center justify-center rounded-2xl border border-white/10 bg-white/5 px-5 text-sm font-semibold text-zinc-200 transition hover:-translate-y-0.5 hover:bg-white/10"
+              href="/profile/settings"
+              className="inline-flex h-11 items-center justify-center rounded-2xl bg-orange-600 px-5 text-sm font-semibold text-white shadow-[0_16px_40px_rgba(249,115,22,0.28)] transition hover:-translate-y-0.5 hover:bg-orange-500"
             >
-              👀 Посмотреть мою витрину
+              Настроить профиль
             </Link>
-          ) : null}
-          <Link
-            href="/profile/settings"
-            className="inline-flex h-11 items-center justify-center rounded-2xl bg-orange-600 px-5 text-sm font-semibold text-white shadow-[0_16px_40px_rgba(249,115,22,0.28)] transition hover:-translate-y-0.5 hover:bg-orange-500"
-          >
-            Настроить профиль
-          </Link>
-        </div>
-      </section>
+          </>
+        }
+      />
 
       <ProfilePageClient
         isAuthenticated={Boolean(sellerId)}

@@ -3,17 +3,20 @@ import { OrderStatus, Prisma } from "@prisma/client";
 import { notFound } from "next/navigation";
 
 import CensoredText from "@/components/censored-text";
+import { ProfileHero } from "@/components/profile/profile-hero";
+import { ProfileRoleBadge } from "@/components/profile/profile-role-badge";
 import {
   MarketplaceProductCard,
   type MarketplaceProductCardData,
 } from "@/components/product/marketplace-product-card";
 import { SellerReviewReplyForm } from "@/components/reviews/seller-review-reply-form";
 import { RatingStars } from "@/components/reviews/rating-stars";
-import { TeamBadge } from "@/components/ui/team-badge";
 import { UserAvatar } from "@/components/ui/user-avatar";
 import { getCurrentSessionUser } from "@/lib/access-control";
 import { getAuthSession } from "@/lib/auth";
+import { mergeProfileBadgeIds } from "@/lib/profile-badges";
 import { prisma } from "@/lib/prisma";
+import { getSellerAutomaticBadgeDataBySellerId } from "@/lib/seller-achievements";
 
 export const dynamic = 'force-dynamic';
 
@@ -104,6 +107,8 @@ async function getPublicSellerProfile(id: string) {
       id: true,
       name: true,
       image: true,
+      bannerUrl: true,
+      badges: true,
       lastSeen: true,
       role: true,
       rank: true,
@@ -177,18 +182,12 @@ async function getPublicSellerProfile(id: string) {
     return null;
   }
 
-  const reviewCount = seller.reviewsReceived.length;
-  const averageRating =
-    reviewCount > 0
-      ? Math.round(
-          (seller.reviewsReceived.reduce(
-            (sum, review) => sum + review.rating,
-            0,
-          ) /
-            reviewCount) *
-            10,
-        ) / 10
-      : null;
+  const automaticBadgeData = await getSellerAutomaticBadgeDataBySellerId(
+    seller.id,
+    seller.badges,
+  );
+  const reviewCount = automaticBadgeData.metrics.reviewCount;
+  const averageRating = automaticBadgeData.metrics.averageRating;
 
   const reviewSummary = {
     averageRating,
@@ -214,6 +213,10 @@ async function getPublicSellerProfile(id: string) {
 
   return {
     ...seller,
+    badges: mergeProfileBadgeIds(
+      seller.badges,
+      automaticBadgeData.automaticBadgeIds,
+    ),
     averageRating,
     reviewCount,
     products,
@@ -234,63 +237,55 @@ export default async function PublicUserPage({ params }: PublicUserPageProps) {
 
   return (
     <main className="mx-auto flex w-full max-w-7xl flex-col gap-8 px-4 py-10 sm:px-6 lg:px-8 lg:py-14">
-      <section className="overflow-hidden rounded-[2.25rem] border border-white/10 bg-[radial-gradient(circle_at_top_left,rgba(249,115,22,0.18),transparent_26%),radial-gradient(circle_at_bottom_right,rgba(14,165,233,0.14),transparent_30%),rgba(9,9,11,0.92)] p-7 shadow-[0_24px_80px_rgba(0,0,0,0.28)] md:p-10">
-        <div className="flex flex-col gap-6 lg:flex-row lg:items-center lg:justify-between">
-          <div className="flex min-w-0 items-center gap-5">
-            <div className="relative shrink-0">
-              <UserAvatar
-                src={seller.image}
-                name={displayName}
-                className="h-24 w-24 shrink-0 border-white/10 bg-zinc-900/80 text-2xl"
-                imageClassName="rounded-full object-cover"
-              />
-              <span
-                aria-label={sellerIsOnline ? "Продавец онлайн" : "Продавец не в сети"}
-                title={sellerIsOnline ? "Продавец онлайн" : "Продавец не в сети"}
-                className={[
-                  "absolute bottom-1 right-1 inline-flex h-5 w-5 items-center justify-center rounded-full border border-zinc-950 text-[10px] shadow-[0_8px_20px_rgba(0,0,0,0.28)]",
-                  sellerIsOnline
-                    ? "bg-emerald-500 text-emerald-950 shadow-[0_8px_20px_rgba(16,185,129,0.4)]"
-                    : "bg-zinc-600 text-zinc-200",
-                ].join(" ")}
-              >
-                ●
-              </span>
-            </div>
-
-            <div className="min-w-0">
-              <p className="text-sm font-semibold tracking-[0.24em] uppercase text-zinc-500">
-                Публичный профиль продавца
-              </p>
-              <h1 className="mt-2 flex flex-wrap items-center gap-2 text-3xl font-semibold tracking-tight text-white md:text-5xl">
-                <span className="truncate">
-                  <CensoredText text={displayName} />
-                </span>
-                <TeamBadge role={seller.role} className="md:text-[11px]" />
-              </h1>
-              <div className="mt-4 flex flex-wrap items-center gap-3 text-sm">
-                <span
-                  className={`inline-flex rounded-full border px-3 py-1.5 font-medium ${getRankClassName(seller.rank)}`}
-                >
-                  Ранг: {getRankLabel(seller.rank)}
-                </span>
-                <span
-                  className={[
-                    "inline-flex rounded-full border px-3 py-1.5 font-medium",
-                    sellerIsOnline
-                      ? "border-emerald-500/20 bg-emerald-500/10 text-emerald-200"
-                      : "border-white/10 bg-white/5 text-zinc-300",
-                  ].join(" ")}
-                >
-                  {sellerIsOnline ? "Онлайн сейчас" : "Сейчас не в сети"}
-                </span>
-                <span className="rounded-full border border-white/10 bg-white/5 px-3 py-1.5 text-zinc-300">
-                  На площадке с {formatJoinedDate(seller.createdAt)}
-                </span>
-              </div>
-            </div>
-          </div>
-
+      <ProfileHero
+        eyebrow="Публичный профиль продавца"
+        displayName={
+          <span className="block truncate">
+            <CensoredText text={displayName} />
+          </span>
+        }
+        avatarName={displayName}
+        avatarSrc={seller.image}
+        bannerUrl={seller.bannerUrl}
+        roleBadge={<ProfileRoleBadge role={seller.role} />}
+        badges={seller.badges}
+        avatarStatus={
+          <span
+            aria-label={sellerIsOnline ? "Продавец онлайн" : "Продавец не в сети"}
+            title={sellerIsOnline ? "Продавец онлайн" : "Продавец не в сети"}
+            className={[
+              "inline-flex h-5 w-5 items-center justify-center rounded-full border border-zinc-950 text-[10px] shadow-[0_8px_20px_rgba(0,0,0,0.28)] md:h-6 md:w-6",
+              sellerIsOnline
+                ? "bg-emerald-500 text-emerald-950 shadow-[0_8px_20px_rgba(16,185,129,0.4)]"
+                : "bg-zinc-600 text-zinc-200",
+            ].join(" ")}
+          >
+            ●
+          </span>
+        }
+        details={
+          <>
+            <span
+              className={`inline-flex rounded-full border px-3 py-1.5 font-medium ${getRankClassName(seller.rank)}`}
+            >
+              Ранг: {getRankLabel(seller.rank)}
+            </span>
+            <span
+              className={[
+                "inline-flex rounded-full border px-3 py-1.5 font-medium",
+                sellerIsOnline
+                  ? "border-emerald-500/20 bg-emerald-500/10 text-emerald-200"
+                  : "border-white/10 bg-white/5 text-zinc-300",
+              ].join(" ")}
+            >
+              {sellerIsOnline ? "Онлайн сейчас" : "Сейчас не в сети"}
+            </span>
+            <span className="rounded-full border border-white/10 bg-white/5 px-3 py-1.5 text-zinc-300">
+              На площадке с {formatJoinedDate(seller.createdAt)}
+            </span>
+          </>
+        }
+        aside={
           <div className="rounded-[1.75rem] border border-white/10 bg-white/5 p-5 shadow-[0_18px_45px_rgba(0,0,0,0.2)]">
             <p className="text-xs font-semibold tracking-[0.22em] uppercase text-zinc-500">
               Средний рейтинг
@@ -309,8 +304,8 @@ export default async function PublicUserPage({ params }: PublicUserPageProps) {
               </div>
             </div>
           </div>
-        </div>
-      </section>
+        }
+      />
 
       <section className="space-y-6">
         <div className="flex flex-col gap-3 md:flex-row md:items-end md:justify-between">

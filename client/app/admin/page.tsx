@@ -13,6 +13,7 @@ import {
 import { GameManager } from "@/components/admin/game-manager";
 import { PromoCodeManager } from "@/components/admin/promo-code-manager";
 import { AdminRoleSelect } from "@/components/admin/admin-role-select";
+import { AdminUserBadgeManager } from "@/components/admin/admin-user-badge-manager";
 import {
   AdminSafeModeToggle,
 } from "@/components/admin/admin-safe-mode";
@@ -43,6 +44,7 @@ import { getAuthSession } from "@/lib/auth";
 import { formatCurrency } from "@/lib/formatters";
 import { prisma } from "@/lib/prisma";
 import { isSuperAdminRole } from "@/lib/roles";
+import { getSellerAutomaticBadgeDataMap } from "@/lib/seller-achievements";
 import { getWithdrawalStatusMeta } from "@/lib/withdrawals";
 
 export const dynamic = "force-dynamic";
@@ -156,6 +158,7 @@ export default async function AdminDashboardPage() {
         id: true,
         email: true,
         name: true,
+        badges: true,
         availableBalance: true,
         holdBalance: true,
         role: true,
@@ -337,6 +340,10 @@ export default async function AdminDashboardPage() {
   const canForceDelete = isSuperAdminRole(currentUser.role);
   const visiblePromoCodes = activePromoCodes.filter(
     (promoCode) => promoCode.usedCount < promoCode.maxUses,
+  );
+  const automaticBadgeDataMap = await getSellerAutomaticBadgeDataMap(
+    users.map((user) => user.id),
+    new Map(users.map((user) => [user.id, user.badges])),
   );
 
   return (
@@ -573,6 +580,7 @@ export default async function AdminDashboardPage() {
                           <TableHead>Email</TableHead>
                           <TableHead>Баланс</TableHead>
                           <TableHead>Роль</TableHead>
+                          <TableHead>Достижения</TableHead>
                           <TableHead>Статус бана</TableHead>
                           <TableHead className="text-right">Действие</TableHead>
                         </TableRow>
@@ -617,6 +625,15 @@ export default async function AdminDashboardPage() {
                               ) : (
                                 <Badge variant={getRoleBadgeVariant(user.role)}>{user.role}</Badge>
                               )}
+                            </TableCell>
+                            <TableCell>
+                              <AdminUserBadgeManager
+                                userId={user.id}
+                                automaticBadges={
+                                  automaticBadgeDataMap.get(user.id)?.automaticBadgeIds ?? []
+                                }
+                                currentBadges={user.badges}
+                              />
                             </TableCell>
                             <TableCell>
                               <Badge variant={getBanBadgeVariant(user.isBanned)}>

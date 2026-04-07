@@ -3,20 +3,53 @@ import { redirect } from "next/navigation";
 
 import { ProfileSettingsForm } from "@/components/profile/profile-settings-form";
 import { getAuthSession } from "@/lib/auth";
+import { mergeProfileBadgeIds } from "@/lib/profile-badges";
+import { prisma } from "@/lib/prisma";
+import { getSellerAutomaticBadgeDataBySellerId } from "@/lib/seller-achievements";
 
 export const dynamic = "force-dynamic";
 
 export default async function ProfileSettingsPage() {
   const session = await getAuthSession();
   const currentUser = session?.user;
-  const email = currentUser?.email?.trim();
+  const userId = currentUser?.id?.trim();
 
-  if (!email || !currentUser) {
+  if (!userId || !currentUser) {
     redirect("/login?callbackUrl=/profile/settings");
   }
 
-  const initialName = currentUser.name?.trim() || email.split("@")[0];
-  const initialImage = currentUser.image ?? null;
+  const userProfile = await prisma.user.findUnique({
+    where: {
+      id: userId,
+    },
+    select: {
+      email: true,
+      name: true,
+      image: true,
+      bannerUrl: true,
+      badges: true,
+      role: true,
+    },
+  });
+
+  if (!userProfile) {
+    redirect("/login?callbackUrl=/profile/settings");
+  }
+
+  const automaticBadgeData = await getSellerAutomaticBadgeDataBySellerId(
+    userId,
+    userProfile.badges,
+  );
+
+  const initialEmail = userProfile.email.trim();
+  const initialName = userProfile.name?.trim() || initialEmail.split("@")[0];
+  const initialImage = userProfile.image ?? null;
+  const initialBannerUrl = userProfile.bannerUrl ?? null;
+  const initialBadges = mergeProfileBadgeIds(
+    userProfile.badges,
+    automaticBadgeData.automaticBadgeIds,
+  );
+  const initialRole = userProfile.role;
 
   return (
     <main className="mx-auto flex w-full max-w-7xl flex-col gap-8 px-4 py-10 sm:px-6 lg:px-8 lg:py-14">
@@ -28,7 +61,7 @@ export default async function ProfileSettingsPage() {
           Настройки профиля
         </h1>
         <p className="mt-4 max-w-3xl text-sm leading-7 text-zinc-300 md:text-base">
-          Обновите никнейм и аватар без отдельного хранилища файлов. Изображение сжимается на клиенте и сохраняется в базе как Base64 WebP.
+          Обновите никнейм, аватар и ссылку на баннер для Steam-подобной шапки профиля. Аватар сжимается на клиенте и сохраняется в базе как Base64 WebP, а баннер можно подтянуть по внешнему URL.
         </p>
 
         <div className="mt-6 flex flex-wrap gap-3">
@@ -39,15 +72,18 @@ export default async function ProfileSettingsPage() {
             Вернуться в кабинет
           </Link>
           <div className="inline-flex h-11 items-center rounded-2xl border border-white/10 bg-white/5 px-4 text-sm text-zinc-300">
-            Аккаунт: <span className="ml-2 font-semibold text-white">{email}</span>
+            Аккаунт: <span className="ml-2 font-semibold text-white">{initialEmail}</span>
           </div>
         </div>
       </section>
 
       <ProfileSettingsForm
-        initialEmail={email}
+        initialBadges={initialBadges}
+        initialBannerUrl={initialBannerUrl}
+        initialEmail={initialEmail}
         initialImage={initialImage}
         initialName={initialName}
+        initialRole={initialRole}
       />
     </main>
   );
