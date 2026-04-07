@@ -12,7 +12,8 @@ import {
 
 interface SendVerificationEmailActionResult {
   ok: boolean;
-  message: string;
+  message?: string;
+  error?: string;
   email?: string;
 }
 
@@ -26,21 +27,21 @@ export async function sendVerificationEmailAction(): Promise<SendVerificationEma
   if (!currentUser) {
     return {
       ok: false,
-      message: "Требуется авторизация.",
+      error: "Требуется авторизация.",
     };
   }
 
   if (currentUser.isBanned) {
     return {
       ok: false,
-      message: BANNED_USER_MESSAGE,
+      error: BANNED_USER_MESSAGE,
     };
   }
 
   if (!isEmailVerificationTestUser(session?.user?.email)) {
     return {
       ok: false,
-      message: VERIFICATION_EMAIL_SEND_ERROR_MESSAGE,
+      error: VERIFICATION_EMAIL_SEND_ERROR_MESSAGE,
     };
   }
 
@@ -58,7 +59,7 @@ export async function sendVerificationEmailAction(): Promise<SendVerificationEma
     if (result.status === "skipped-test-mode") {
       return {
         ok: false,
-        message: VERIFICATION_EMAIL_SEND_ERROR_MESSAGE,
+        error: VERIFICATION_EMAIL_SEND_ERROR_MESSAGE,
       };
     }
 
@@ -72,7 +73,7 @@ export async function sendVerificationEmailAction(): Promise<SendVerificationEma
 
     return {
       ok: false,
-      message: VERIFICATION_EMAIL_SEND_ERROR_MESSAGE,
+      error: VERIFICATION_EMAIL_SEND_ERROR_MESSAGE,
     };
   }
 }

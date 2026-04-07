@@ -26,14 +26,13 @@ export function EmailVerificationBanner({
       void sendVerificationEmailAction()
         .then((result) => {
           if (result.ok) {
-            setFeedback(result.message);
+            setFeedback(result.message ?? "Письмо отправлено.");
             setErrorMessage("");
             return;
           }
 
-          setErrorMessage("");
           setFeedback("");
-          setErrorMessage(result.message || fallbackErrorMessage);
+          setErrorMessage(result.error || result.message || fallbackErrorMessage);
         })
         .catch(() => {
           setFeedback("");
@@ -53,10 +52,10 @@ export function EmailVerificationBanner({
             Текущий адрес: {email}
           </p>
           {feedback ? (
-            <p className="mt-1 text-xs text-emerald-200">{feedback}</p>
+            <p className="mt-1 break-words text-xs text-emerald-200">{feedback}</p>
           ) : null}
           {errorMessage ? (
-            <p className="mt-1 text-xs text-red-200">{errorMessage}</p>
+            <p className="mt-1 break-words text-xs text-red-200">{errorMessage}</p>
           ) : null}
         </div>
 

@@ -8,7 +8,6 @@ import { SiteHeader } from "@/components/layout/site-header";
 import { AuthSessionProvider } from "@/components/providers/session-provider";
 import { SiteFooter } from "@/components/site-footer";
 import { getAuthSession } from "@/lib/auth";
-import { isEmailVerificationTestUser } from "@/lib/email-verification";
 import { getSiteUrl } from "@/lib/site-url";
 import "./globals.css";
 
@@ -19,6 +18,7 @@ const googleSiteVerification =
   process.env.NEXT_PUBLIC_GOOGLE_SITE_VERIFICATION?.trim() || undefined;
 const yandexSiteVerification =
   process.env.NEXT_PUBLIC_YANDEX_VERIFICATION?.trim() || undefined;
+const EMAIL_VERIFICATION_ADMIN_EMAIL = "sefexius@gmail.com";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -89,7 +89,7 @@ export default async function RootLayout({
           <SiteHeader />
           {session?.user &&
           !session.user.emailVerified &&
-          isEmailVerificationTestUser(session.user.email) ? (
+          session.user.email === EMAIL_VERIFICATION_ADMIN_EMAIL ? (
             <EmailVerificationBanner email={session.user.email ?? ""} />
           ) : null}
           <BannedModal />
