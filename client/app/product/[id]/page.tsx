@@ -22,6 +22,16 @@ interface ProductPageProps {
   }>;
 }
 
+interface ProductMetadataProps {
+  params:
+    | Promise<{
+        id: string;
+      }>
+    | {
+        id: string;
+      };
+}
+
 const DEFAULT_OG_IMAGE_PATH = "/default-og-game.jpg";
 
 interface ProductDetail {
@@ -103,75 +113,71 @@ function getGalleryGridClassName(imageCount: number) {
   return "grid-cols-1 md:grid-cols-2 xl:grid-cols-3";
 }
 
-export async function generateMetadata({ params }: ProductPageProps): Promise<Metadata> {
-  const { id } = await params;
-  const product = await prisma.product.findUnique({
-    where: {
-      id,
-    },
-    select: {
-      title: true,
-      images: true,
-      price: true,
-      seller: {
-        select: {
-          name: true,
-        },
-      },
-      game: {
-        select: {
-          name: true,
-        },
-      },
-    },
-  });
+export async function generateMetadata({ params }: ProductMetadataProps): Promise<Metadata> {
+  try {
+    const { id } = await Promise.resolve(params);
+    const product = await prisma.product.findUnique({
+      where: { id },
+      include: { seller: true, game: true },
+    });
 
-  if (!product) {
+    if (!product) {
+      return { title: "Товар не найден | SafeLoot" };
+    }
+
+    const baseUrl = (process.env.NEXT_PUBLIC_APP_URL || "https://safeloot.vercel.app").replace(
+      /\/+$/,
+      "",
+    );
+
+    let imageUrl = `${baseUrl}${DEFAULT_OG_IMAGE_PATH}`;
+    if (product.images && product.images.length > 0) {
+      const firstImage = product.images[0]?.trim();
+
+      if (firstImage) {
+        imageUrl = /^https?:\/\//i.test(firstImage)
+          ? firstImage
+          : `${baseUrl}/${firstImage.replace(/^\/+/, "")}`;
+      }
+    }
+
+    const priceValue = Number(product.price);
+    const formattedPrice = Number.isFinite(priceValue)
+      ? formatCurrency(priceValue)
+      : String(product.price);
+    const title = `${product.title} за ${formattedPrice} USDT`;
+    const description = `Купить ${product.title} для игры ${product.game?.name || "Другое"}. Продавец: ${product.seller?.name || "Неизвестен"}. Безопасная сделка на SafeLoot.`;
+
     return {
-      title: "Товар не найден | SafeLoot",
-      description: "Карточка товара недоступна или была удалена с SafeLoot.",
+      title: `${title} | SafeLoot`,
+      description,
+      openGraph: {
+        title,
+        description,
+        url: `${baseUrl}/product/${product.id}`,
+        siteName: "SafeLoot Market",
+        images: [
+          {
+            url: imageUrl,
+            width: 1200,
+            height: 630,
+            alt: product.title,
+          },
+        ],
+        locale: "ru_RU",
+        type: "website",
+      },
+      twitter: {
+        card: "summary_large_image",
+        title,
+        description,
+        images: [imageUrl],
+      },
     };
+  } catch (error) {
+    console.error("Ошибка при генерации метаданных:", error);
+    return { title: "SafeLoot Market" };
   }
-
-  const sellerName = product.seller.name?.trim() || "Проверенный продавец";
-  const productTitle = product.title.trim() || "Товар";
-  const gameName = product.game.name.trim() || "игры";
-  const formattedPrice = formatCurrency(Number(product.price));
-  const baseUrl = process.env.NEXT_PUBLIC_APP_URL || "https://safeloot.vercel.app";
-  const normalizedBaseUrl = baseUrl.replace(/\/+$/, "");
-  let imageUrl = product.images?.[0]?.trim() || `${normalizedBaseUrl}${DEFAULT_OG_IMAGE_PATH}`;
-
-  if (imageUrl.startsWith("/")) {
-    imageUrl = `${normalizedBaseUrl}${imageUrl}`;
-  } else if (!/^https?:\/\//i.test(imageUrl)) {
-    imageUrl = `${normalizedBaseUrl}/${imageUrl.replace(/^\/+/, "")}`;
-  }
-
-  return {
-    title: `${productTitle} | SafeLoot`,
-    description: `Купить ${productTitle} для игры ${gameName}. Продавец: ${sellerName}. Цена: ${formattedPrice} USDT. Безопасная сделка на SafeLoot.`,
-    openGraph: {
-      url: `${normalizedBaseUrl}/product/${id}`,
-      siteName: "SafeLoot",
-      title: `${productTitle} - ${formattedPrice} USDT`,
-      description: `Безопасная покупка на SafeLoot. Продавец: ${sellerName}.`,
-      images: [
-        {
-          url: imageUrl,
-          width: 1200,
-          height: 630,
-          alt: productTitle,
-        },
-      ],
-      type: "website",
-    },
-    twitter: {
-      card: "summary_large_image",
-      title: `${productTitle} - ${formattedPrice} USDT`,
-      description: "Безопасная покупка на SafeLoot.",
-      images: [imageUrl],
-    },
-  };
 }
 
 export default async function ProductPage({ params }: ProductPageProps) {
