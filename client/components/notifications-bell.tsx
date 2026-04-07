@@ -1,7 +1,7 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useSession } from "next-auth/react";
 
 import {
@@ -19,9 +19,11 @@ import {
 } from "@/components/ui/dropdown-menu";
 
 const NOTIFICATIONS_POLL_INTERVAL_MS = 20000;
+const ANNOUNCED_NOTIFICATIONS_STORAGE_KEY = "safeloot:announced-notifications";
 
 interface NotificationsBellProps {
   mode?: "trigger" | "panel";
+  pushNotificationsEnabled?: boolean;
 }
 
 function formatNotificationTime(value: string) {
@@ -33,13 +35,59 @@ function formatNotificationTime(value: string) {
   }).format(new Date(value));
 }
 
-export function NotificationsBell({ mode = "trigger" }: NotificationsBellProps) {
+function loadAnnouncedNotificationIds(userId: string) {
+  if (typeof window === "undefined") {
+    return new Set<string>();
+  }
+
+  try {
+    const rawValue = window.sessionStorage.getItem(
+      `${ANNOUNCED_NOTIFICATIONS_STORAGE_KEY}:${userId}`,
+    );
+
+    if (!rawValue) {
+      return new Set<string>();
+    }
+
+    const parsedValue = JSON.parse(rawValue) as string[];
+    return new Set(parsedValue.filter(Boolean));
+  } catch {
+    return new Set<string>();
+  }
+}
+
+function persistAnnouncedNotificationIds(userId: string, notificationIds: Set<string>) {
+  if (typeof window === "undefined") {
+    return;
+  }
+
+  const normalizedIds = Array.from(notificationIds).slice(-150);
+  window.sessionStorage.setItem(
+    `${ANNOUNCED_NOTIFICATIONS_STORAGE_KEY}:${userId}`,
+    JSON.stringify(normalizedIds),
+  );
+}
+
+export function NotificationsBell({
+  mode = "trigger",
+  pushNotificationsEnabled = false,
+}: NotificationsBellProps) {
   const router = useRouter();
-  const { status } = useSession();
+  const { data: session, status } = useSession();
   const [notifications, setNotifications] = useState<NotificationListItem[]>([]);
   const [isOpen, setIsOpen] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState("");
+  const hasHydratedInitialNotificationsRef = useRef(false);
+  const announcedNotificationIdsRef = useRef<Set<string>>(new Set());
+  const notificationUserId = session?.user?.id?.trim() ?? "";
+
+  useEffect(() => {
+    announcedNotificationIdsRef.current = notificationUserId
+      ? loadAnnouncedNotificationIds(notificationUserId)
+      : new Set<string>();
+    hasHydratedInitialNotificationsRef.current = false;
+  }, [notificationUserId]);
 
   useEffect(() => {
     let isMounted = true;
@@ -58,6 +106,60 @@ export function NotificationsBell({ mode = "trigger" }: NotificationsBellProps) 
         const nextNotifications = await getUnreadNotifications();
 
         if (isMounted) {
+          const nextNotificationIds = nextNotifications.map((notification) => notification.id);
+          const announcedNotificationIds = announcedNotificationIdsRef.current;
+
+          if (!hasHydratedInitialNotificationsRef.current) {
+            for (const notificationId of nextNotificationIds) {
+              announcedNotificationIds.add(notificationId);
+            }
+
+            if (notificationUserId) {
+              persistAnnouncedNotificationIds(notificationUserId, announcedNotificationIds);
+            }
+
+            hasHydratedInitialNotificationsRef.current = true;
+          } else {
+            const newNotifications = nextNotifications.filter(
+              (notification) => !announcedNotificationIds.has(notification.id),
+            );
+
+            for (const notification of newNotifications) {
+              announcedNotificationIds.add(notification.id);
+            }
+
+            if (notificationUserId) {
+              persistAnnouncedNotificationIds(notificationUserId, announcedNotificationIds);
+            }
+
+            if (
+              pushNotificationsEnabled &&
+              newNotifications.length > 0 &&
+              typeof window !== "undefined" &&
+              "Notification" in window &&
+              window.Notification.permission === "granted" &&
+              (document.visibilityState !== "visible" || !document.hasFocus())
+            ) {
+              for (const notification of [...newNotifications].reverse()) {
+                const browserNotification = new window.Notification(notification.title, {
+                  body: notification.message,
+                  tag: notification.id,
+                });
+
+                browserNotification.onclick = () => {
+                  window.focus();
+
+                  if (notification.link) {
+                    router.push(notification.link);
+                  }
+
+                  browserNotification.close();
+                };
+              }
+            }
+
+          }
+
           setNotifications(nextNotifications);
           setErrorMessage("");
         }
@@ -85,7 +187,7 @@ export function NotificationsBell({ mode = "trigger" }: NotificationsBellProps) 
       isMounted = false;
       window.clearInterval(intervalId);
     };
-  }, [status]);
+  }, [notificationUserId, pushNotificationsEnabled, router, status]);
 
   async function handleNotificationClick(notification: NotificationListItem) {
     try {

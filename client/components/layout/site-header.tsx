@@ -6,10 +6,17 @@ import { useEffect, useRef, useState } from "react";
 import { signOut, useSession } from "next-auth/react";
 import type { Role } from "@prisma/client";
 
-import { searchGames } from "@/app/actions/search";
+import {
+  searchMarketplace,
+  type SearchGameResult,
+  type SearchMarketplaceResult,
+  type SearchProductResult,
+  type SearchSellerResult,
+} from "@/app/actions/search";
 import { NotificationsBell } from "@/components/notifications-bell";
 import { TopupBalanceDialogMenuItem } from "@/components/payment/topup-balance-dialog";
 import { useCurrency } from "@/components/providers/currency-provider";
+import { Badge } from "@/components/ui/badge";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -21,7 +28,7 @@ import {
 import { Select } from "@/components/ui/select";
 import { UserAvatar } from "@/components/ui/user-avatar";
 import catalogSeedData from "@/lib/catalog-seed-data.json";
-import { isAdminRole } from "@/lib/roles";
+import { getRoleLabel, isAdminRole, isTeamRole } from "@/lib/roles";
 
 const BALANCE_REFRESH_EVENT = "safeloot:balances-refresh";
 const LAST_SEEN_UPDATE_INTERVAL_MS = 5 * 60 * 1000;
@@ -29,12 +36,11 @@ const PROFILE_REFRESH_INTERVAL_MS = 5000;
 const SEARCH_DEBOUNCE_MS = 250;
 const POPULAR_GAMES = catalogSeedData.popularGames;
 
-interface SearchGameResult {
-  id: string;
-  name: string;
-  slug: string;
-  imageUrl: string | null;
-}
+const EMPTY_SEARCH_RESULTS: SearchMarketplaceResult = {
+  games: [],
+  products: [],
+  sellers: [],
+};
 
 function SearchGameIcon({
   name,
@@ -67,6 +73,8 @@ interface CurrentUser {
   email: string;
   name: string;
   image: string | null;
+  emailNotifications: boolean;
+  pushNotifications: boolean;
   role: Role;
   rank: string;
   lastSeen: string;
@@ -103,7 +111,7 @@ export function SiteHeader() {
   const [user, setUser] = useState<CurrentUser | null>(null);
   const [refreshToken, setRefreshToken] = useState(0);
   const [query, setQuery] = useState("");
-  const [results, setResults] = useState<SearchGameResult[]>([]);
+  const [results, setResults] = useState<SearchMarketplaceResult>(EMPTY_SEARCH_RESULTS);
   const [isSearchOpen, setIsSearchOpen] = useState(false);
   const [isSearching, setIsSearching] = useState(false);
   const searchContainerRef = useRef<HTMLDivElement | null>(null);
@@ -215,7 +223,7 @@ export function SiteHeader() {
 
   useEffect(() => {
     if (!query.trim()) {
-      setResults([]);
+      setResults(EMPTY_SEARCH_RESULTS);
       setIsSearching(false);
       return;
     }
@@ -224,7 +232,7 @@ export function SiteHeader() {
     const timeoutId = window.setTimeout(async () => {
       try {
         setIsSearching(true);
-        const nextResults = await searchGames(query);
+        const nextResults = await searchMarketplace(query);
 
         if (isActive) {
           setResults(nextResults);
@@ -232,7 +240,7 @@ export function SiteHeader() {
         }
       } catch {
         if (isActive) {
-          setResults([]);
+          setResults(EMPTY_SEARCH_RESULTS);
         }
       } finally {
         if (isActive) {
@@ -263,16 +271,77 @@ export function SiteHeader() {
 
   function handleSelectGame(game: SearchGameResult) {
     setQuery(game.name);
-    setResults([]);
+    setResults(EMPTY_SEARCH_RESULTS);
     setIsSearchOpen(false);
     router.push(`/games/${game.slug}`);
   }
 
+  function handleSelectProduct(product: SearchProductResult) {
+    setQuery(product.title);
+    setResults(EMPTY_SEARCH_RESULTS);
+    setIsSearchOpen(false);
+    router.push(`/product/${product.id}`);
+  }
+
+  function handleSelectSeller(seller: SearchSellerResult) {
+    setQuery(seller.name);
+    setResults(EMPTY_SEARCH_RESULTS);
+    setIsSearchOpen(false);
+    router.push(`/profile/${seller.id}`);
+  }
+
+  function getSearchRoleBadgeVariant(role: Role) {
+    switch (role) {
+      case "MODERATOR":
+        return "info" as const;
+      case "ADMIN":
+        return "warning" as const;
+      case "SUPER_ADMIN":
+        return "destructive" as const;
+      case "USER":
+      default:
+        return "secondary" as const;
+    }
+  }
+
+  function renderSearchSection(props: {
+    title: string;
+    items: React.ReactNode[];
+  }) {
+    if (props.items.length === 0) {
+      return null;
+    }
+
+    return (
+      <div>
+        <div className="border-b border-white/10 px-4 py-3 text-xs font-semibold tracking-[0.22em] uppercase text-zinc-500">
+          {props.title}
+        </div>
+        <div className="divide-y divide-white/10">{props.items}</div>
+      </div>
+    );
+  }
+
+  const hasSearchResults =
+    results.games.length > 0 ||
+    results.products.length > 0 ||
+    results.sellers.length > 0;
+
   function handleSearchSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
 
-    if (results[0]) {
-      handleSelectGame(results[0]);
+    if (results.games[0]) {
+      handleSelectGame(results.games[0]);
+      return;
+    }
+
+    if (results.products[0]) {
+      handleSelectProduct(results.products[0]);
+      return;
+    }
+
+    if (results.sellers[0]) {
+      handleSelectSeller(results.sellers[0]);
     }
   }
 
@@ -290,7 +359,7 @@ export function SiteHeader() {
     return (
       <DropdownMenu>
         <DropdownMenuTrigger asChild>{trigger}</DropdownMenuTrigger>
-        <DropdownMenuContent align="end" className={contentClassName}>
+        <DropdownMenuContent align="end" forceMount className={contentClassName}>
           <DropdownMenuLabel>Аккаунт</DropdownMenuLabel>
           <div className="px-3 pb-2">
             <p className="truncate text-sm font-semibold text-white">
@@ -310,7 +379,10 @@ export function SiteHeader() {
           <TopupBalanceDialogMenuItem />
           <DropdownMenuSeparator className="my-1 h-px bg-white/10" />
           <div className="px-2 py-2">
-            <NotificationsBell mode="panel" />
+            <NotificationsBell
+              mode="panel"
+              pushNotificationsEnabled={Boolean(user?.pushNotifications)}
+            />
           </div>
           <DropdownMenuSeparator className="my-1 h-px bg-white/10" />
           <DropdownMenuItem
@@ -432,7 +504,7 @@ export function SiteHeader() {
                   onFocus={() => {
                     setIsSearchOpen(true);
                   }}
-                  placeholder="Поиск по играм, товарам и услугам"
+                  placeholder="Поиск по играм, товарам и продавцам"
                   className="h-12 w-full rounded-2xl border border-white/10 bg-white/5 pl-12 pr-4 text-sm text-zinc-100 shadow-[0_12px_30px_rgba(0,0,0,0.22)] outline-none transition placeholder:text-zinc-500 focus:border-orange-500/40 focus:bg-white/8 focus:ring-4 focus:ring-orange-500/10"
                 />
               </label>
@@ -473,28 +545,87 @@ export function SiteHeader() {
                     </div>
                   ) : isSearching ? (
                     <div className="px-4 py-3 text-sm text-zinc-400">
-                      Ищем игры...
+                      Ищем игры, товары и продавцов...
                     </div>
-                  ) : results.length > 0 ? (
+                  ) : hasSearchResults ? (
                     <div className="divide-y divide-white/10">
-                      {results.map((game) => (
-                        <button
-                          key={game.id}
-                          type="button"
-                          onClick={() => handleSelectGame(game)}
-                          className="flex w-full items-center gap-3 px-4 py-3 text-left transition hover:bg-white/5"
-                        >
-                          <SearchGameIcon name={game.name} imageUrl={game.imageUrl} />
-                          <span className="min-w-0 flex-1">
-                            <span className="block truncate text-sm font-semibold text-white">
-                              {game.name}
+                      {renderSearchSection({
+                        title: "Игры",
+                        items: results.games.map((game) => (
+                          <button
+                            key={game.id}
+                            type="button"
+                            onClick={() => handleSelectGame(game)}
+                            className="flex w-full items-center gap-3 px-4 py-3 text-left transition hover:bg-white/5"
+                          >
+                            <SearchGameIcon name={game.name} imageUrl={game.imageUrl} />
+                            <span className="min-w-0 flex-1">
+                              <span className="block truncate text-sm font-semibold text-white">
+                                {game.name}
+                              </span>
+                              <span className="block truncate text-xs uppercase tracking-[0.18em] text-zinc-500">
+                                Каталог игры
+                              </span>
                             </span>
-                            <span className="block truncate text-xs uppercase tracking-[0.18em] text-zinc-500">
-                              Каталог игры
+                          </button>
+                        )),
+                      })}
+
+                      {renderSearchSection({
+                        title: "Товары",
+                        items: results.products.map((product) => (
+                          <button
+                            key={product.id}
+                            type="button"
+                            onClick={() => handleSelectProduct(product)}
+                            className="flex w-full items-center gap-3 px-4 py-3 text-left transition hover:bg-white/5"
+                          >
+                            <SearchGameIcon name={product.title} imageUrl={product.imageUrl} />
+                            <span className="min-w-0 flex-1">
+                              <span className="block truncate text-sm font-semibold text-white">
+                                {product.title}
+                              </span>
+                              <span className="block truncate text-xs uppercase tracking-[0.18em] text-zinc-500">
+                                {product.gameName}
+                              </span>
                             </span>
-                          </span>
-                        </button>
-                      ))}
+                          </button>
+                        )),
+                      })}
+
+                      {renderSearchSection({
+                        title: "Продавцы",
+                        items: results.sellers.map((seller) => (
+                          <button
+                            key={seller.id}
+                            type="button"
+                            onClick={() => handleSelectSeller(seller)}
+                            className="flex w-full items-center gap-3 px-4 py-3 text-left transition hover:bg-white/5"
+                          >
+                            <UserAvatar
+                              src={seller.image}
+                              name={seller.name}
+                              className="h-9 w-9 shrink-0 rounded-xl border-white/10 bg-zinc-800/80"
+                              imageClassName="rounded-xl object-cover"
+                            />
+                            <span className="min-w-0 flex-1">
+                              <span className="flex flex-wrap items-center gap-2">
+                                <span className="truncate text-sm font-semibold text-white">
+                                  {seller.name}
+                                </span>
+                                {isTeamRole(seller.role) ? (
+                                  <Badge variant={getSearchRoleBadgeVariant(seller.role)} className="px-2 py-0.5 text-[10px] tracking-[0.14em]">
+                                    {getRoleLabel(seller.role)}
+                                  </Badge>
+                                ) : null}
+                              </span>
+                              <span className="block truncate text-xs uppercase tracking-[0.18em] text-zinc-500">
+                                Публичный профиль продавца
+                              </span>
+                            </span>
+                          </button>
+                        )),
+                      })}
                     </div>
                   ) : (
                     <div className="px-4 py-3 text-sm text-zinc-400">

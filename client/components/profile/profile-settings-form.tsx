@@ -17,13 +17,16 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
+import { Switch } from "@/components/ui/switch";
 
 interface ProfileSettingsFormProps {
   initialBadges: string[];
   initialBannerUrl: string | null;
   initialEmail: string;
+  initialEmailNotifications: boolean;
   initialName: string;
   initialImage: string | null;
+  initialPushNotifications: boolean;
   initialRole: Role;
 }
 
@@ -131,12 +134,51 @@ function compressBannerToWebpBase64(file: File) {
   });
 }
 
+async function requestBrowserPushPermissionIfNeeded() {
+  if (typeof window === "undefined" || !("Notification" in window)) {
+    return {
+      ok: false as const,
+      message: "Ваш браузер не поддерживает системные уведомления.",
+    };
+  }
+
+  if (window.Notification.permission === "granted") {
+    return {
+      ok: true as const,
+      permission: "granted" as NotificationPermission,
+    };
+  }
+
+  if (window.Notification.permission === "denied") {
+    return {
+      ok: false as const,
+      message: "Системные уведомления заблокированы в браузере. Разрешите их в настройках браузера.",
+    };
+  }
+
+  const permission = await window.Notification.requestPermission();
+
+  if (permission !== "granted") {
+    return {
+      ok: false as const,
+      message: "Чтобы получать push-уведомления, разрешите показ уведомлений в браузере.",
+    };
+  }
+
+  return {
+    ok: true as const,
+    permission,
+  };
+}
+
 export function ProfileSettingsForm({
   initialBadges,
   initialBannerUrl,
   initialEmail,
+  initialEmailNotifications,
   initialImage,
   initialName,
+  initialPushNotifications,
   initialRole,
 }: ProfileSettingsFormProps) {
   const router = useRouter();
@@ -144,9 +186,13 @@ export function ProfileSettingsForm({
   const [name, setName] = useState(initialName);
   const [image, setImage] = useState<string | null>(initialImage);
   const [bannerUrl, setBannerUrl] = useState(initialBannerUrl ?? "");
+  const [emailNotifications, setEmailNotifications] = useState(initialEmailNotifications);
+  const [pushNotifications, setPushNotifications] = useState(initialPushNotifications);
   const [savedName, setSavedName] = useState(initialName);
   const [savedImage, setSavedImage] = useState<string | null>(initialImage);
   const [savedBannerUrl, setSavedBannerUrl] = useState(initialBannerUrl ?? "");
+  const [savedEmailNotifications, setSavedEmailNotifications] = useState(initialEmailNotifications);
+  const [savedPushNotifications, setSavedPushNotifications] = useState(initialPushNotifications);
   const [errorMessage, setErrorMessage] = useState("");
   const [successMessage, setSuccessMessage] = useState("");
   const [isProcessingAvatar, setIsProcessingAvatar] = useState(false);
@@ -159,7 +205,9 @@ export function ProfileSettingsForm({
   const hasChanges =
     name.trim() !== savedName ||
     image !== savedImage ||
-    normalizedBannerUrl !== savedBannerUrl;
+    normalizedBannerUrl !== savedBannerUrl ||
+    emailNotifications !== savedEmailNotifications ||
+    pushNotifications !== savedPushNotifications;
   const isSaveDisabled = !name.trim() || !hasChanges || isPending || isProcessingImage;
 
   async function handleAvatarSelection(file: File) {
@@ -235,7 +283,13 @@ export function ProfileSettingsForm({
     setSuccessMessage("");
 
     try {
-      const result = await updateUserProfile(name, image, bannerUrl);
+      const result = await updateUserProfile(
+        name,
+        image,
+        bannerUrl,
+        emailNotifications,
+        pushNotifications,
+      );
 
       if (!result.ok) {
         setErrorMessage(result.message || "Не удалось сохранить профиль.");
@@ -245,13 +299,19 @@ export function ProfileSettingsForm({
       const nextName = result.name ?? name.trim();
       const nextImage = result.image ?? null;
       const nextBannerUrl = result.bannerUrl ?? null;
+      const nextEmailNotifications = result.emailNotifications ?? emailNotifications;
+      const nextPushNotifications = result.pushNotifications ?? pushNotifications;
 
       setName(nextName);
       setImage(nextImage);
       setBannerUrl(nextBannerUrl ?? "");
+      setEmailNotifications(nextEmailNotifications);
+      setPushNotifications(nextPushNotifications);
       setSavedName(nextName);
       setSavedImage(nextImage);
       setSavedBannerUrl(nextBannerUrl ?? "");
+      setSavedEmailNotifications(nextEmailNotifications);
+      setSavedPushNotifications(nextPushNotifications);
 
       await update();
       router.refresh();
@@ -376,6 +436,79 @@ export function ProfileSettingsForm({
               Поддерживаются JPG, PNG и WebP. Перед сохранением изображение сжимается до компактного формата для Vercel-friendly MVP.
             </p>
           </div>
+
+          <section className="space-y-4 rounded-[1.75rem] border border-white/10 bg-white/5 p-5">
+            <div>
+              <h3 className="text-base font-semibold text-white">Настройки уведомлений</h3>
+              <p className="mt-1 text-sm leading-7 text-zinc-400">
+                Выберите, как получать уведомления о новых заказах, сообщениях и событиях аккаунта.
+              </p>
+            </div>
+
+            <div className="space-y-3">
+              <div className="flex items-start justify-between gap-4 rounded-[1.25rem] border border-white/10 bg-black/20 px-4 py-3">
+                <div className="min-w-0">
+                  <label htmlFor="profile-email-notifications" className="text-sm font-semibold text-zinc-100">
+                    Email-уведомления
+                  </label>
+                  <p className="mt-1 text-sm leading-6 text-zinc-400">
+                    Получать письма о новых заказах и сообщениях
+                  </p>
+                </div>
+                <Switch
+                  id="profile-email-notifications"
+                  checked={emailNotifications}
+                  onCheckedChange={(checked) => {
+                    setEmailNotifications(checked);
+                    setErrorMessage("");
+                    setSuccessMessage("");
+                  }}
+                />
+              </div>
+
+              <div className="flex items-start justify-between gap-4 rounded-[1.25rem] border border-white/10 bg-black/20 px-4 py-3">
+                <div className="min-w-0">
+                  <label htmlFor="profile-push-notifications" className="text-sm font-semibold text-zinc-100">
+                    Браузерные push-уведомления
+                  </label>
+                  <p className="mt-1 text-sm leading-6 text-zinc-400">
+                    Мгновенные всплывающие уведомления на экране
+                  </p>
+                </div>
+                <Switch
+                  id="profile-push-notifications"
+                  checked={pushNotifications}
+                  onCheckedChange={(checked) => {
+                    setPushNotifications(checked);
+                    setErrorMessage("");
+                    setSuccessMessage("");
+
+                    if (!checked) {
+                      return;
+                    }
+
+                    void requestBrowserPushPermissionIfNeeded().then((result) => {
+                      if (!result.ok) {
+                        setErrorMessage(result.message);
+                      }
+                    });
+                  }}
+                />
+              </div>
+
+              <div className="flex items-start justify-between gap-4 rounded-[1.25rem] border border-dashed border-white/10 bg-black/20 px-4 py-3 opacity-75">
+                <div className="min-w-0">
+                  <label htmlFor="profile-telegram-notifications" className="text-sm font-semibold text-zinc-100">
+                    Telegram-бот
+                  </label>
+                  <p className="mt-1 text-sm leading-6 text-zinc-400">
+                    В разработке
+                  </p>
+                </div>
+                <Switch id="profile-telegram-notifications" checked={false} disabled />
+              </div>
+            </div>
+          </section>
 
           {errorMessage ? (
             <div className="rounded-[1.5rem] border border-red-500/20 bg-red-500/10 px-4 py-3 text-sm text-red-200">

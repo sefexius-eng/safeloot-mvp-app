@@ -18,6 +18,24 @@ Open [http://localhost:3000](http://localhost:3000) with your browser to see the
 
 You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
 
+## Notifications Setup
+
+Profile settings now control two delivery channels:
+
+- Email notifications are sent only if the user has `emailNotifications=true` and SMTP is configured.
+- Browser push notifications use the Web Notifications API and appear only if the user has `pushNotifications=true` and the browser permission is granted.
+
+For email delivery, configure these environment variables:
+
+```bash
+SMTP_HOST=
+SMTP_PORT=587
+SMTP_SECURE=false
+SMTP_USER=
+SMTP_PASS=
+SMTP_FROM=
+```
+
 This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
 
 ## Learn More

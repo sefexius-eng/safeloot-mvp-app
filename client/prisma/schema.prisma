@@ -51,6 +51,8 @@ model User {
   image            String?
   bannerUrl        String?
   badges           String[]      @default([])
+  emailNotifications Boolean      @default(true)
+  pushNotifications Boolean       @default(true)
   password         String
   role             Role          @default(USER)
   isBanned         Boolean       @default(false)

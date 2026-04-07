@@ -10,6 +10,8 @@ export interface UpdateUserProfileResult {
   name?: string;
   image?: string | null;
   bannerUrl?: string | null;
+  emailNotifications?: boolean;
+  pushNotifications?: boolean;
   message?: string;
 }
 
@@ -84,6 +86,8 @@ export async function updateUserProfile(
   name: string,
   imageBase64: string | null,
   bannerUrl: string,
+  emailNotifications: boolean,
+  pushNotifications: boolean,
 ): Promise<UpdateUserProfileResult> {
   const session = await getAuthSession();
   const userId = session?.user?.id?.trim();
@@ -140,12 +144,16 @@ export async function updateUserProfile(
       name: normalizedName,
       image: imageBase64,
       bannerUrl: normalizedBannerUrl.value,
+      emailNotifications,
+      pushNotifications,
     },
     select: {
       id: true,
       name: true,
       image: true,
       bannerUrl: true,
+      emailNotifications: true,
+      pushNotifications: true,
     },
   });
 
@@ -159,5 +167,7 @@ export async function updateUserProfile(
     name: updatedUser.name ?? normalizedName,
     image: updatedUser.image,
     bannerUrl: updatedUser.bannerUrl,
+    emailNotifications: updatedUser.emailNotifications,
+    pushNotifications: updatedUser.pushNotifications,
   };
 }

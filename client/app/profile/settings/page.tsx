@@ -28,6 +28,8 @@ export default async function ProfileSettingsPage() {
       image: true,
       bannerUrl: true,
       badges: true,
+      emailNotifications: true,
+      pushNotifications: true,
       role: true,
     },
   });
@@ -49,6 +51,8 @@ export default async function ProfileSettingsPage() {
     userProfile.badges,
     automaticBadgeData.automaticBadgeIds,
   );
+  const initialEmailNotifications = userProfile.emailNotifications;
+  const initialPushNotifications = userProfile.pushNotifications;
   const initialRole = userProfile.role;
 
   return (
@@ -81,8 +85,10 @@ export default async function ProfileSettingsPage() {
         initialBadges={initialBadges}
         initialBannerUrl={initialBannerUrl}
         initialEmail={initialEmail}
+        initialEmailNotifications={initialEmailNotifications}
         initialImage={initialImage}
         initialName={initialName}
+        initialPushNotifications={initialPushNotifications}
         initialRole={initialRole}
       />
     </main>

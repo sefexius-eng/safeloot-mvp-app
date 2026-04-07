@@ -8,6 +8,10 @@ import {
 
 import { prisma } from "@/lib/prisma";
 import {
+  sendNotificationEmails,
+  type NotificationEmailDeliveryInput,
+} from "@/lib/notification-delivery";
+import {
   getSellerReviewSummary,
   getSellerReviewSummaryBySellerId,
   getSellerReviewSummaryMap,
@@ -308,6 +312,7 @@ async function createUserNotification(
     message: string;
     link?: string;
   },
+  emailDeliveryQueue?: NotificationEmailDeliveryInput[],
 ) {
   const userId = normalizeText(input.userId);
   const title = normalizeText(input.title);
@@ -318,6 +323,31 @@ async function createUserNotification(
     return;
   }
 
+  let recipientEmailDelivery: NotificationEmailDeliveryInput | null = null;
+
+  if (emailDeliveryQueue) {
+    const user = await transactionClient.user.findUnique({
+      where: {
+        id: userId,
+      },
+      select: {
+        email: true,
+        name: true,
+        emailNotifications: true,
+      },
+    });
+
+    if (user?.emailNotifications) {
+      recipientEmailDelivery = {
+        recipientEmail: user.email,
+        recipientName: user.name?.trim() || user.email.split("@")[0],
+        title,
+        message,
+        link,
+      };
+    }
+  }
+
   await transactionClient.notification.create({
     data: {
       userId,
@@ -326,6 +356,10 @@ async function createUserNotification(
       link,
     },
   });
+
+  if (recipientEmailDelivery && emailDeliveryQueue) {
+    emailDeliveryQueue.push(recipientEmailDelivery);
+  }
 }
 
 async function mapProductsWithSellerReviewSummary<
@@ -945,7 +979,7 @@ export async function deleteProductByActor(input: {
     throw new Error("userId is required.");
   }
 
-  return prisma.$transaction(
+  const result = await prisma.$transaction(
     async (transactionClient) => {
       const product = await transactionClient.product.findUnique({
         where: {
@@ -1007,6 +1041,8 @@ export async function deleteProductByActor(input: {
       isolationLevel: Prisma.TransactionIsolationLevel.Serializable,
     },
   );
+
+  return result;
 }
 
 export async function toggleProductVisibilityBySeller(input: {
@@ -1145,6 +1181,8 @@ export async function getUserById(userId: string) {
       email: true,
       name: true,
       image: true,
+      emailNotifications: true,
+      pushNotifications: true,
       role: true,
       rank: true,
       lastSeen: true,
@@ -1453,7 +1491,9 @@ export async function confirmOrder(input: { orderId?: string; buyerId: string })
     throw new Error("buyerId is required.");
   }
 
-  return prisma.$transaction(
+  const emailDeliveryQueue: NotificationEmailDeliveryInput[] = [];
+
+  const result = await prisma.$transaction(
     async (transactionClient) => {
       const existingOrder = await transactionClient.order.findUnique({
         where: { id: orderId },
@@ -1515,7 +1555,7 @@ export async function confirmOrder(input: { orderId?: string; buyerId: string })
         title: "Новый заказ!",
         message: "У вас купили товар. Перейдите к сделке.",
         link: `/orders/${checkoutOrder.id}`,
-      });
+      }, emailDeliveryQueue);
 
       return {
         orderId: checkoutOrder.id,
@@ -1526,6 +1566,10 @@ export async function confirmOrder(input: { orderId?: string; buyerId: string })
       isolationLevel: Prisma.TransactionIsolationLevel.Serializable,
     },
   );
+
+  await sendNotificationEmails(emailDeliveryQueue);
+
+  return result;
 }
 
 export async function completeOrder(input: { orderId: string; buyerId: string }) {
@@ -1540,7 +1584,7 @@ export async function completeOrder(input: { orderId: string; buyerId: string })
     throw new Error("buyerId is required.");
   }
 
-  return prisma.$transaction(
+  const result = await prisma.$transaction(
     async (transactionClient) => {
       const order = await transactionClient.order.findUnique({
         where: { id: orderId },
@@ -1673,6 +1717,8 @@ export async function completeOrder(input: { orderId: string; buyerId: string })
       isolationLevel: Prisma.TransactionIsolationLevel.Serializable,
     },
   );
+
+  return result;
 }
 
 export async function refundOrder(input: { orderId: string; sellerId: string }) {
@@ -1687,7 +1733,9 @@ export async function refundOrder(input: { orderId: string; sellerId: string }) 
     throw new Error("sellerId is required.");
   }
 
-  return prisma.$transaction(
+  const emailDeliveryQueue: NotificationEmailDeliveryInput[] = [];
+
+  const result = await prisma.$transaction(
     async (transactionClient) => {
       const order = await transactionClient.order.findUnique({
         where: { id: orderId },
@@ -1783,7 +1831,7 @@ export async function refundOrder(input: { orderId: string; sellerId: string }) 
         title: "Возврат по сделке",
         message: "Продавец оформил возврат средств по заказу.",
         link: `/orders/${order.id}`,
-      });
+      }, emailDeliveryQueue);
 
       return {
         orderId: order.id,
@@ -1795,6 +1843,10 @@ export async function refundOrder(input: { orderId: string; sellerId: string }) 
       isolationLevel: Prisma.TransactionIsolationLevel.Serializable,
     },
   );
+
+  await sendNotificationEmails(emailDeliveryQueue);
+
+  return result;
 }
 
 export async function openOrderDispute(input: {
@@ -2574,6 +2626,8 @@ export async function createConversationMessage(input: {
 
   const recipientId = senderId === conversation.buyerId ? conversation.sellerId : conversation.buyerId;
 
+  const emailDeliveryQueue: NotificationEmailDeliveryInput[] = [];
+
   const message = await prisma.$transaction(
     async (transactionClient) => {
       const createdMessage = await transactionClient.message.create({
@@ -2615,7 +2669,7 @@ export async function createConversationMessage(input: {
         title: "Новое сообщение",
         message: "Вам написали в личном диалоге.",
         link: `/chats/${conversation.id}`,
-      });
+      }, emailDeliveryQueue);
 
       return createdMessage;
     },
@@ -2623,6 +2677,8 @@ export async function createConversationMessage(input: {
       isolationLevel: Prisma.TransactionIsolationLevel.Serializable,
     },
   );
+
+  await sendNotificationEmails(emailDeliveryQueue);
 
   return {
     conversationId: conversation.id,
