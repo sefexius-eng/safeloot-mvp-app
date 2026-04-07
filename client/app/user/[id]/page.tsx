@@ -10,6 +10,11 @@ import {
   type MarketplaceProductCardData,
 } from "@/components/product/marketplace-product-card";
 import { SellerReviewReplyForm } from "@/components/reviews/seller-review-reply-form";
+import {
+  SellerStarScale,
+  formatSellerAverageRating,
+  formatSellerReviewCount,
+} from "@/components/reviews/seller-star-scale";
 import { RatingStars } from "@/components/reviews/rating-stars";
 import { UserAvatar } from "@/components/ui/user-avatar";
 import { getCurrentSessionUser } from "@/lib/access-control";
@@ -60,17 +65,6 @@ function formatJoinedDate(value: Date) {
     day: "2-digit",
     month: "long",
     year: "numeric",
-  }).format(value);
-}
-
-function formatAverageRating(value: number | null) {
-  if (value === null) {
-    return "Нет оценок";
-  }
-
-  return new Intl.NumberFormat("ru-RU", {
-    minimumFractionDigits: 1,
-    maximumFractionDigits: 1,
   }).format(value);
 }
 
@@ -290,18 +284,23 @@ export default async function PublicUserPage({ params }: PublicUserPageProps) {
             <p className="text-xs font-semibold tracking-[0.22em] uppercase text-zinc-500">
               Средний рейтинг
             </p>
-            <div className="mt-3 flex items-center gap-3">
-              <RatingStars value={Math.round(seller.averageRating ?? 0)} size="lg" />
-              <div>
-                <p className="text-2xl font-semibold text-white">
-                  {formatAverageRating(seller.averageRating)}
-                </p>
-                <p className="text-sm text-zinc-400">
-                  {seller.reviewCount > 0
-                    ? `${seller.reviewCount} отзывов`
-                    : "Отзывов пока нет"}
-                </p>
-              </div>
+            <div className="mt-3">
+              {seller.reviewCount > 0 && seller.averageRating !== null ? (
+                <div className="flex flex-wrap items-center gap-3">
+                  <span className="text-2xl font-semibold text-white">
+                    {formatSellerAverageRating(seller.averageRating)}
+                  </span>
+                  <SellerStarScale rating={seller.averageRating} />
+                  <span className="text-sm text-zinc-400">
+                    {formatSellerReviewCount(seller.reviewCount)}
+                  </span>
+                </div>
+              ) : (
+                <div>
+                  <p className="text-2xl font-semibold text-white">Нет оценок</p>
+                  <p className="text-sm text-zinc-400">Отзывов пока нет</p>
+                </div>
+              )}
             </div>
           </div>
         }

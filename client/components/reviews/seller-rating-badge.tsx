@@ -1,32 +1,10 @@
-import { RatingStars } from "@/components/reviews/rating-stars";
+import {
+  SellerStarScale,
+  formatSellerAverageRating,
+  formatSellerReviewCount,
+} from "@/components/reviews/seller-star-scale";
 import type { SellerReviewSummary } from "@/lib/review-summary";
 import { cn } from "@/lib/utils";
-
-function formatAverageRating(value: number) {
-  return new Intl.NumberFormat("ru-RU", {
-    minimumFractionDigits: 1,
-    maximumFractionDigits: 1,
-  }).format(value);
-}
-
-function formatReviewCount(count: number) {
-  const lastDigit = count % 10;
-  const lastTwoDigits = count % 100;
-
-  if (lastDigit === 1 && lastTwoDigits !== 11) {
-    return `${count} отзыв`;
-  }
-
-  if (
-    lastDigit >= 2 &&
-    lastDigit <= 4 &&
-    (lastTwoDigits < 12 || lastTwoDigits > 14)
-  ) {
-    return `${count} отзыва`;
-  }
-
-  return `${count} отзывов`;
-}
 
 interface SellerRatingBadgeProps {
   summary: SellerReviewSummary;
@@ -57,14 +35,13 @@ export function SellerRatingBadge({
         <span className="font-medium">Нет отзывов</span>
       ) : (
         <>
-          <RatingStars
-            value={Math.round(averageRating)}
-            size={size === "sm" ? "sm" : "md"}
-          />
           <span className="font-semibold text-white">
-            {formatAverageRating(averageRating)} / 5
+            {formatSellerAverageRating(averageRating)}
           </span>
-          <span className="text-amber-100/80">{formatReviewCount(summary.reviewCount)}</span>
+          <SellerStarScale rating={averageRating} size={size === "sm" ? "sm" : "md"} />
+          <span className="text-amber-100/80">
+            {formatSellerReviewCount(summary.reviewCount)}
+          </span>
         </>
       )}
     </div>

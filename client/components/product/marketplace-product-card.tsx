@@ -5,6 +5,11 @@ import Link from "next/link";
 
 import CensoredText from "@/components/censored-text";
 import { useCurrency } from "@/components/providers/currency-provider";
+import {
+  SellerStarScale,
+  formatSellerAverageRating,
+  formatSellerReviewCount,
+} from "@/components/reviews/seller-star-scale";
 import { UserAvatar } from "@/components/ui/user-avatar";
 import type { SellerReviewSummary } from "@/lib/review-summary";
 
@@ -48,32 +53,6 @@ function getProductCover(product: MarketplaceProductCardData) {
 
 function getSellerDisplayName(seller: MarketplaceProductCardData["seller"]) {
   return seller.name?.trim() || "Продавец";
-}
-
-function formatAverageRating(value: number) {
-  return new Intl.NumberFormat("ru-RU", {
-    minimumFractionDigits: 1,
-    maximumFractionDigits: 1,
-  }).format(value);
-}
-
-function formatReviewCount(count: number) {
-  const lastDigit = count % 10;
-  const lastTwoDigits = count % 100;
-
-  if (lastDigit === 1 && lastTwoDigits !== 11) {
-    return `${count} отзыв`;
-  }
-
-  if (
-    lastDigit >= 2 &&
-    lastDigit <= 4 &&
-    (lastTwoDigits < 12 || lastTwoDigits > 14)
-  ) {
-    return `${count} отзыва`;
-  }
-
-  return `${count} отзывов`;
 }
 
 function isTeamSeller(role: Role) {
@@ -153,19 +132,20 @@ export function MarketplaceProductCard({ product }: MarketplaceProductCardProps)
                 </span>
               ) : null}
             </div>
-            <div className="mt-1 flex items-center gap-1.5 text-xs text-zinc-500">
-              <svg
-                viewBox="0 0 24 24"
-                aria-hidden="true"
-                className="h-3.5 w-3.5 shrink-0 fill-yellow-400 text-yellow-400"
-              >
-                <path d="M12 2.75l2.84 5.75 6.35.92-4.6 4.48 1.09 6.32L12 17.25 6.32 20.22l1.09-6.32-4.6-4.48 6.35-.92L12 2.75z" />
-              </svg>
-              <span className="text-zinc-500">
-                {hasReviews
-                  ? `${formatAverageRating(averageRating)} · ${formatReviewCount(reviewSummary.reviewCount)}`
-                  : "Пока без отзывов"}
-              </span>
+            <div className="mt-1">
+              {hasReviews ? (
+                <div className="flex flex-wrap items-center gap-1.5">
+                  <span className="text-sm font-semibold text-zinc-200">
+                    {formatSellerAverageRating(averageRating)}
+                  </span>
+                  <SellerStarScale rating={averageRating} size="sm" />
+                  <span className="text-xs text-zinc-500">
+                    {formatSellerReviewCount(reviewSummary.reviewCount)}
+                  </span>
+                </div>
+              ) : (
+                <span className="text-xs text-zinc-500">Пока без отзывов</span>
+              )}
             </div>
           </div>
         </Link>
