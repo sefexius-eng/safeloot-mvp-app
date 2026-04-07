@@ -36,7 +36,7 @@ export function EmailVerificationBanner({
 
   return (
     <div className="border-b border-amber-500/20 bg-[linear-gradient(90deg,rgba(120,53,15,0.42),rgba(37,99,235,0.14))]">
-      <div className="mx-auto flex w-full max-w-7xl flex-col gap-3 px-4 py-3 sm:px-6 lg:flex-row lg:items-center lg:justify-between lg:px-8">
+      <div className="mx-auto flex w-full max-w-7xl flex-col gap-2 px-4 py-2.5 sm:px-6 lg:flex-row lg:items-center lg:justify-between lg:px-8">
         <div className="min-w-0">
           <p className="text-sm font-semibold text-amber-100">
             ⚠️ Пожалуйста, подтвердите ваш email, чтобы получать уведомления и продавать товары.
@@ -56,7 +56,7 @@ export function EmailVerificationBanner({
           type="button"
           onClick={handleSendVerificationEmail}
           disabled={isPending}
-          className="h-10 shrink-0 rounded-xl bg-amber-400 px-4 text-sm font-semibold text-zinc-950 shadow-[0_12px_28px_rgba(251,191,36,0.28)] hover:bg-amber-300"
+          className="ml-0 h-9 shrink-0 rounded-xl border border-yellow-500 bg-transparent px-4 text-sm font-semibold text-yellow-400 shadow-none hover:bg-yellow-500/10 lg:ml-4"
         >
           {isPending ? "Отправляем..." : "Отправить письмо"}
         </Button>

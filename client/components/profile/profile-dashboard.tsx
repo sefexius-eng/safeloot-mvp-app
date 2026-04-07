@@ -7,7 +7,6 @@ import { useSession } from "next-auth/react";
 
 import { useCurrency } from "@/components/providers/currency-provider";
 import { SellerRatingBadge } from "@/components/reviews/seller-rating-badge";
-import { SellAccessLink } from "@/components/sell/sell-access-link";
 import type { SellerReviewSummary } from "@/lib/review-summary";
 
 const BALANCE_REFRESH_EVENT = "safeloot:balances-refresh";
@@ -200,9 +199,12 @@ export function ProfileDashboard() {
             >
               Открыть настройки
             </Link>
-            <SellAccessLink className="inline-flex h-11 items-center justify-center rounded-2xl border border-white/10 bg-white/5 px-5 text-sm font-semibold text-zinc-200 transition hover:bg-white/10">
+            <Link
+              href="/sell"
+              className="inline-flex h-11 items-center justify-center rounded-2xl border border-white/10 bg-white/5 px-5 text-sm font-semibold text-zinc-200 transition hover:bg-white/10"
+            >
               Разместить товар
-            </SellAccessLink>
+            </Link>
           </div>
         </article>
       </div>

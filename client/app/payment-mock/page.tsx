@@ -2,7 +2,6 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 
 import { MockPaymentButton } from "@/components/payment/mock-payment-button";
-import { SellAccessLink } from "@/components/sell/sell-access-link";
 import { FormattedPrice } from "@/components/ui/formatted-price";
 import { getCurrentSessionUser } from "@/lib/access-control";
 import { getAuthSession } from "@/lib/auth";
@@ -123,9 +122,12 @@ export default async function PaymentMockPage({
             >
               Вернуться на главную
             </Link>
-            <SellAccessLink className="inline-flex rounded-2xl border border-white/10 bg-white/5 px-5 py-3 text-sm font-semibold text-zinc-200 transition hover:bg-white/10">
+            <Link
+              href="/sell"
+              className="inline-flex rounded-2xl border border-white/10 bg-white/5 px-5 py-3 text-sm font-semibold text-zinc-200 transition hover:bg-white/10"
+            >
               Продолжить размещение
-            </SellAccessLink>
+            </Link>
           </div>
         </aside>
       </section>

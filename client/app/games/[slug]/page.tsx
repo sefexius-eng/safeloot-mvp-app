@@ -8,7 +8,6 @@ import {
   MarketplaceProductCard,
   type MarketplaceProductCardData,
 } from "@/components/product/marketplace-product-card";
-import { SellAccessLink } from "@/components/sell/sell-access-link";
 import { prisma } from "@/lib/prisma";
 import {
   getSellerReviewSummary,
@@ -304,9 +303,12 @@ export default async function GameCatalogPage({
               Вы можете стать первым продавцом и разместить своё предложение в этой игре.
             </p>
             <div className="mt-6">
-              <SellAccessLink className="inline-flex rounded-2xl bg-orange-600 px-6 py-3 text-sm font-semibold text-white transition hover:bg-orange-500">
+              <Link
+                href="/sell"
+                className="inline-flex rounded-2xl bg-orange-600 px-6 py-3 text-sm font-semibold text-white transition hover:bg-orange-500"
+              >
                 Разместить товар
-              </SellAccessLink>
+              </Link>
             </div>
           </div>
         ) : (

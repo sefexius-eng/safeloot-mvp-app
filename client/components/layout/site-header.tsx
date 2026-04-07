@@ -16,7 +16,6 @@ import { UserSearchDialog } from "@/components/layout/user-search-dialog";
 import { NotificationsBell } from "@/components/notifications-bell";
 import { TopupBalanceDialogMenuItem } from "@/components/payment/topup-balance-dialog";
 import { useCurrency } from "@/components/providers/currency-provider";
-import { SellAccessLink } from "@/components/sell/sell-access-link";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -418,12 +417,13 @@ export function SiteHeader() {
                 </Link>
 
                 {!isBanned ? (
-                  <SellAccessLink
+                  <Link
+                    href="/sell"
                     className="sell-link inline-flex h-9 w-9 items-center justify-center rounded-md bg-orange-600 text-white shadow-[0_16px_40px_rgba(249,115,22,0.28)] transition hover:-translate-y-0.5 hover:bg-orange-500 md:w-auto md:px-4"
-                    ariaLabel="Продать"
+                    aria-label="Продать"
                   >
                     <span aria-hidden="true">+</span>
-                  </SellAccessLink>
+                  </Link>
                 ) : null}
               </div>
             ) : status === "unauthenticated" ? (
@@ -670,13 +670,14 @@ export function SiteHeader() {
                   </div>
                 ) : (
                   <>
-                    <SellAccessLink
+                    <Link
+                      href="/sell"
                       className="sell-link inline-flex h-9 w-9 items-center justify-center rounded-md bg-orange-600 text-white shadow-[0_16px_40px_rgba(249,115,22,0.28)] transition hover:-translate-y-0.5 hover:bg-orange-500 md:h-10 md:w-auto md:px-4 md:rounded-xl"
-                      ariaLabel="Продать"
+                      aria-label="Продать"
                     >
                       <span className="md:hidden" aria-hidden="true">+</span>
                       <span className="hidden md:inline">Продать</span>
-                    </SellAccessLink>
+                    </Link>
 
                     {isAdminRole(user?.role) ? (
                       <Link
