@@ -1,6 +1,7 @@
 import { hash } from "bcryptjs";
 import { NextResponse } from "next/server";
 
+import { sendVerificationEmailToUser } from "@/lib/email-verification";
 import { prisma } from "@/lib/prisma";
 
 interface RegisterRequestBody {
@@ -62,6 +63,12 @@ export async function POST(request: Request) {
         rank: true,
       },
     });
+
+    try {
+      await sendVerificationEmailToUser(user.id);
+    } catch (error) {
+      console.error("[REGISTER_VERIFICATION_EMAIL_ERROR]", error);
+    }
 
     return NextResponse.json(user, { status: 201 });
   } catch (error) {

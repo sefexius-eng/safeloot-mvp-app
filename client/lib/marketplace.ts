@@ -6,6 +6,7 @@ import {
   TransactionType,
 } from "@prisma/client";
 
+import { EMAIL_VERIFICATION_REQUIRED_MESSAGE } from "@/lib/access-control";
 import { prisma } from "@/lib/prisma";
 import {
   sendNotificationEmails,
@@ -332,12 +333,13 @@ async function createUserNotification(
       },
       select: {
         email: true,
+        emailVerified: true,
         name: true,
         emailNotifications: true,
       },
     });
 
-    if (user?.emailNotifications) {
+    if (user?.emailNotifications && user.emailVerified) {
       recipientEmailDelivery = {
         recipientEmail: user.email,
         recipientName: user.name?.trim() || user.email.split("@")[0],
@@ -585,6 +587,10 @@ export function mapMarketplaceErrorToStatusCode(message: string) {
     return 403;
   }
 
+  if (message.includes("Подтвердите email")) {
+    return 403;
+  }
+
   if (message.includes("was not found") || message.includes("not found")) {
     return 404;
   }
@@ -816,6 +822,7 @@ export async function createProduct(input: {
       },
       select: {
         id: true,
+        emailVerified: true,
       },
     }),
     validateCatalogSelection(gameId, categoryId),
@@ -823,6 +830,10 @@ export async function createProduct(input: {
 
   if (!seller) {
     throw new Error(`Seller with id ${sellerId} was not found.`);
+  }
+
+  if (!seller.emailVerified) {
+    throw new Error(EMAIL_VERIFICATION_REQUIRED_MESSAGE);
   }
 
   const product = await prisma.product.create({
@@ -1179,6 +1190,7 @@ export async function getUserById(userId: string) {
     select: {
       id: true,
       email: true,
+      emailVerified: true,
       name: true,
       image: true,
       emailNotifications: true,
@@ -1201,6 +1213,7 @@ export async function getUserById(userId: string) {
 
   return {
     ...user,
+    emailVerified: user.emailVerified?.toISOString() ?? null,
     name: user.name ?? user.email.split("@")[0],
     lastSeen: user.lastSeen.toISOString(),
     platformRevenue: user.platformRevenue,

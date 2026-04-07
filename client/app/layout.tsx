@@ -3,6 +3,7 @@ import { Geist, Geist_Mono } from "next/font/google";
 
 import { Analytics } from "@/components/analytics";
 import { BannedModal } from "@/components/banned-modal";
+import { EmailVerificationBanner } from "@/components/layout/email-verification-banner";
 import { SiteHeader } from "@/components/layout/site-header";
 import { AuthSessionProvider } from "@/components/providers/session-provider";
 import { SiteFooter } from "@/components/site-footer";
@@ -85,6 +86,9 @@ export default async function RootLayout({
       <body className="min-h-screen flex flex-col">
         <AuthSessionProvider session={session}>
           <SiteHeader />
+          {session?.user && !session.user.emailVerified ? (
+            <EmailVerificationBanner email={session.user.email ?? ""} />
+          ) : null}
           <BannedModal />
 
           <main className="flex-1">{children}</main>

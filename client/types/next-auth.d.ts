@@ -5,6 +5,7 @@ declare module "next-auth" {
   interface Session {
     user: DefaultSession["user"] & {
       id: string;
+      emailVerified?: string | null;
       role: Role;
       isBanned: boolean;
       platformRevenue: number;
@@ -15,6 +16,7 @@ declare module "next-auth" {
 
   interface User {
     id: string;
+    emailVerified?: string | null;
     role: Role;
     isBanned: boolean;
     platformRevenue: number;
@@ -26,6 +28,7 @@ declare module "next-auth" {
 declare module "next-auth/jwt" {
   interface JWT {
     id?: string;
+    emailVerified?: string | null;
     role?: Role;
     isBanned?: boolean;
     platformRevenue?: number;

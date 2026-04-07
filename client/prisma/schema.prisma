@@ -47,6 +47,7 @@ enum TransactionStatus {
 model User {
   id               String        @id @default(cuid())
   email            String        @unique
+  emailVerified    DateTime?
   name             String?
   image            String?
   bannerUrl        String?
@@ -77,6 +78,15 @@ model User {
   updatedAt        DateTime      @updatedAt
 
   @@map("users")
+}
+
+model VerificationToken {
+  identifier String
+  token      String   @unique
+  expires    DateTime
+
+  @@unique([identifier, token])
+  @@map("verification_tokens")
 }
 
 model Game {

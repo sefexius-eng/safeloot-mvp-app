@@ -11,6 +11,7 @@ import { PromoCodePanel } from "@/components/profile/promo-code-panel";
 import { ProfileProductActions } from "@/components/profile/profile-product-actions";
 import { RatingStars } from "@/components/reviews/rating-stars";
 import { SellerReviewReplyForm } from "@/components/reviews/seller-review-reply-form";
+import { SellAccessLink } from "@/components/sell/sell-access-link";
 import { UserAvatar } from "@/components/ui/user-avatar";
 
 export interface ProfileTabsProduct {
@@ -200,7 +201,7 @@ export function ProfileTabs({ products: initialProducts, reviews }: ProfileTabsP
 
           {products.length === 0 ? (
             <div className="mt-6 rounded-[1.5rem] border border-white/10 bg-white/5 p-6 text-sm leading-7 text-zinc-400">
-              У вас пока нет опубликованных товаров. <Link href="/sell" className="font-semibold text-orange-300 transition hover:text-orange-200">Перейти к размещению</Link>
+              У вас пока нет опубликованных товаров. <SellAccessLink className="font-semibold text-orange-300 transition hover:text-orange-200">Перейти к размещению</SellAccessLink>
             </div>
           ) : (
             <div className="mt-6 overflow-x-auto rounded-[1.5rem] border border-white/10">

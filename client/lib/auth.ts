@@ -37,6 +37,7 @@ export const authOptions: NextAuthOptions = {
           select: {
             id: true,
             email: true,
+            emailVerified: true,
             name: true,
             image: true,
             password: true,
@@ -63,6 +64,7 @@ export const authOptions: NextAuthOptions = {
         return {
           id: user.id,
           email: user.email,
+          emailVerified: user.emailVerified?.toISOString() ?? null,
           name: user.name ?? user.email.split("@")[0],
           image: user.image,
           role: user.role,
@@ -77,6 +79,8 @@ export const authOptions: NextAuthOptions = {
       if (user) {
         token.id = user.id;
         token.email = user.email;
+        token.emailVerified =
+          typeof user.emailVerified === "string" ? user.emailVerified : null;
         token.name = user.name;
         token.picture = user.image ?? null;
         token.platformRevenue = user.platformRevenue ?? 0;
@@ -97,6 +101,7 @@ export const authOptions: NextAuthOptions = {
         },
         select: {
           email: true,
+          emailVerified: true,
           name: true,
           image: true,
           role: true,
@@ -107,6 +112,7 @@ export const authOptions: NextAuthOptions = {
 
       if (dbUser) {
         token.email = dbUser.email;
+        token.emailVerified = dbUser.emailVerified?.toISOString() ?? null;
         token.name = dbUser.name ?? dbUser.email.split("@")[0];
         token.picture = dbUser.image ?? null;
         token.role = dbUser.role;
@@ -120,6 +126,8 @@ export const authOptions: NextAuthOptions = {
       if (session.user) {
         session.user.id = (token.id as string) ?? token.sub ?? "";
         session.user.email = token.email;
+        session.user.emailVerified =
+          typeof token.emailVerified === "string" ? token.emailVerified : null;
         session.user.name =
           (typeof token.name === "string" && token.name) ||
           token.email?.split("@")[0] ||

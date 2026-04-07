@@ -7,9 +7,12 @@ import { isAdminRole as isAdminRoleHelper } from "@/lib/roles";
 export const BANNED_AUTH_ERROR = "ACCOUNT_BANNED";
 export const BANNED_USER_MESSAGE =
   "Ваш аккаунт заблокирован. Вход и торговые действия недоступны.";
+export const EMAIL_VERIFICATION_REQUIRED_MESSAGE =
+  "Подтвердите email, чтобы получать уведомления и продавать товары.";
 
 export interface CurrentSessionUser {
   id: string;
+  emailVerified: Date | null;
   role: Role;
   isBanned: boolean;
 }
@@ -37,6 +40,7 @@ export async function getCurrentSessionUser(
     },
     select: {
       id: true,
+      emailVerified: true,
       role: true,
       isBanned: true,
     },

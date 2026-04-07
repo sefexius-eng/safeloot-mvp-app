@@ -5,6 +5,7 @@ import {
   MarketplaceProductCard,
   type MarketplaceProductCardData,
 } from "@/components/product/marketplace-product-card";
+import { SellAccessLink } from "@/components/sell/sell-access-link";
 import catalogSeedData from "@/lib/catalog-seed-data.json";
 import { listProducts } from "@/lib/marketplace";
 import { prisma } from "@/lib/prisma";
@@ -151,12 +152,9 @@ export default async function Home() {
               >
                 Смотреть каталог
               </Link>
-              <Link
-                href="/sell"
-                className="inline-flex rounded-2xl border border-white/10 bg-white/6 px-6 py-3 text-sm font-semibold text-white transition hover:bg-white/10"
-              >
+              <SellAccessLink className="inline-flex rounded-2xl border border-white/10 bg-white/6 px-6 py-3 text-sm font-semibold text-white transition hover:bg-white/10">
                 Разместить товар
-              </Link>
+              </SellAccessLink>
             </div>
 
             <div className="mt-6 grid grid-cols-3 gap-2">
@@ -338,12 +336,9 @@ export default async function Home() {
               Разместите первый товар через форму публикации, и он сразу появится на главной странице в этой витрине.
             </p>
             <div className="mt-6">
-              <Link
-                href="/sell"
-                className="inline-flex rounded-2xl bg-orange-600 px-6 py-3 text-sm font-semibold text-white transition hover:bg-orange-500"
-              >
+              <SellAccessLink className="inline-flex rounded-2xl bg-orange-600 px-6 py-3 text-sm font-semibold text-white transition hover:bg-orange-500">
                 Добавить первый товар
-              </Link>
+              </SellAccessLink>
             </div>
           </div>
         ) : (
