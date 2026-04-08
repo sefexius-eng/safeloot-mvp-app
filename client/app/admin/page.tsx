@@ -1,5 +1,6 @@
 import type { Role } from "@prisma/client";
 import type { Metadata } from "next";
+import Image from "next/image";
 import { redirect } from "next/navigation";
 
 import {
@@ -425,6 +426,16 @@ export default async function AdminDashboardPage() {
         <aside className="lg:sticky lg:top-24">
           <Card>
             <CardHeader>
+              <div className="rounded-[1.25rem] border border-white/10 bg-black/20 p-4">
+                <Image
+                  src="/safeloot-logo-full.svg"
+                  alt="SafeLoot"
+                  width={320}
+                  height={64}
+                  className="h-8 w-auto"
+                  priority
+                />
+              </div>
               <CardDescription>Навигация</CardDescription>
               <CardTitle className="text-xl">Секции дашборда</CardTitle>
             </CardHeader>
