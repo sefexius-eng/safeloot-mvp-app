@@ -93,6 +93,7 @@ interface ChatMessage {
   id: string;
   content: string;
   imageUrl: string | null;
+  isSystem: boolean;
   isRead: boolean;
   senderId: string;
   createdAt: string;
@@ -764,9 +765,20 @@ export function ActiveOrderView({ orderId }: ActiveOrderViewProps) {
             updatedAt: new Date(result.message.updatedAt).toISOString(),
           }
         : null;
+      const nextSystemMessage = result.systemMessage
+        ? {
+            ...result.systemMessage,
+            createdAt: new Date(result.systemMessage.createdAt).toISOString(),
+            updatedAt: new Date(result.systemMessage.updatedAt).toISOString(),
+          }
+        : null;
 
       if (nextMessage) {
-        setMessages((currentMessages) => [...currentMessages, nextMessage]);
+        setMessages((currentMessages) =>
+          nextSystemMessage
+            ? [...currentMessages, nextMessage, nextSystemMessage]
+            : [...currentMessages, nextMessage],
+        );
       }
     } catch (error) {
       setChatError(
@@ -1247,6 +1259,24 @@ export function ActiveOrderView({ orderId }: ActiveOrderViewProps) {
 
           <div className="space-y-3">
             {messages.map((message) => {
+              if (message.isSystem) {
+                return (
+                  <div key={message.id} className="flex justify-center">
+                    <div className="max-w-[92%] rounded-[1.5rem] border border-amber-500/20 bg-amber-500/10 px-4 py-3 text-center text-sm leading-7 text-amber-100 shadow-[0_12px_30px_rgba(0,0,0,0.18)]">
+                      <p className="text-xs font-semibold uppercase tracking-[0.18em] text-amber-200/80">
+                        Система SafeLoot
+                      </p>
+                      <p className="mt-2 whitespace-pre-wrap">
+                        <CensoredText text={message.content} />
+                      </p>
+                      <p className="mt-3 text-[11px] uppercase tracking-[0.16em] text-amber-200/70">
+                        {formatMessageTime(message.createdAt)}
+                      </p>
+                    </div>
+                  </div>
+                );
+              }
+
               const isOwnMessage = message.senderId === currentUserId;
               const isSellerMessage = message.senderId === order.sellerId;
               const author = resolveMessageAuthor(order, message);

@@ -303,6 +303,7 @@ model Message {
   senderId       String
   text           String
   imageUrl       String?
+  isSystem       Boolean      @default(false)
   isRead         Boolean      @default(false)
   conversation   Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade, onUpdate: Cascade)
   sender         User         @relation("MessageSender", fields: [senderId], references: [id], onDelete: Cascade, onUpdate: Cascade)

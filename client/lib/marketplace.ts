@@ -36,11 +36,28 @@ const MAX_PRODUCT_IMAGE_BASE64_LENGTH = 2_000_000;
 const PRODUCT_IMAGE_BASE64_PATTERN =
   /^data:image\/webp;base64,[A-Za-z0-9+/=]+$/;
 const ZERO_MONEY = new Prisma.Decimal(0);
+const DEAL_ROOM_CONTACTS_PLACEHOLDER = "[КОНТАКТЫ СКРЫТЫ]";
+const DEAL_ROOM_SECURITY_WARNING =
+  "⚠️ Внимание! Переход в сторонние мессенджеры и передача личных контактов запрещены. Это лишает вас защиты SafeLoot и может привести к блокировке.";
 const TERMINAL_ORDER_STATUSES = [
   OrderStatus.COMPLETED,
   OrderStatus.REFUNDED,
   OrderStatus.CANCELLED,
 ] as const;
+
+const DEAL_ROOM_CONTACT_BLACKLIST_REGEX =
+  /(?<![\p{L}\p{N}_])(?:discord|дискорд|tg|тг|telegram|телеграм|skype|whatsapp|вк|vk|номер|кидай\s+на|на\s+карту)(?![\p{L}\p{N}_])/giu;
+const DEAL_ROOM_LINK_REGEX =
+  /(?:https?:\/\/|www\.)\S+|(?<![\p{L}\p{N}_])(?:[a-z0-9-]+\.)+(?:com|ru|net|org|gg|me|io|app|dev|xyz|info|biz|link|shop|su|ua|tv|cc|to)(?:\/\S*)?/giu;
+const DEAL_ROOM_USERNAME_REGEX = /@[a-z0-9_]{2,}/giu;
+const DEAL_ROOM_EMAIL_REGEX =
+  /\b[a-z0-9._%+-]+@[a-z0-9.-]+\.[a-z]{2,}\b/giu;
+const DEAL_ROOM_CARD_CANDIDATE_REGEX =
+  /(?<![\p{L}\p{N}])(?:\d[\s-]?){13,19}(?![\p{L}\p{N}])/gu;
+const DEAL_ROOM_PHONE_CANDIDATE_REGEX =
+  /(?<![\p{L}\p{N}])(?:\+?\d[\d\s().-]{8,}\d)(?![\p{L}\p{N}])/gu;
+const DEAL_ROOM_CRYPTO_WALLET_REGEX =
+  /(?<![\p{L}\p{N}])(?:0x[a-f0-9]{40}|bc1[a-z0-9]{25,62}|[13][a-km-zA-HJ-NP-Z1-9]{25,34}|T[a-zA-HJ-NP-Z1-9]{33})(?![\p{L}\p{N}])/giu;
 
 const chatTypingState = new Map<string, Map<string, number>>();
 
@@ -304,6 +321,102 @@ function normalizeOptionalText(value?: string | null) {
   const normalizedValue = value?.trim() ?? "";
 
   return normalizedValue || null;
+}
+
+function countDigits(value: string) {
+  return value.replace(/\D/g, "").length;
+}
+
+function replaceSensitiveDealRoomMatches(
+  value: string,
+  pattern: RegExp,
+  predicate?: (match: string) => boolean,
+) {
+  return value.replace(pattern, (match) => {
+    if (predicate && !predicate(match)) {
+      return match;
+    }
+
+    return DEAL_ROOM_CONTACTS_PLACEHOLDER;
+  });
+}
+
+function isLikelyCardNumber(value: string) {
+  const digitsCount = countDigits(value);
+
+  return digitsCount >= 13 && digitsCount <= 19;
+}
+
+function isLikelyPhoneNumber(value: string) {
+  const digitsCount = countDigits(value);
+
+  if (digitsCount < 10 || digitsCount > 15) {
+    return false;
+  }
+
+  if (digitsCount === 10) {
+    return value.trim().startsWith("0") || /[\s().-]/.test(value);
+  }
+
+  return true;
+}
+
+function moderateDealRoomMessageText(value?: string) {
+  const normalizedValue = normalizeText(value);
+
+  if (!normalizedValue) {
+    return {
+      text: normalizedValue,
+      wasBlocked: false,
+    };
+  }
+
+  let sanitizedValue = replaceSensitiveDealRoomMatches(
+    normalizedValue,
+    DEAL_ROOM_EMAIL_REGEX,
+  );
+
+  sanitizedValue = replaceSensitiveDealRoomMatches(
+    sanitizedValue,
+    DEAL_ROOM_LINK_REGEX,
+  );
+  sanitizedValue = replaceSensitiveDealRoomMatches(
+    sanitizedValue,
+    DEAL_ROOM_USERNAME_REGEX,
+  );
+  sanitizedValue = replaceSensitiveDealRoomMatches(
+    sanitizedValue,
+    DEAL_ROOM_CONTACT_BLACKLIST_REGEX,
+  );
+  sanitizedValue = replaceSensitiveDealRoomMatches(
+    sanitizedValue,
+    DEAL_ROOM_CARD_CANDIDATE_REGEX,
+    isLikelyCardNumber,
+  );
+  sanitizedValue = replaceSensitiveDealRoomMatches(
+    sanitizedValue,
+    DEAL_ROOM_PHONE_CANDIDATE_REGEX,
+    isLikelyPhoneNumber,
+  );
+  sanitizedValue = replaceSensitiveDealRoomMatches(
+    sanitizedValue,
+    DEAL_ROOM_CRYPTO_WALLET_REGEX,
+  )
+    .replace(
+      /(?:\[КОНТАКТЫ СКРЫТЫ\](?:\s*[,:;.-]?\s*)?){2,}/g,
+      `${DEAL_ROOM_CONTACTS_PLACEHOLDER} `,
+    )
+    .replace(/\s{2,}/g, " ")
+    .trim();
+
+  if (!sanitizedValue) {
+    sanitizedValue = DEAL_ROOM_CONTACTS_PLACEHOLDER;
+  }
+
+  return {
+    text: sanitizedValue,
+    wasBlocked: sanitizedValue !== normalizedValue,
+  };
 }
 
 function formatMoney(value: Prisma.Decimal) {
@@ -2994,6 +3107,7 @@ export async function getConversationMessages(
           id: true,
           text: true,
           imageUrl: true,
+          isSystem: true,
           isRead: true,
           senderId: true,
           createdAt: true,
@@ -3038,7 +3152,8 @@ export async function createConversationMessage(input: {
 }) {
   const conversationId = normalizeText(input.conversationId);
   const senderId = normalizeText(input.senderId);
-  const text = normalizeText(input.text);
+  const moderationResult = moderateDealRoomMessageText(input.text);
+  const text = moderationResult.text;
   const imageBase64 = normalizeOptionalText(input.imageBase64);
 
   if (!conversationId) {
@@ -3083,7 +3198,7 @@ export async function createConversationMessage(input: {
 
   const emailDeliveryQueue: NotificationEmailDeliveryInput[] = [];
 
-  const message = await prisma.$transaction(
+  const result = await prisma.$transaction(
     async (transactionClient) => {
       const createdMessage = await transactionClient.message.create({
         data: {
@@ -3091,11 +3206,13 @@ export async function createConversationMessage(input: {
           senderId,
           text,
           imageUrl: imageBase64,
+          isSystem: false,
         },
         select: {
           id: true,
           text: true,
           imageUrl: true,
+          isSystem: true,
           isRead: true,
           senderId: true,
           createdAt: true,
@@ -3109,6 +3226,34 @@ export async function createConversationMessage(input: {
           },
         },
       });
+
+      const systemMessage = moderationResult.wasBlocked
+        ? await transactionClient.message.create({
+            data: {
+              conversationId: conversation.id,
+              senderId,
+              text: DEAL_ROOM_SECURITY_WARNING,
+              isSystem: true,
+            },
+            select: {
+              id: true,
+              text: true,
+              imageUrl: true,
+              isSystem: true,
+              isRead: true,
+              senderId: true,
+              createdAt: true,
+              updatedAt: true,
+              sender: {
+                select: {
+                  id: true,
+                  name: true,
+                  image: true,
+                },
+              },
+            },
+          })
+        : null;
 
       await transactionClient.conversation.update({
         where: {
@@ -3126,7 +3271,10 @@ export async function createConversationMessage(input: {
         link: `/chats/${conversation.id}`,
       }, emailDeliveryQueue);
 
-      return createdMessage;
+      return {
+        message: createdMessage,
+        systemMessage,
+      };
     },
     {
       isolationLevel: Prisma.TransactionIsolationLevel.Serializable,
@@ -3138,10 +3286,17 @@ export async function createConversationMessage(input: {
   return {
     conversationId: conversation.id,
     message: {
-      ...message,
-      createdAt: message.createdAt.toISOString(),
-      updatedAt: message.updatedAt.toISOString(),
+      ...result.message,
+      createdAt: result.message.createdAt.toISOString(),
+      updatedAt: result.message.updatedAt.toISOString(),
     },
+    systemMessage: result.systemMessage
+      ? {
+          ...result.systemMessage,
+          createdAt: result.systemMessage.createdAt.toISOString(),
+          updatedAt: result.systemMessage.updatedAt.toISOString(),
+        }
+      : null,
   };
 }
 
@@ -3276,6 +3431,7 @@ export async function getChatMessages(
           id: true,
           text: true,
           imageUrl: true,
+          isSystem: true,
           isRead: true,
           senderId: true,
           createdAt: true,
@@ -3305,6 +3461,7 @@ export async function getChatMessages(
       id: message.id,
       content: message.text,
       imageUrl: message.imageUrl,
+      isSystem: message.isSystem,
       isRead: message.isRead,
       senderId: message.senderId,
       createdAt: message.createdAt.toISOString(),
@@ -3355,11 +3512,25 @@ export async function createChatMessage(input: {
           id: result.message.id,
           content: result.message.text,
           imageUrl: result.message.imageUrl,
+          isSystem: result.message.isSystem,
           isRead: result.message.isRead,
           senderId: result.message.senderId,
           createdAt: result.message.createdAt,
           updatedAt: result.message.updatedAt,
           sender: result.message.sender,
+        }
+      : null,
+    systemMessage: result.systemMessage
+      ? {
+          id: result.systemMessage.id,
+          content: result.systemMessage.text,
+          imageUrl: result.systemMessage.imageUrl,
+          isSystem: result.systemMessage.isSystem,
+          isRead: result.systemMessage.isRead,
+          senderId: result.systemMessage.senderId,
+          createdAt: result.systemMessage.createdAt,
+          updatedAt: result.systemMessage.updatedAt,
+          sender: result.systemMessage.sender,
         }
       : null,
   };

@@ -28,6 +28,7 @@ export interface ChatMessage {
   id: string;
   text: string;
   imageUrl: string | null;
+  isSystem: boolean;
   isRead: boolean;
   senderId: string;
   createdAt: string;
@@ -519,6 +520,7 @@ export function ChatMessages({
       id: tempId,
       text,
       imageUrl: imageBase64,
+      isSystem: false,
       isRead: true,
       senderId: currentUserId,
       createdAt: optimisticTimestamp,
@@ -564,15 +566,17 @@ export function ChatMessages({
       const result = await parseApiResponse<{
         conversationId: string;
         message: ChatMessage;
+        systemMessage?: ChatMessage | null;
       }>(response);
 
       setMessages((currentMessages) =>
         mergeMessages(
           currentMessages.filter((message) => message.id !== tempId),
-          [result.message],
+          result.systemMessage ? [result.message, result.systemMessage] : [result.message],
         ),
       );
-      latestMessageCreatedAtRef.current = result.message.createdAt;
+      latestMessageCreatedAtRef.current =
+        result.systemMessage?.createdAt ?? result.message.createdAt;
     } catch (error) {
       setMessages((currentMessages) =>
         currentMessages.filter((message) => message.id !== tempId),
@@ -599,6 +603,24 @@ export function ChatMessages({
             </div>
           ) : (
             messages.map((message) => {
+              if (message.isSystem) {
+                return (
+                  <div key={message.id} className="flex justify-center">
+                    <div className="max-w-[92%] rounded-[1.5rem] border border-amber-500/20 bg-amber-500/10 px-4 py-3 text-center text-sm leading-7 text-amber-100 shadow-[0_12px_30px_rgba(0,0,0,0.18)]">
+                      <p className="text-xs font-semibold uppercase tracking-[0.18em] text-amber-200/80">
+                        Система SafeLoot
+                      </p>
+                      <p className="mt-2 whitespace-pre-wrap">
+                        <CensoredText text={message.text} />
+                      </p>
+                      <p className="mt-3 text-[11px] uppercase tracking-[0.16em] text-amber-200/70">
+                        {formatMessageTime(message.createdAt)}
+                      </p>
+                    </div>
+                  </div>
+                );
+              }
+
               const isOwnMessage = message.senderId === currentUserId;
               const authorLabel = isOwnMessage
                 ? "Вы"
