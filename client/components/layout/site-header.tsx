@@ -336,7 +336,7 @@ export function SiteHeader() {
     }
 
     event.preventDefault();
-    window.scrollTo({ top: 0, behavior: "smooth" });
+    window.scrollTo(0, 0);
   }
 
   function renderProfileMenu(trigger: React.ReactNode, contentClassName: string) {
