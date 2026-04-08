@@ -6,9 +6,68 @@ import { revalidatePath } from "next/cache";
 import { BANNED_USER_MESSAGE, getCurrentSessionUser } from "@/lib/access-control";
 import { getAuthSession } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
+import { getSiteUrl } from "@/lib/site-url";
+import { escapeTelegramHtml, sendTelegramNotification } from "@/lib/telegram";
 
 const MAX_REVIEW_COMMENT_LENGTH = 1000;
 const MAX_REVIEW_REPLY_LENGTH = 1000;
+
+function buildSellerReviewTelegramMessage(input: {
+  sellerId: string;
+  productTitle: string;
+  rating: number;
+  comment?: string | null;
+}) {
+  const stars = "⭐".repeat(input.rating);
+  const profileUrl = `${getSiteUrl()}/user/${input.sellerId}`;
+  const commentBlock = input.comment?.trim()
+    ? [
+        "",
+        "💬 <b>Текст отзыва:</b>",
+        `<i>«${escapeTelegramHtml(input.comment)}»</i>`,
+      ].join("\n")
+    : "";
+
+  return [
+    "🌟 <b>Новый отзыв о вас!</b>",
+    "",
+    `📦 <b>Товар:</b> ${escapeTelegramHtml(input.productTitle)}`,
+    `📊 <b>Оценка:</b> ${stars} (${input.rating}/5)`,
+    commentBlock,
+    "",
+    `<a href="${profileUrl}">Посмотреть в профиле</a>`,
+  ]
+    .filter(Boolean)
+    .join("\n");
+}
+
+function triggerSellerReviewTelegramNotification(input: {
+  telegramId?: bigint | null;
+  sellerId: string;
+  productTitle: string;
+  rating: number;
+  comment?: string | null;
+}) {
+  if (!input.telegramId) {
+    return;
+  }
+
+  try {
+    void sendTelegramNotification(
+      input.telegramId,
+      buildSellerReviewTelegramMessage({
+        sellerId: input.sellerId,
+        productTitle: input.productTitle,
+        rating: input.rating,
+        comment: input.comment,
+      }),
+    ).catch((error) => {
+      console.error("[SELLER_REVIEW_TELEGRAM_NOTIFICATION_ERROR]", error);
+    });
+  } catch (error) {
+    console.error("[SELLER_REVIEW_TELEGRAM_NOTIFICATION_ERROR]", error);
+  }
+}
 
 async function requireActiveReviewUserId() {
   const session = await getAuthSession();
@@ -106,11 +165,18 @@ export async function createReview(
             product: {
               select: {
                 id: true,
+                title: true,
                 game: {
                   select: {
                     slug: true,
                   },
                 },
+              },
+            },
+            seller: {
+              select: {
+                id: true,
+                telegramId: true,
               },
             },
           },
@@ -167,6 +233,14 @@ export async function createReview(
 
     revalidatePath("/");
     revalidatePath("/profile");
+
+    triggerSellerReviewTelegramNotification({
+      telegramId: result.order.seller.telegramId,
+      sellerId: result.order.seller.id,
+      productTitle: result.order.product.title,
+      rating: result.review.rating,
+      comment: result.review.comment,
+    });
 
     return {
       ok: true,
