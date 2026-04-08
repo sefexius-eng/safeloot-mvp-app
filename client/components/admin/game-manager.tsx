@@ -1,6 +1,7 @@
 "use client";
 
 import type { Role } from "@prisma/client";
+import { Package, Pencil, Trash2 } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState, useTransition } from "react";
 
@@ -832,7 +833,7 @@ export function GameManager({ games: initialGames, currentUserRole }: GameManage
                             return (
                               <div
                                 key={category.id}
-                                className="rounded-2xl border border-white/10 bg-white/5 px-3 py-2.5"
+                                className="flex flex-col gap-2 rounded-md border border-border/50 bg-secondary/40 p-3"
                               >
                                 {isEditing ? (
                                   <div className="space-y-2">
@@ -897,38 +898,40 @@ export function GameManager({ games: initialGames, currentUserRole }: GameManage
                                     </div>
                                   </div>
                                 ) : (
-                                  <div className="flex w-full items-center justify-between gap-4">
-                                    <div className="min-w-0 flex-1">
-                                      <p className="truncate text-sm font-medium text-zinc-100">
+                                  <>
+                                    <div className="flex w-full items-center justify-between gap-4">
+                                      <p className="min-w-0 flex-1 truncate font-semibold tracking-wide text-foreground">
                                         {category.name}
                                       </p>
-                                      <div className="mt-1 flex flex-wrap items-center gap-2 text-[11px] uppercase tracking-[0.14em] text-zinc-500">
-                                        <span>{category.slug}</span>
-                                        <span className="rounded-full border border-white/10 bg-black/20 px-2 py-1 tracking-normal text-zinc-400">
-                                          Товаров: {category.productCount}
-                                        </span>
+
+                                      <div className="flex shrink-0 items-center gap-1 whitespace-nowrap">
+                                        <Button
+                                          type="button"
+                                          onClick={() => startCategoryEditing(category)}
+                                          aria-label={`Редактировать подкатегорию ${category.name}`}
+                                          className="h-8 w-8 rounded-md border border-transparent bg-transparent px-0 text-zinc-300 shadow-none hover:translate-y-0 hover:bg-white/10 hover:text-white"
+                                        >
+                                          <Pencil className="h-4 w-4" />
+                                        </Button>
+                                        {canDeleteContent ? (
+                                          <Button
+                                            type="button"
+                                            onClick={() => handleCategoryDelete(category)}
+                                            aria-label={`Удалить подкатегорию ${category.name}`}
+                                            className="h-8 w-8 rounded-md border border-transparent bg-transparent px-0 text-red-200 shadow-none hover:translate-y-0 hover:bg-red-500/15 hover:text-red-100"
+                                            disabled={isDeletingCategory}
+                                          >
+                                            <Trash2 className="h-4 w-4" />
+                                          </Button>
+                                        ) : null}
                                       </div>
                                     </div>
-                                    <div className="flex shrink-0 gap-2">
-                                      <button
-                                        type="button"
-                                        onClick={() => startCategoryEditing(category)}
-                                        className="inline-flex h-8 items-center justify-center rounded-xl border border-white/10 bg-white/5 px-3 text-xs font-semibold text-zinc-200 transition hover:bg-white/10"
-                                      >
-                                        ✏️ Редактировать
-                                      </button>
-                                      {canDeleteContent ? (
-                                        <button
-                                          type="button"
-                                          onClick={() => handleCategoryDelete(category)}
-                                          className="inline-flex h-8 items-center justify-center rounded-xl border border-red-500/20 bg-red-500/10 px-3 text-xs font-semibold text-red-100 transition hover:bg-red-500/20"
-                                          disabled={isDeletingCategory}
-                                        >
-                                          {isDeletingCategory ? "Удаляем..." : "🗑️ Удалить"}
-                                        </button>
-                                      ) : null}
+
+                                    <div className="flex items-center gap-1.5 text-xs font-medium text-muted-foreground">
+                                      <Package className="h-3.5 w-3.5" />
+                                      <span>Товаров: {category.productCount}</span>
                                     </div>
-                                  </div>
+                                  </>
                                 )}
                               </div>
                             );
