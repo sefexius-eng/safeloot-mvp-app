@@ -127,15 +127,10 @@ export async function generateMetadata({ params }: ProductMetadataProps): Promis
       /\/+$/,
       "",
     );
-
-    let imageUrl = "https://images.unsplash.com/photo-1542751371-adc38448a05e?q=80&w=1200&auto=format&fit=crop";
-
-    const gameImage = product.game?.imageUrl?.trim();
-    if (gameImage && gameImage.startsWith("http") && /\.(jpeg|jpg|gif|png|webp)$/i.test(gameImage)) {
-      imageUrl = gameImage;
-    } else if (product.images?.[0] && product.images[0].startsWith("http")) {
-      imageUrl = product.images[0];
-    }
+    const productImage = product.images.find((image) => image.trim());
+    const imageUrl = productImage
+      ? `${baseUrl}/product/${product.id}/image`
+      : `${baseUrl}/og-image.png`;
 
     const priceValue = Number(product.price);
     const formattedPrice = Number.isFinite(priceValue)
