@@ -57,6 +57,13 @@ export function hasTelegramBotTokenConfigured() {
   return Boolean(getTelegramBotToken());
 }
 
+export function escapeTelegramHtml(value: string) {
+  return value
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;");
+}
+
 export async function getTelegramBotUsername() {
   const bot = await telegramApiRequest<{ username?: string }>("getMe");
   const username = bot.username?.trim().replace(/^@/, "");
@@ -79,4 +86,52 @@ export async function sendTelegramTextMessage(chatId: bigint | number | string, 
     chat_id: chatId.toString(),
     text: normalizedText,
   });
+}
+
+export async function sendTelegramNotification(
+  chatId: bigint | number | string | null | undefined,
+  message: string,
+) {
+  const token = getTelegramBotToken();
+  const normalizedChatId = chatId?.toString().trim() ?? "";
+  const normalizedMessage = message.trim();
+
+  if (!token || !normalizedChatId || !normalizedMessage) {
+    return false;
+  }
+
+  try {
+    const response = await fetch(`${getTelegramApiBaseUrl()}/sendMessage`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        chat_id: normalizedChatId,
+        text: normalizedMessage,
+        parse_mode: "HTML",
+        disable_web_page_preview: true,
+      }),
+      cache: "no-store",
+    });
+
+    const data = (await response.json().catch(() => null)) as
+      | TelegramApiResponse<unknown>
+      | null;
+
+    if (!response.ok || !data?.ok) {
+      console.error(
+        "[TELEGRAM_NOTIFICATION_FAILED]",
+        data?.description || `HTTP ${response.status}`,
+      );
+
+      return false;
+    }
+
+    return true;
+  } catch (error) {
+    console.error("[TELEGRAM_NOTIFICATION_FAILED]", error);
+
+    return false;
+  }
 }
