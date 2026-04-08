@@ -906,22 +906,26 @@ export function GameManager({ games: initialGames, currentUserRole }: GameManage
 
                                       <div className="flex shrink-0 items-center gap-1 whitespace-nowrap">
                                         <Button
+                                          variant="ghost"
+                                          size="icon"
                                           type="button"
                                           onClick={() => startCategoryEditing(category)}
                                           aria-label={`Редактировать подкатегорию ${category.name}`}
-                                          className="group h-8 w-8 rounded-md border border-transparent bg-transparent px-0 shadow-none hover:translate-y-0 hover:bg-white/10"
+                                          className="h-8 w-8 rounded-md hover:bg-slate-800"
                                         >
-                                          <Pencil className="h-4 w-4 text-slate-400 transition-colors group-hover:text-white" />
+                                          <Pencil className="h-4 w-4 text-slate-400 hover:text-white transition-colors" />
                                         </Button>
                                         {canDeleteContent ? (
                                           <Button
+                                            variant="ghost"
+                                            size="icon"
                                             type="button"
                                             onClick={() => handleCategoryDelete(category)}
                                             aria-label={`Удалить подкатегорию ${category.name}`}
-                                            className="group h-8 w-8 rounded-md border border-transparent bg-transparent px-0 shadow-none hover:translate-y-0 hover:bg-red-500/15"
+                                            className="h-8 w-8 rounded-md hover:bg-red-950/30"
                                             disabled={isDeletingCategory}
                                           >
-                                            <Trash2 className="h-4 w-4 text-slate-400 transition-colors group-hover:text-white" />
+                                            <Trash2 className="h-4 w-4 text-red-400 hover:text-red-300 transition-colors" />
                                           </Button>
                                         ) : null}
                                       </div>
