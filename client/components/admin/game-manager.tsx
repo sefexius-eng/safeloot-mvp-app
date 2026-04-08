@@ -909,19 +909,19 @@ export function GameManager({ games: initialGames, currentUserRole }: GameManage
                                           type="button"
                                           onClick={() => startCategoryEditing(category)}
                                           aria-label={`Редактировать подкатегорию ${category.name}`}
-                                          className="h-8 w-8 rounded-md border border-transparent bg-transparent px-0 text-zinc-300 shadow-none hover:translate-y-0 hover:bg-white/10 hover:text-white"
+                                          className="group h-8 w-8 rounded-md border border-transparent bg-transparent px-0 shadow-none hover:translate-y-0 hover:bg-white/10"
                                         >
-                                          <Pencil className="h-4 w-4" />
+                                          <Pencil className="h-4 w-4 text-slate-400 transition-colors group-hover:text-white" />
                                         </Button>
                                         {canDeleteContent ? (
                                           <Button
                                             type="button"
                                             onClick={() => handleCategoryDelete(category)}
                                             aria-label={`Удалить подкатегорию ${category.name}`}
-                                            className="h-8 w-8 rounded-md border border-transparent bg-transparent px-0 text-red-200 shadow-none hover:translate-y-0 hover:bg-red-500/15 hover:text-red-100"
+                                            className="group h-8 w-8 rounded-md border border-transparent bg-transparent px-0 shadow-none hover:translate-y-0 hover:bg-red-500/15"
                                             disabled={isDeletingCategory}
                                           >
-                                            <Trash2 className="h-4 w-4" />
+                                            <Trash2 className="h-4 w-4 text-slate-400 transition-colors group-hover:text-white" />
                                           </Button>
                                         ) : null}
                                       </div>
@@ -971,7 +971,7 @@ export function GameManager({ games: initialGames, currentUserRole }: GameManage
                             });
                           }}
                           placeholder="Name"
-                          className="h-9 border-slate-700 bg-slate-900 text-sm text-white placeholder:text-slate-400 focus:border-orange-500/45 focus:bg-slate-900"
+                          className="h-9 !border-slate-700 !bg-slate-900 !text-white !placeholder:text-slate-400 text-sm shadow-none focus:!border-orange-500/45 focus:!bg-slate-900"
                           disabled={isAddingCategory || isDeletingGame}
                         />
                         <Input
@@ -986,7 +986,7 @@ export function GameManager({ games: initialGames, currentUserRole }: GameManage
                             }));
                           }}
                           placeholder="Slug"
-                          className="h-9 border-slate-700 bg-slate-900 text-sm text-white placeholder:text-slate-400 focus:border-orange-500/45 focus:bg-slate-900"
+                          className="h-9 !border-slate-700 !bg-slate-900 !text-white !placeholder:text-slate-400 text-sm shadow-none focus:!border-orange-500/45 focus:!bg-slate-900"
                           disabled={isAddingCategory || isDeletingGame}
                         />
                         <button
