@@ -56,7 +56,7 @@ model User {
   badges           String[]      @default([])
   emailNotifications Boolean      @default(true)
   pushNotifications Boolean       @default(true)
-  password         String
+  password         String?
   role             Role          @default(USER)
   isBanned         Boolean       @default(false)
   rank             SellerRank    @default(BRONZE)
@@ -64,6 +64,8 @@ model User {
   platformRevenue  Float         @default(0)
   holdBalance      Decimal       @default(0) @db.Decimal(36, 8)
   availableBalance Decimal       @default(0) @db.Decimal(36, 8)
+  accounts         Account[]
+  sessions         Session[]
   products         Product[]     @relation("SellerProducts")
   buyerOrders      Order[]       @relation("BuyerOrders")
   sellerOrders     Order[]       @relation("SellerOrders")
@@ -80,6 +82,37 @@ model User {
   updatedAt        DateTime      @updatedAt
 
   @@map("users")
+}
+
+model Account {
+  id                String  @id @default(cuid())
+  userId            String
+  type              String
+  provider          String
+  providerAccountId String
+  refresh_token     String?
+  access_token      String?
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String?
+  session_state     String?
+  user              User    @relation(fields: [userId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+
+  @@unique([provider, providerAccountId])
+  @@index([userId])
+  @@map("accounts")
+}
+
+model Session {
+  id           String   @id @default(cuid())
+  sessionToken String   @unique
+  userId       String
+  expires      DateTime
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+
+  @@index([userId])
+  @@map("sessions")
 }
 
 model VerificationToken {
