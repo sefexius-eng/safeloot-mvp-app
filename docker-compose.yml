@@ -3,44 +3,21 @@ services:
     build:
       context: ./client
       dockerfile: Dockerfile
-    command: npm run dev
+    command: sh -c "npm run prisma:db:push && npm run dev"
     ports:
       - "3000:3000"
     environment:
-      API_BASE_URL: http://server:4000/api
-      NEXT_PUBLIC_API_URL: http://localhost:4000/api
-      CHOKIDAR_USEPOLLING: "true"
-    depends_on:
-      server:
-        condition: service_started
-    volumes:
-      - ./client:/app
-      - /app/node_modules
-      - /app/.next
-
-  server:
-    build:
-      context: ./server
-      dockerfile: Dockerfile
-    command: npm run dev
-    ports:
-      - "4000:4000"
-    environment:
-      NODE_ENV: development
-      PORT: 4000
-      CORS_ORIGIN: http://localhost:3000
       DATABASE_URL: postgresql://postgres:postgres@db:5432/app_db?schema=public
-      DB_HOST: db
-      DB_PORT: 5432
-      DB_USER: postgres
-      DB_PASSWORD: postgres
-      DB_NAME: app_db
+      NEXTAUTH_URL: http://localhost:3000
+      NEXT_PUBLIC_APP_URL: http://localhost:3000
+      CHOKIDAR_USEPOLLING: "true"
     depends_on:
       db:
         condition: service_healthy
     volumes:
-      - ./server:/app
+      - ./client:/app
       - /app/node_modules
+      - /app/.next
 
   db:
     image: postgres:16-alpine
