@@ -18,6 +18,11 @@ import {
 } from "@/lib/review-summary";
 import { isAdminRole } from "@/lib/roles";
 import { escapeTelegramHtml, sendTelegramNotification } from "@/lib/telegram";
+import {
+  formatStoredOrderAmount,
+  normalizeCurrencyCode,
+} from "@/lib/currency-config";
+import { getSiteUrl } from "@/lib/site-url";
 
 const MONEY_SCALE = 2;
 const COMMISSION_RATE = 0.05;
@@ -305,15 +310,23 @@ function formatMoney(value: Prisma.Decimal) {
   return roundMoney(value).toFixed(MONEY_SCALE);
 }
 
+function formatTelegramNotificationAmount(
+  amount: string | number,
+  currency?: string | null,
+) {
+  return formatStoredOrderAmount(amount, currency);
+}
+
 function buildSellerNewOrderTelegramMessage(input: {
   productTitle: string;
   price: string;
+  currency?: string | null;
 }) {
   return [
     "🎉 <b>У вас новый заказ!</b>",
     "",
     `📦 <b>Товар:</b> ${escapeTelegramHtml(input.productTitle)}`,
-    `💰 <b>Сумма:</b> ${input.price} USDT`,
+    `💰 <b>Сумма:</b> ${formatTelegramNotificationAmount(input.price, input.currency)}`,
     "",
     "Перейдите в свои сделки на SafeLoot, чтобы передать товар покупателю!",
   ].join("\n");
@@ -322,12 +335,13 @@ function buildSellerNewOrderTelegramMessage(input: {
 function buildSellerOrderCompletedTelegramMessage(input: {
   productTitle: string;
   sellerNetAmount: string;
+  currency?: string | null;
 }) {
   return [
     "✅ <b>Сделка завершена</b>",
     "",
     `📦 <b>Товар:</b> ${escapeTelegramHtml(input.productTitle)}`,
-    `💰 <b>Зачислено:</b> ${input.sellerNetAmount} USDT`,
+    `💰 <b>Зачислено:</b> ${formatTelegramNotificationAmount(input.sellerNetAmount, input.currency)}`,
     "",
     "Средства уже доступны на вашем балансе SafeLoot.",
   ].join("\n");
@@ -336,12 +350,13 @@ function buildSellerOrderCompletedTelegramMessage(input: {
 function buildBuyerRefundTelegramMessage(input: {
   productTitle: string;
   refundAmount: string;
+  currency?: string | null;
 }) {
   return [
     "💸 <b>По заказу оформлен возврат</b>",
     "",
     `📦 <b>Товар:</b> ${escapeTelegramHtml(input.productTitle)}`,
-    `💰 <b>Сумма возврата:</b> ${input.refundAmount} USDT`,
+    `💰 <b>Сумма возврата:</b> ${formatTelegramNotificationAmount(input.refundAmount, input.currency)}`,
     "",
     "Средства уже возвращены на ваш баланс SafeLoot.",
   ].join("\n");
@@ -367,6 +382,7 @@ async function sendSellerOrderTelegramNotification(input: {
   telegramId?: bigint | null;
   productTitle: string;
   price: string;
+  currency?: string | null;
 }) {
   if (!input.telegramId) {
     return;
@@ -377,6 +393,7 @@ async function sendSellerOrderTelegramNotification(input: {
     buildSellerNewOrderTelegramMessage({
       productTitle: input.productTitle,
       price: input.price,
+      currency: input.currency,
     }),
   );
 }
@@ -385,6 +402,7 @@ async function sendSellerOrderCompletedTelegramNotification(input: {
   telegramId?: bigint | null;
   productTitle: string;
   sellerNetAmount: string;
+  currency?: string | null;
 }) {
   if (!input.telegramId) {
     return;
@@ -395,6 +413,7 @@ async function sendSellerOrderCompletedTelegramNotification(input: {
     buildSellerOrderCompletedTelegramMessage({
       productTitle: input.productTitle,
       sellerNetAmount: input.sellerNetAmount,
+      currency: input.currency,
     }),
   );
 }
@@ -403,6 +422,7 @@ async function sendBuyerRefundTelegramNotification(input: {
   telegramId?: bigint | null;
   productTitle: string;
   refundAmount: string;
+  currency?: string | null;
 }) {
   if (!input.telegramId) {
     return;
@@ -413,6 +433,7 @@ async function sendBuyerRefundTelegramNotification(input: {
     buildBuyerRefundTelegramMessage({
       productTitle: input.productTitle,
       refundAmount: input.refundAmount,
+      currency: input.currency,
     }),
   );
 }
@@ -433,6 +454,68 @@ async function sendOrderDisputeOpenedTelegramNotification(input: {
       openedBy: input.openedBy,
     }),
   );
+}
+
+function buildDealChatTelegramMessage(input: {
+  orderId: string;
+  productTitle: string;
+  senderName: string;
+  messageText: string;
+}) {
+  const dealUrl = `${getSiteUrl()}/order/${input.orderId}`;
+
+  return [
+    "💬 <b>Новое сообщение!</b>",
+    "",
+    `🛍 <b>Сделка:</b> ${escapeTelegramHtml(input.productTitle)}`,
+    `👤 <b>От:</b> ${escapeTelegramHtml(input.senderName)}`,
+    "",
+    `<i>«${escapeTelegramHtml(input.messageText)}»</i>`,
+    "",
+    `<a href="${dealUrl}">Перейти в чат</a>`,
+  ].join("\n");
+}
+
+async function sendDealChatMessageTelegramNotification(input: {
+  telegramId?: bigint | null;
+  orderId: string;
+  productTitle: string;
+  senderName: string;
+  messageText: string;
+}) {
+  if (!input.telegramId) {
+    return;
+  }
+
+  await sendTelegramNotification(
+    input.telegramId,
+    buildDealChatTelegramMessage({
+      orderId: input.orderId,
+      productTitle: input.productTitle,
+      senderName: input.senderName,
+      messageText: input.messageText,
+    }),
+  );
+}
+
+function triggerDealChatTelegramNotification(input: {
+  telegramId?: bigint | null;
+  orderId: string;
+  productTitle: string;
+  senderName: string;
+  messageText: string;
+}) {
+  if (!input.telegramId) {
+    return;
+  }
+
+  try {
+    void sendDealChatMessageTelegramNotification(input).catch((error) => {
+      console.error("[DEAL_CHAT_TELEGRAM_NOTIFICATION_ERROR]", error);
+    });
+  } catch (error) {
+    console.error("[DEAL_CHAT_TELEGRAM_NOTIFICATION_ERROR]", error);
+  }
 }
 
 async function createUserNotification(
@@ -1393,9 +1476,11 @@ export async function listProductsBySeller(userId: string) {
 export async function createOrder(input: {
   productId?: string;
   buyerId: string;
+  currency?: string;
 }) {
   const productId = normalizeText(input.productId);
   const buyerId = normalizeText(input.buyerId);
+  const orderCurrency = normalizeCurrencyCode(input.currency);
 
   if (!productId) {
     throw new Error("productId is required.");
@@ -1500,6 +1585,7 @@ export async function createOrder(input: {
           data: {
             sellerId: product.sellerId,
             price: orderPrice,
+            currency: orderCurrency,
             status: OrderStatus.PAID,
           },
         });
@@ -1514,6 +1600,7 @@ export async function createOrder(input: {
             sellerId: product.sellerId,
             productId: product.id,
             price: orderPrice,
+            currency: orderCurrency,
             status: OrderStatus.PAID,
           },
           select: {
@@ -1564,6 +1651,7 @@ export async function createOrder(input: {
         sellerTelegramId: product.seller.telegramId,
         productTitle: product.title,
         orderPrice: formatMoney(orderPrice),
+        orderCurrency,
       };
     },
     {
@@ -1576,6 +1664,7 @@ export async function createOrder(input: {
     telegramId: result.sellerTelegramId,
     productTitle: result.productTitle,
     price: result.orderPrice,
+    currency: result.orderCurrency,
   });
 
   return {
@@ -1694,6 +1783,7 @@ export async function getOrderById(
     sellerId: order.sellerId,
     productId: order.productId,
     price: formatMoney(order.price),
+    currency: order.currency,
     platformFee: formatMoney(order.platformFee),
     status: order.status,
     chatRoomId: null,
@@ -1738,6 +1828,7 @@ export async function confirmOrder(input: { orderId?: string; buyerId: string })
           buyerId: true,
           sellerId: true,
           price: true,
+          currency: true,
           status: true,
           seller: {
             select: {
@@ -1809,6 +1900,7 @@ export async function confirmOrder(input: { orderId?: string; buyerId: string })
         sellerTelegramId: checkoutOrder.seller.telegramId,
         productTitle: checkoutOrder.product.title,
         orderPrice: formatMoney(escrowAmount),
+        orderCurrency: checkoutOrder.currency,
       };
     },
     {
@@ -1821,6 +1913,7 @@ export async function confirmOrder(input: { orderId?: string; buyerId: string })
     telegramId: result.sellerTelegramId,
     productTitle: result.productTitle,
     price: result.orderPrice,
+    currency: result.orderCurrency,
   });
 
   return {
@@ -1850,6 +1943,7 @@ export async function completeOrder(input: { orderId: string; buyerId: string })
           buyerId: true,
           sellerId: true,
           price: true,
+          currency: true,
           status: true,
           seller: {
             select: {
@@ -1980,6 +2074,7 @@ export async function completeOrder(input: { orderId: string; buyerId: string })
         sellerNetAmount: formatMoney(sellerPayout),
         sellerTelegramId: order.seller.telegramId,
         productTitle: order.product.title,
+        orderCurrency: order.currency,
       };
     },
     {
@@ -1991,6 +2086,7 @@ export async function completeOrder(input: { orderId: string; buyerId: string })
     telegramId: result.sellerTelegramId,
     productTitle: result.productTitle,
     sellerNetAmount: result.sellerNetAmount,
+    currency: result.orderCurrency,
   });
 
   return {
@@ -2025,6 +2121,7 @@ export async function refundOrder(input: { orderId: string; sellerId: string }) 
           buyerId: true,
           sellerId: true,
           price: true,
+          currency: true,
           status: true,
           buyer: {
             select: {
@@ -2130,6 +2227,7 @@ export async function refundOrder(input: { orderId: string; sellerId: string }) 
         refundAmount: formatMoney(refundAmount),
         buyerTelegramId: order.buyer.telegramId,
         productTitle: order.product.title,
+        orderCurrency: order.currency,
       };
     },
     {
@@ -2143,6 +2241,7 @@ export async function refundOrder(input: { orderId: string; sellerId: string }) 
     telegramId: result.buyerTelegramId,
     productTitle: result.productTitle,
     refundAmount: result.refundAmount,
+    currency: result.orderCurrency,
   });
 
   return {
@@ -2653,6 +2752,25 @@ async function getOrCreateConversationByOrder(orderId: string) {
       sellerId: true,
       productId: true,
       status: true,
+      product: {
+        select: {
+          title: true,
+        },
+      },
+      buyer: {
+        select: {
+          id: true,
+          name: true,
+          telegramId: true,
+        },
+      },
+      seller: {
+        select: {
+          id: true,
+          name: true,
+          telegramId: true,
+        },
+      },
     },
   });
 
@@ -3208,6 +3326,25 @@ export async function createChatMessage(input: {
     senderId: input.senderId,
     text: input.content,
     imageBase64: input.imageBase64,
+  });
+
+  const sender = input.senderId === order.buyerId ? order.buyer : order.seller;
+  const recipient = input.senderId === order.buyerId ? order.seller : order.buyer;
+  const normalizedMessageText =
+    normalizeText(result.message?.text ?? input.content) ||
+    (result.message?.imageUrl || input.imageBase64
+      ? "Отправлено изображение."
+      : "Новое сообщение.");
+  const senderName =
+    sender.name?.trim() ||
+    (input.senderId === order.buyerId ? "Покупатель" : "Продавец");
+
+  triggerDealChatTelegramNotification({
+    telegramId: recipient.telegramId,
+    orderId: order.id,
+    productTitle: order.product.title,
+    senderName,
+    messageText: normalizedMessageText,
   });
 
   return {

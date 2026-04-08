@@ -42,6 +42,7 @@ import {
   isAdminRole,
 } from "@/lib/access-control";
 import { getAuthSession } from "@/lib/auth";
+import { formatStoredOrderAmount } from "@/lib/currency-config";
 import { formatCurrency } from "@/lib/formatters";
 import { prisma } from "@/lib/prisma";
 import { isSuperAdminRole } from "@/lib/roles";
@@ -845,7 +846,7 @@ export default async function AdminDashboardPage() {
                                 <Badge variant={statusMeta.variant}>{statusMeta.label}</Badge>
                               </TableCell>
                               <TableCell className="text-right font-semibold text-white">
-                                {formatAmount(order.price)} USDT
+                                {formatStoredOrderAmount(order.price.toString(), order.currency)}
                               </TableCell>
                               {canForceDelete ? (
                                 <TableCell className="text-right">
@@ -925,7 +926,7 @@ export default async function AdminDashboardPage() {
                                 />
                               </TableCell>
                               <TableCell className="text-right font-semibold text-white">
-                                {formatAmount(order.price)} USDT
+                                {formatStoredOrderAmount(order.price.toString(), order.currency)}
                               </TableCell>
                               <TableCell className="text-right">
                                 <a

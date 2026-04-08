@@ -72,12 +72,14 @@ function revalidateOrderPaths(orderId: string) {
 
 export async function createPendingOrder(
   productId: string,
+  currency?: string,
 ): Promise<CreatePendingOrderResult> {
   try {
     const currentUser = await requireActiveOrderUser();
     const result = await createOrder({
       productId,
       buyerId: currentUser.id,
+      currency,
     });
 
     revalidateOrderPaths(result.orderId);

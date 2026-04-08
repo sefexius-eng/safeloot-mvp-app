@@ -33,7 +33,7 @@ interface CreateOrderResponse {
 
 export function BuyProductDialog({ product }: BuyProductDialogProps) {
   const router = useRouter();
-  const { formatPrice } = useCurrency();
+  const { currency, formatPrice } = useCurrency();
   const [isLoading, setIsLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState("");
 
@@ -42,7 +42,7 @@ export function BuyProductDialog({ product }: BuyProductDialogProps) {
     setIsLoading(true);
 
     try {
-      const result = (await createPendingOrder(product.id)) as CreateOrderResponse;
+      const result = (await createPendingOrder(product.id, currency)) as CreateOrderResponse;
 
       if (!result.ok || !result.orderId) {
         throw new Error(result.message || "Не удалось создать заказ.");

@@ -178,6 +178,7 @@ model Order {
   sellerId     String
   productId    String
   price        Decimal       @db.Decimal(36, 8)
+  currency     String        @default("UAH")
   platformFee  Decimal       @default(0) @db.Decimal(36, 8)
   commission   Float         @default(0)
   status       OrderStatus   @default(PENDING)

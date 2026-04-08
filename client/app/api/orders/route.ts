@@ -5,6 +5,7 @@ import { requireActiveSessionUserId } from "@/lib/session-user";
 
 interface CreateOrderPayload {
   productId?: string;
+  currency?: string;
 }
 
 export async function POST(request: Request) {

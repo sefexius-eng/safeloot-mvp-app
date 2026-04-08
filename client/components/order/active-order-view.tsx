@@ -15,7 +15,6 @@ import {
   resolveDisputeToSeller,
 } from "@/app/actions/orders";
 import {
-  useCurrency,
   type CurrencyCode,
 } from "@/components/providers/currency-provider";
 import { createReview } from "@/app/actions/reviews";
@@ -26,6 +25,10 @@ import { Input } from "@/components/ui/input";
 import { TeamBadge } from "@/components/ui/team-badge";
 import { Textarea } from "@/components/ui/textarea";
 import { UserAvatar } from "@/components/ui/user-avatar";
+import {
+  formatStoredOrderAmount,
+  normalizeCurrencyCode,
+} from "@/lib/currency-config";
 import { isAdminRole } from "@/lib/roles";
 
 const CHAT_POLL_INTERVAL_MS = 3000;
@@ -68,6 +71,7 @@ interface OrderDetail {
   sellerId: string;
   productId: string;
   price: string;
+  currency: string;
   platformFee: string;
   status: OrderStatus;
   chatRoomId: string | null;
@@ -164,46 +168,13 @@ function formatMessageTime(value: string) {
   }).format(new Date(value));
 }
 
-function attachCurrencySymbol(
-  currency: CurrencyCode,
-  currencySymbol: string,
-  formattedValue: string,
-) {
-  if (currency === "USD" || currency === "EUR") {
-    return `${currencySymbol}${formattedValue}`;
-  }
-
-  return `${formattedValue} ${currencySymbol}`;
-}
-
 function formatAmountWithoutFractions(
   value: string | number,
   options: {
-    currency: CurrencyCode;
-    currentRate: number;
-    currencySymbol: string;
+    currency: CurrencyCode | string;
   },
 ) {
-  const parsedValue = Number(value);
-
-  if (!Number.isFinite(parsedValue)) {
-    return attachCurrencySymbol(options.currency, options.currencySymbol, "0");
-  }
-
-  const convertedValue = parsedValue * options.currentRate;
-  const wholeValue = Math.floor(convertedValue + Number.EPSILON);
-  const localizedValue = new Intl.NumberFormat("en-US", {
-    minimumFractionDigits: 0,
-    maximumFractionDigits: 0,
-  })
-    .format(wholeValue)
-    .replace(/,/g, " ");
-
-  return attachCurrencySymbol(
-    options.currency,
-    options.currencySymbol,
-    localizedValue,
-  );
+  return formatStoredOrderAmount(value, options.currency);
 }
 
 function formatReviewTime(value: string) {
@@ -319,7 +290,6 @@ async function compressChatImage(file: File) {
 
 export function ActiveOrderView({ orderId }: ActiveOrderViewProps) {
   const { data: session, status: sessionStatus } = useSession();
-  const { currency, currentRate, currencySymbol } = useCurrency();
   const router = useRouter();
   const [isReviewPending, startReviewTransition] = useTransition();
   const [order, setOrder] = useState<OrderDetail | null>(null);
@@ -839,7 +809,7 @@ export function ActiveOrderView({ orderId }: ActiveOrderViewProps) {
       );
       setCompleteMessage(
         result.sellerNetAmount
-          ? `Сделка завершена. Продавцу зачислено ${formatAmountWithoutFractions(result.sellerNetAmount, { currency, currentRate, currencySymbol })}.`
+          ? `Сделка завершена. Продавцу зачислено ${formatAmountWithoutFractions(result.sellerNetAmount, { currency: order?.currency ?? "UAH" })}.`
           : "Сделка завершена. Средства зачислены продавцу на доступный баланс.",
       );
       window.dispatchEvent(new Event(BALANCE_REFRESH_EVENT));
@@ -883,7 +853,7 @@ export function ActiveOrderView({ orderId }: ActiveOrderViewProps) {
       );
       setCompleteMessage(
         result.refundAmount
-          ? `Возврат выполнен. Покупателю возвращено ${formatAmountWithoutFractions(result.refundAmount, { currency, currentRate, currencySymbol })}.`
+          ? `Возврат выполнен. Покупателю возвращено ${formatAmountWithoutFractions(result.refundAmount, { currency: order?.currency ?? "UAH" })}.`
           : "Возврат выполнен. Средства возвращены покупателю.",
       );
       window.dispatchEvent(new Event(BALANCE_REFRESH_EVENT));
@@ -953,7 +923,7 @@ export function ActiveOrderView({ orderId }: ActiveOrderViewProps) {
       );
       setCompleteMessage(
         result.refundAmount
-          ? `Арбитраж завершен: покупателю возвращено ${formatAmountWithoutFractions(result.refundAmount, { currency, currentRate, currencySymbol })}.`
+          ? `Арбитраж завершен: покупателю возвращено ${formatAmountWithoutFractions(result.refundAmount, { currency: order?.currency ?? "UAH" })}.`
           : "Арбитраж завершен в пользу покупателя.",
       );
       window.dispatchEvent(new Event(BALANCE_REFRESH_EVENT));
@@ -992,7 +962,7 @@ export function ActiveOrderView({ orderId }: ActiveOrderViewProps) {
       );
       setCompleteMessage(
         result.sellerNetAmount
-          ? `Арбитраж завершен: продавцу начислено ${formatAmountWithoutFractions(result.sellerNetAmount, { currency, currentRate, currencySymbol })}.`
+          ? `Арбитраж завершен: продавцу начислено ${formatAmountWithoutFractions(result.sellerNetAmount, { currency: order?.currency ?? "UAH" })}.`
           : "Арбитраж завершен в пользу продавца.",
       );
       window.dispatchEvent(new Event(BALANCE_REFRESH_EVENT));
@@ -1146,17 +1116,14 @@ export function ActiveOrderView({ orderId }: ActiveOrderViewProps) {
     currentUserId === order.buyerId &&
     !order.review;
   const reviewTitle = currentUserId === order.buyerId ? "Ваш отзыв" : "Отзыв покупателя";
+  const orderCurrency = normalizeCurrencyCode(order.currency);
   const formattedOrderPrice = formatAmountWithoutFractions(order.price, {
-    currency,
-    currentRate,
-    currencySymbol,
+    currency: orderCurrency,
   });
   const formattedSellerPayout = formatAmountWithoutFractions(
     Number(order.price) * 0.95,
     {
-      currency,
-      currentRate,
-      currencySymbol,
+      currency: orderCurrency,
     },
   );
 

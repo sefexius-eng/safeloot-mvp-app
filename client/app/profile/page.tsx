@@ -10,6 +10,7 @@ import {
   type ProfileTabsReview,
 } from "@/components/profile-tabs";
 import { getAuthSession } from "@/lib/auth";
+import { formatStoredOrderAmount } from "@/lib/currency-config";
 import { formatCurrency } from "@/lib/formatters";
 import { mergeProfileBadgeIds } from "@/lib/profile-badges";
 import { prisma } from "@/lib/prisma";
@@ -64,19 +65,6 @@ function getOrderStatusClassName(status: string) {
     default:
       return "border-amber-500/20 bg-amber-500/10 text-amber-200";
   }
-}
-
-function formatAmount(value: unknown) {
-  const numericValue = Number(value);
-
-  if (!Number.isFinite(numericValue)) {
-    return String(value);
-  }
-
-  return new Intl.NumberFormat("ru-RU", {
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2,
-  }).format(numericValue);
 }
 
 function getUserDisplayName(input: {
@@ -380,7 +368,7 @@ export default async function ProfilePage() {
 
                 <div className="flex flex-col items-start gap-3 md:items-end">
                   <div className="text-sm text-zinc-400">
-                    Сумма заказа: <span className="font-semibold text-white">{formatAmount(order.price)} USDT</span>
+                    Сумма заказа: <span className="font-semibold text-white">{formatStoredOrderAmount(order.price.toString(), order.currency)}</span>
                   </div>
                   <Link
                     href={`/order/${order.id}`}
@@ -450,7 +438,7 @@ export default async function ProfilePage() {
 
                 <div className="flex flex-col items-start gap-3 md:items-end">
                   <div className="text-sm text-zinc-400">
-                    Сумма сделки: <span className="font-semibold text-white">{formatAmount(order.price)} USDT</span>
+                    Сумма сделки: <span className="font-semibold text-white">{formatStoredOrderAmount(order.price.toString(), order.currency)}</span>
                   </div>
                   <Link
                     href={`/order/${order.id}`}
