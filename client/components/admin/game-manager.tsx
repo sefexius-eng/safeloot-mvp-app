@@ -836,8 +836,8 @@ export function GameManager({ games: initialGames, currentUserRole }: GameManage
                                 className="flex flex-col gap-2 rounded-md border border-border/50 bg-secondary/40 p-3"
                               >
                                 {isEditing ? (
-                                  <div className="space-y-2">
-                                    <div className="grid gap-2 md:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_auto] md:items-center">
+                                  <div className="w-full">
+                                    <div className="mb-2 flex w-full gap-2">
                                       <Input
                                         value={editDraft.name}
                                         onChange={(event) => {
@@ -860,7 +860,7 @@ export function GameManager({ games: initialGames, currentUserRole }: GameManage
                                             };
                                           });
                                         }}
-                                        className="h-9 border-white/10 bg-white/5 text-sm text-zinc-100 placeholder:text-zinc-500 focus:border-orange-500/45 focus:bg-white/8"
+                                        className="h-9 flex-1 !border-slate-700 !bg-slate-900 !text-white !placeholder:text-slate-400 text-sm shadow-none focus:!border-orange-500/45 focus:!bg-slate-900"
                                         disabled={isSavingCategory || isDeletingCategory}
                                       />
                                       <Input
@@ -874,10 +874,11 @@ export function GameManager({ games: initialGames, currentUserRole }: GameManage
                                             },
                                           }));
                                         }}
-                                        className="h-9 border-white/10 bg-white/5 text-sm text-zinc-100 placeholder:text-zinc-500 focus:border-orange-500/45 focus:bg-white/8"
+                                        className="h-9 flex-1 !border-slate-700 !bg-slate-900 !text-white !placeholder:text-slate-400 text-sm shadow-none focus:!border-orange-500/45 focus:!bg-slate-900"
                                         disabled={isSavingCategory || isDeletingCategory}
                                       />
-                                      <div className="flex gap-2">
+                                    </div>
+                                    <div className="flex justify-end gap-2">
                                         <button
                                           type="button"
                                           onClick={() => handleCategorySave(category)}
@@ -894,7 +895,6 @@ export function GameManager({ games: initialGames, currentUserRole }: GameManage
                                         >
                                           Отмена
                                         </button>
-                                      </div>
                                     </div>
                                   </div>
                                 ) : (
