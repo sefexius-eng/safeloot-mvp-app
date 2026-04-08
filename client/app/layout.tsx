@@ -13,8 +13,7 @@ import { getSiteUrl } from "@/lib/site-url";
 import "./globals.css";
 
 const baseUrl = getSiteUrl();
-const globalOgImageUrl =
-  "https://images.unsplash.com/photo-1542751371-adc38448a05e?q=80&w=1200&auto=format&fit=crop";
+const globalOgImageUrl = "/og-image.png";
 const googleSiteVerification =
   process.env.NEXT_PUBLIC_GOOGLE_SITE_VERIFICATION?.trim() || undefined;
 const yandexSiteVerification =
@@ -60,7 +59,7 @@ export const metadata: Metadata = {
         url: globalOgImageUrl,
         width: 1200,
         height: 630,
-        alt: "SafeLoot Market",
+        alt: "SafeLoot Market Preview",
       },
     ],
   },
