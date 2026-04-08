@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import { Analytics } from "@vercel/analytics/next";
 
@@ -19,6 +19,10 @@ const googleSiteVerification =
 const yandexSiteVerification =
   process.env.NEXT_PUBLIC_YANDEX_VERIFICATION?.trim() || undefined;
 const EMAIL_VERIFICATION_ADMIN_EMAIL = "sefexius@gmail.com";
+const APP_NAME = "SafeLoot Market";
+const APP_SHORT_NAME = "SafeLoot";
+const PWA_BACKGROUND_COLOR = "#09090b";
+const PWA_THEME_COLOR = "#00B85C";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -32,9 +36,40 @@ const geistMono = Geist_Mono({
 
 export const metadata: Metadata = {
   metadataBase: new URL(baseUrl),
+  applicationName: APP_NAME,
+  manifest: "/manifest.json",
   title: "SafeLoot Market | Безопасная покупка игровых товаров",
   description:
     "Маркетплейс цифровых товаров. Безопасные сделки, Escrow система, защита покупателей и продавцов 24/7.",
+  icons: {
+    icon: [
+      {
+        url: "/icon-192x192.png",
+        sizes: "192x192",
+        type: "image/png",
+      },
+      {
+        url: "/icon-512x512.png",
+        sizes: "512x512",
+        type: "image/png",
+      },
+    ],
+    apple: [
+      {
+        url: "/icon-192x192.png",
+        sizes: "192x192",
+        type: "image/png",
+      },
+    ],
+  },
+  appleWebApp: {
+    capable: true,
+    statusBarStyle: "black-translucent",
+    title: APP_SHORT_NAME,
+  },
+  formatDetection: {
+    telephone: false,
+  },
   verification:
     googleSiteVerification || yandexSiteVerification
       ? {
@@ -70,6 +105,11 @@ export const metadata: Metadata = {
       "Покупай и продавай аккаунты, валюту и предметы безопасно через Escrow.",
     images: [globalOgImageUrl],
   },
+};
+
+export const viewport: Viewport = {
+  themeColor: PWA_THEME_COLOR,
+  colorScheme: "dark",
 };
 
 export default async function RootLayout({

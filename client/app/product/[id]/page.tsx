@@ -23,13 +23,9 @@ interface ProductPageProps {
 }
 
 interface ProductMetadataProps {
-  params:
-    | Promise<{
-        id: string;
-      }>
-    | {
-        id: string;
-      };
+  params: Promise<{
+    id: string;
+  }>;
 }
 
 interface ProductDetail {
@@ -113,7 +109,7 @@ function getGalleryGridClassName(imageCount: number) {
 
 export async function generateMetadata({ params }: ProductMetadataProps): Promise<Metadata> {
   try {
-    const { id } = await Promise.resolve(params);
+    const { id } = await params;
     const product = await prisma.product.findUnique({
       where: { id },
       include: { seller: true, game: true },
