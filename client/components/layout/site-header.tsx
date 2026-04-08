@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
@@ -373,18 +374,15 @@ export function SiteHeader() {
       <div className="mx-auto w-full max-w-7xl px-4 py-3 sm:px-6 lg:px-8">
         <div className="flex flex-col gap-3 md:grid md:grid-cols-[auto_minmax(0,1fr)_auto] md:items-center md:gap-5">
           <div className="flex items-center justify-between gap-4 md:min-w-[220px]">
-            <Link href="/" className="flex items-center gap-3">
-              <span className="flex h-11 w-11 items-center justify-center rounded-2xl bg-orange-600 text-lg font-semibold text-white shadow-[0_14px_40px_rgba(249,115,22,0.26)]">
-                S
-              </span>
-              <span>
-                <span className="block text-lg font-semibold tracking-tight text-neutral-50">
-                  SafeLoot
-                </span>
-                <span className="block text-xs tracking-[0.24em] uppercase text-zinc-500">
-                  Escrow Market
-                </span>
-              </span>
+            <Link href="/" className="flex items-center" aria-label="SafeLoot">
+              <Image
+                src="/safeloot-logo-full.svg"
+                alt="SafeLoot"
+                width={320}
+                height={64}
+                className="h-8 w-auto sm:h-9"
+                priority
+              />
             </Link>
 
             {status === "loading" ? (
