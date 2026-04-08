@@ -2,8 +2,8 @@
 
 import Image from "next/image";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
-import { useEffect, useRef, useState } from "react";
+import { usePathname, useRouter } from "next/navigation";
+import { useEffect, useRef, useState, type MouseEvent as ReactMouseEvent } from "react";
 import { signOut, useSession } from "next-auth/react";
 import type { Role } from "@prisma/client";
 
@@ -105,6 +105,7 @@ function HeaderMobileAuthSkeleton() {
 }
 
 export function SiteHeader() {
+  const pathname = usePathname();
   const router = useRouter();
   const { data: session, status } = useSession();
   const { currencies, currency, setCurrency, formatBalance } = useCurrency();
@@ -329,6 +330,15 @@ export function SiteHeader() {
   const availableBalanceLabel = formatBalance(displayAvailable);
   const holdBalanceLabel = formatBalance(displayHold);
 
+  function handleLogoClick(event: ReactMouseEvent<HTMLAnchorElement>) {
+    if (pathname !== "/") {
+      return;
+    }
+
+    event.preventDefault();
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  }
+
   function renderProfileMenu(trigger: React.ReactNode, contentClassName: string) {
     return (
       <DropdownMenu>
@@ -374,7 +384,12 @@ export function SiteHeader() {
       <div className="mx-auto w-full max-w-7xl px-4 py-3 sm:px-6 lg:px-8">
         <div className="flex flex-col gap-3 md:grid md:grid-cols-[auto_minmax(0,1fr)_auto] md:items-center md:gap-5">
           <div className="flex items-center justify-between gap-4 md:min-w-[220px]">
-            <Link href="/" className="flex items-center" aria-label="SafeLoot">
+            <Link
+              href="/"
+              onClick={handleLogoClick}
+              className="flex items-center"
+              aria-label="SafeLoot"
+            >
               <Image
                 src="/safeloot-logo-full.svg"
                 alt="SafeLoot"
