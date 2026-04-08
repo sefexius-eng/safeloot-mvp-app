@@ -1,3 +1,5 @@
+import { timingSafeEqual } from "node:crypto";
+
 import { revalidatePath } from "next/cache";
 import { NextResponse } from "next/server";
 
@@ -13,6 +15,50 @@ type SeedCatalogGame = {
     slug: string;
   }>;
 };
+
+function getSeedRequestSecret(request: Request) {
+  const requestUrl = new URL(request.url);
+
+  return (
+    request.headers.get("x-admin-seed-secret")?.trim() ??
+    request.headers.get("x-seed-secret")?.trim() ??
+    requestUrl.searchParams.get("secret")?.trim() ??
+    requestUrl.searchParams.get("token")?.trim() ??
+    null
+  );
+}
+
+function areSecretsEqual(expectedSecret: string, receivedSecret: string) {
+  const expectedBuffer = Buffer.from(expectedSecret);
+  const receivedBuffer = Buffer.from(receivedSecret);
+
+  if (expectedBuffer.length !== receivedBuffer.length) {
+    return false;
+  }
+
+  return timingSafeEqual(expectedBuffer, receivedBuffer);
+}
+
+function authorizeSeedRequest(request: Request) {
+  if (process.env.NODE_ENV === "production") {
+    return NextResponse.json(
+      { ok: false, message: "Forbidden." },
+      { status: 403 },
+    );
+  }
+
+  const expectedSecret = process.env.ADMIN_SEED_SECRET?.trim();
+  const receivedSecret = getSeedRequestSecret(request);
+
+  if (!expectedSecret || !receivedSecret || !areSecretsEqual(expectedSecret, receivedSecret)) {
+    return NextResponse.json(
+      { ok: false, message: "Forbidden." },
+      { status: 403 },
+    );
+  }
+
+  return null;
+}
 
 async function seedCatalog() {
   let createdGames = 0;
@@ -94,8 +140,14 @@ async function seedCatalog() {
   };
 }
 
-export async function GET() {
+export async function GET(request: Request) {
   try {
+    const authorizationError = authorizeSeedRequest(request);
+
+    if (authorizationError) {
+      return authorizationError;
+    }
+
     const result = await seedCatalog();
 
     return NextResponse.json({
@@ -112,8 +164,14 @@ export async function GET() {
   }
 }
 
-export async function POST() {
+export async function POST(request: Request) {
   try {
+    const authorizationError = authorizeSeedRequest(request);
+
+    if (authorizationError) {
+      return authorizationError;
+    }
+
     const result = await seedCatalog();
 
     return NextResponse.json({

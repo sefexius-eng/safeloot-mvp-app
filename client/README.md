@@ -36,6 +36,23 @@ SMTP_PASS=
 SMTP_FROM=
 ```
 
+## Seed Route Protection
+
+The catalog seed endpoint at `/api/seed` is disabled when `NODE_ENV=production`.
+
+For non-production environments, configure a shared secret before calling it:
+
+```bash
+ADMIN_SEED_SECRET=
+```
+
+Pass the secret in either the `x-admin-seed-secret` header or the `secret` query parameter.
+If you do not need the route, prefer the local script instead:
+
+```bash
+npm run seed:catalog
+```
+
 This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
 
 ## Learn More
