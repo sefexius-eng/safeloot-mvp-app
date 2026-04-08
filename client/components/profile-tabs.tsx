@@ -1,17 +1,18 @@
 "use client";
 
+import type { Role } from "@prisma/client";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useState, useTransition } from "react";
 
 import { toggleAllProductsVisibility } from "@/app/actions/product";
-import CensoredText from "@/components/censored-text";
 import { useCurrency } from "@/components/providers/currency-provider";
 import { PromoCodePanel } from "@/components/profile/promo-code-panel";
 import { ProfileProductActions } from "@/components/profile/profile-product-actions";
-import { RatingStars } from "@/components/reviews/rating-stars";
-import { SellerReviewReplyForm } from "@/components/reviews/seller-review-reply-form";
-import { UserAvatar } from "@/components/ui/user-avatar";
+import {
+  SellerReviewCard,
+  type SellerReviewCardData,
+} from "@/components/reviews/seller-review-card";
 
 export interface ProfileTabsProduct {
   id: string;
@@ -54,29 +55,33 @@ export interface ProfileTabsReview {
 interface ProfileTabsProps {
   products: ProfileTabsProduct[];
   reviews: ProfileTabsReview[];
+  sellerId: string;
+  currentUserId?: string | null;
+  currentUserRole?: Role | null;
 }
 
-function formatReviewDate(value: string) {
-  return new Intl.DateTimeFormat("ru-RU", {
-    day: "2-digit",
-    month: "long",
-    year: "numeric",
-    hour: "2-digit",
-    minute: "2-digit",
-  }).format(new Date(value));
-}
-
-export function ProfileTabs({ products: initialProducts, reviews }: ProfileTabsProps) {
+export function ProfileTabs({
+  products: initialProducts,
+  reviews: initialReviews,
+  sellerId,
+  currentUserId,
+  currentUserRole,
+}: ProfileTabsProps) {
   const router = useRouter();
   const { formatPrice } = useCurrency();
   const [activeTab, setActiveTab] = useState<"products" | "reviews">("products");
   const [products, setProducts] = useState<ProfileTabsProduct[]>(initialProducts);
+  const [reviews, setReviews] = useState<ProfileTabsReview[]>(initialReviews);
   const [bulkError, setBulkError] = useState("");
   const [isBulkPending, startBulkTransition] = useTransition();
 
   useEffect(() => {
     setProducts(initialProducts);
   }, [initialProducts]);
+
+  useEffect(() => {
+    setReviews(initialReviews);
+  }, [initialReviews]);
 
   function handleProductDeleted(productId: string) {
     setProducts((currentProducts) =>
@@ -269,69 +274,36 @@ export function ProfileTabs({ products: initialProducts, reviews }: ProfileTabsP
             </div>
           ) : (
             <div className="space-y-4">
-              {reviews.map((review) => {
-                const authorName = review.author.name?.trim() || review.author.email;
-
-                return (
-                  <article
-                    key={review.id}
-                    className="rounded-[1.75rem] border border-white/10 bg-white/5 p-5 shadow-[0_14px_36px_rgba(0,0,0,0.16)]"
-                  >
-                    <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
-                      <div className="flex min-w-0 items-center gap-3">
-                        <UserAvatar
-                          src={review.author.image}
-                          name={authorName}
-                          email={review.author.email}
-                          className="h-12 w-12 shrink-0 border-white/10 bg-zinc-900/80"
-                          imageClassName="rounded-full object-cover"
-                        />
-                        <div className="min-w-0">
-                          <p className="truncate text-sm font-semibold text-white">
-                            <CensoredText text={authorName} />
-                          </p>
-                          <p className="truncate text-xs uppercase tracking-[0.16em] text-zinc-500">
-                            Покупатель
-                          </p>
-                        </div>
-                      </div>
-
-                      <div className="flex flex-col items-start gap-2 md:items-end">
-                        <RatingStars value={review.rating} size="sm" />
-                        <span className="text-xs uppercase tracking-[0.16em] text-zinc-500">
-                          {formatReviewDate(review.createdAt)}
-                        </span>
-                      </div>
-                    </div>
-
-                    <div className="mt-4 rounded-[1.35rem] border border-white/10 bg-black/20 px-4 py-4 text-sm leading-7 text-zinc-200">
-                      <CensoredText
-                        text={review.comment?.trim() || "Покупатель поставил оценку без текстового комментария."}
-                      />
-                    </div>
-
-                    {review.sellerReply?.trim() ? (
-                      <div className="ml-6 mt-4 rounded-[1.35rem] border-l-2 border-gray-600 bg-gray-800/50 px-4 py-4 text-sm leading-7 text-zinc-200">
-                        <p className="text-xs font-semibold tracking-[0.16em] uppercase text-zinc-400">
-                          Ответ продавца
-                        </p>
-                        <div className="mt-2">
-                          <CensoredText text={review.sellerReply} />
-                        </div>
-                        {review.replyCreatedAt ? (
-                          <p className="mt-3 text-xs uppercase tracking-[0.16em] text-zinc-500">
-                            {formatReviewDate(review.replyCreatedAt)}
-                          </p>
-                        ) : null}
-                      </div>
-                    ) : (
-                      <div className="mt-4">
-                        <SellerReviewReplyForm reviewId={review.id} />
-                      </div>
-                    )}
-                  </article>
-                );
-              })}
+              {reviews.map((review) => (
+                <SellerReviewCard
+                  key={review.id}
+                  review={review satisfies SellerReviewCardData}
+                  sellerId={sellerId}
+                  currentUserId={currentUserId}
+                  currentUserRole={currentUserRole}
+                  onUpdated={(updatedReview) =>
+                    setReviews((currentReviews) =>
+                      currentReviews.map((currentReview) =>
+                        currentReview.id === updatedReview.id
+                          ? {
+                              ...currentReview,
+                              rating: updatedReview.rating,
+                              comment: updatedReview.comment,
+                              sellerReply: updatedReview.sellerReply,
+                              createdAt: updatedReview.createdAt,
+                              replyCreatedAt: updatedReview.replyCreatedAt,
+                            }
+                          : currentReview,
+                      ),
+                    )
+                  }
+                  onDeleted={(reviewId) =>
+                    setReviews((currentReviews) =>
+                      currentReviews.filter((currentReview) => currentReview.id !== reviewId),
+                    )
+                  }
+                />
+              ))}
             </div>
           )}
         </div>

@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { OrderStatus, Prisma } from "@prisma/client";
+import { OrderStatus } from "@prisma/client";
 import { notFound } from "next/navigation";
 
 import CensoredText from "@/components/censored-text";
@@ -9,14 +9,15 @@ import {
   MarketplaceProductCard,
   type MarketplaceProductCardData,
 } from "@/components/product/marketplace-product-card";
-import { SellerReviewReplyForm } from "@/components/reviews/seller-review-reply-form";
+import {
+  SellerReviewCard,
+  type SellerReviewCardData,
+} from "@/components/reviews/seller-review-card";
 import {
   SellerStarScale,
   formatSellerAverageRating,
   formatSellerReviewCount,
 } from "@/components/reviews/seller-star-scale";
-import { RatingStars } from "@/components/reviews/rating-stars";
-import { UserAvatar } from "@/components/ui/user-avatar";
 import { getCurrentSessionUser } from "@/lib/access-control";
 import { getAuthSession } from "@/lib/auth";
 import { mergeProfileBadgeIds } from "@/lib/profile-badges";
@@ -65,16 +66,6 @@ function formatJoinedDate(value: Date) {
     day: "2-digit",
     month: "long",
     year: "numeric",
-  }).format(value);
-}
-
-function formatReviewDate(value: Date) {
-  return new Intl.DateTimeFormat("ru-RU", {
-    day: "2-digit",
-    month: "long",
-    year: "numeric",
-    hour: "2-digit",
-    minute: "2-digit",
   }).format(value);
 }
 
@@ -355,68 +346,23 @@ export default async function PublicUserPage({ params }: PublicUserPageProps) {
           </div>
         ) : (
           <div className="space-y-4">
-            {seller.reviewsReceived.map((review) => {
-              const authorName = review.author.name?.trim() || "Покупатель";
-
-              return (
-                <article
-                  key={review.id}
-                  className="rounded-[1.75rem] border border-white/10 bg-white/5 p-5 shadow-[0_14px_36px_rgba(0,0,0,0.16)]"
-                >
-                  <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
-                    <div className="flex min-w-0 items-center gap-3">
-                      <UserAvatar
-                        src={review.author.image}
-                        name={authorName}
-                        className="h-12 w-12 shrink-0 border-white/10 bg-zinc-900/80"
-                        imageClassName="rounded-full object-cover"
-                      />
-                      <div className="min-w-0">
-                        <p className="truncate text-sm font-semibold text-white">
-                          <CensoredText text={authorName} />
-                        </p>
-                        <p className="truncate text-xs uppercase tracking-[0.16em] text-zinc-500">
-                          Покупатель
-                        </p>
-                      </div>
-                    </div>
-
-                    <div className="flex flex-col items-start gap-2 md:items-end">
-                      <RatingStars value={review.rating} size="sm" />
-                      <span className="text-xs uppercase tracking-[0.16em] text-zinc-500">
-                        {formatReviewDate(review.createdAt)}
-                      </span>
-                    </div>
-                  </div>
-
-                  <div className="mt-4 rounded-[1.35rem] border border-white/10 bg-black/20 px-4 py-4 text-sm leading-7 text-zinc-200">
-                    <CensoredText
-                      text={review.comment?.trim() || "Покупатель поставил оценку без текстового комментария."}
-                    />
-                  </div>
-
-                  {review.sellerReply?.trim() ? (
-                    <div className="ml-6 mt-4 rounded-[1.35rem] border-l-2 border-gray-600 bg-gray-800/50 px-4 py-4 text-sm leading-7 text-zinc-200">
-                      <p className="text-xs font-semibold tracking-[0.16em] uppercase text-zinc-400">
-                        Ответ продавца
-                      </p>
-                      <div className="mt-2">
-                        <CensoredText text={review.sellerReply} />
-                      </div>
-                      {review.replyCreatedAt ? (
-                        <p className="mt-3 text-xs uppercase tracking-[0.16em] text-zinc-500">
-                          {formatReviewDate(review.replyCreatedAt)}
-                        </p>
-                      ) : null}
-                    </div>
-                  ) : currentUser?.id === seller.id ? (
-                    <div className="mt-4">
-                      <SellerReviewReplyForm reviewId={review.id} />
-                    </div>
-                  ) : null}
-                </article>
-              );
-            })}
+            {seller.reviewsReceived.map((review) => (
+              <SellerReviewCard
+                key={review.id}
+                review={{
+                  id: review.id,
+                  rating: review.rating,
+                  comment: review.comment,
+                  sellerReply: review.sellerReply,
+                  replyCreatedAt: review.replyCreatedAt?.toISOString() ?? null,
+                  createdAt: review.createdAt.toISOString(),
+                  author: review.author,
+                } satisfies SellerReviewCardData}
+                sellerId={seller.id}
+                currentUserId={currentUser?.id ?? null}
+                currentUserRole={currentUser?.role ?? null}
+              />
+            ))}
           </div>
         )}
       </section>

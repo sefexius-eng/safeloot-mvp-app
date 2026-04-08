@@ -3,7 +3,11 @@
 import { OrderStatus, Prisma } from "@prisma/client";
 import { revalidatePath } from "next/cache";
 
-import { BANNED_USER_MESSAGE, getCurrentSessionUser } from "@/lib/access-control";
+import {
+  BANNED_USER_MESSAGE,
+  getCurrentSessionUser,
+  type CurrentSessionUser,
+} from "@/lib/access-control";
 import { getAuthSession } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { getSiteUrl } from "@/lib/site-url";
@@ -69,7 +73,7 @@ function triggerSellerReviewTelegramNotification(input: {
   }
 }
 
-async function requireActiveReviewUserId() {
+async function requireActiveReviewUser() {
   const session = await getAuthSession();
   const currentUser = await getCurrentSessionUser(session);
 
@@ -81,7 +85,84 @@ async function requireActiveReviewUserId() {
     throw new Error(BANNED_USER_MESSAGE);
   }
 
-  return currentUser.id;
+  return currentUser;
+}
+
+function hasReviewAdminAccess(user: CurrentSessionUser) {
+  return user.role === "ADMIN" || user.role === "SUPER_ADMIN";
+}
+
+function canManageReview(user: CurrentSessionUser, authorId: string) {
+  return user.id === authorId || hasReviewAdminAccess(user);
+}
+
+function normalizeReviewRating(rating: number) {
+  const normalizedRating = Number(rating);
+
+  if (
+    !Number.isInteger(normalizedRating) ||
+    normalizedRating < 1 ||
+    normalizedRating > 5
+  ) {
+    throw new Error("Поставьте оценку от 1 до 5.");
+  }
+
+  return normalizedRating;
+}
+
+function revalidateReviewRelatedPaths(input: {
+  orderId: string;
+  sellerId: string;
+  productId: string;
+  gameSlug?: string | null;
+}) {
+  revalidatePath(`/order/${input.orderId}`);
+  revalidatePath(`/orders/${input.orderId}`);
+  revalidatePath(`/product/${input.productId}`);
+  revalidatePath(`/user/${input.sellerId}`);
+  revalidatePath("/");
+  revalidatePath("/profile");
+
+  if (input.gameSlug) {
+    revalidatePath(`/games/${input.gameSlug}`);
+  }
+}
+
+async function getReviewMutationContext(
+  reviewId: string,
+  transactionClient: Prisma.TransactionClient,
+) {
+  return transactionClient.review.findUnique({
+    where: {
+      id: reviewId,
+    },
+    select: {
+      id: true,
+      orderId: true,
+      authorId: true,
+      sellerId: true,
+      rating: true,
+      comment: true,
+      sellerReply: true,
+      replyCreatedAt: true,
+      createdAt: true,
+      order: {
+        select: {
+          id: true,
+          productId: true,
+          product: {
+            select: {
+              game: {
+                select: {
+                  slug: true,
+                },
+              },
+            },
+          },
+        },
+      },
+    },
+  });
 }
 
 function normalizeComment(comment?: string | null) {
@@ -122,26 +203,15 @@ export async function createReview(
   comment?: string | null,
 ) {
   try {
-    const userId = await requireActiveReviewUserId();
+    const currentUser = await requireActiveReviewUser();
     const normalizedOrderId = orderId.trim();
-    const normalizedRating = Number(rating);
+    const normalizedRating = normalizeReviewRating(rating);
     const normalizedComment = normalizeComment(comment);
 
     if (!normalizedOrderId) {
       return {
         ok: false,
         message: "orderId is required.",
-      };
-    }
-
-    if (
-      !Number.isInteger(normalizedRating) ||
-      normalizedRating < 1 ||
-      normalizedRating > 5
-    ) {
-      return {
-        ok: false,
-        message: "Поставьте оценку от 1 до 5.",
       };
     }
 
@@ -186,7 +256,7 @@ export async function createReview(
           throw new Error(`Order with id ${normalizedOrderId} was not found.`);
         }
 
-        if (order.buyerId !== userId) {
+        if (order.buyerId !== currentUser.id) {
           throw new Error("Только покупатель может оставить отзыв.");
         }
 
@@ -201,7 +271,7 @@ export async function createReview(
         const review = await transactionClient.review.create({
           data: {
             orderId: order.id,
-            authorId: userId,
+            authorId: currentUser.id,
             sellerId: order.sellerId,
             rating: normalizedRating,
             comment: normalizedComment,
@@ -224,15 +294,12 @@ export async function createReview(
       },
     );
 
-    revalidatePath(`/order/${result.order.id}`);
-    revalidatePath(`/product/${result.order.productId}`);
-
-    if (result.order.product.game?.slug) {
-      revalidatePath(`/games/${result.order.product.game.slug}`);
-    }
-
-    revalidatePath("/");
-    revalidatePath("/profile");
+    revalidateReviewRelatedPaths({
+      orderId: result.order.id,
+      sellerId: result.order.seller.id,
+      productId: result.order.productId,
+      gameSlug: result.order.product.game?.slug,
+    });
 
     triggerSellerReviewTelegramNotification({
       telegramId: result.order.seller.telegramId,
@@ -268,9 +335,157 @@ export async function createReview(
   }
 }
 
+export async function updateReview(
+  reviewId: string,
+  rating: number,
+  comment?: string | null,
+) {
+  try {
+    const currentUser = await requireActiveReviewUser();
+    const normalizedReviewId = reviewId.trim();
+    const normalizedRating = normalizeReviewRating(rating);
+    const normalizedComment = normalizeComment(comment);
+
+    if (!normalizedReviewId) {
+      return {
+        ok: false,
+        message: "reviewId is required.",
+      };
+    }
+
+    const result = await prisma.$transaction(
+      async (transactionClient) => {
+        const review = await getReviewMutationContext(
+          normalizedReviewId,
+          transactionClient,
+        );
+
+        if (!review) {
+          throw new Error("Отзыв не найден.");
+        }
+
+        if (!canManageReview(currentUser, review.authorId)) {
+          throw new Error(
+            "Редактировать отзывы может только автор или администратор.",
+          );
+        }
+
+        const updatedReview = await transactionClient.review.update({
+          where: {
+            id: normalizedReviewId,
+          },
+          data: {
+            rating: normalizedRating,
+            comment: normalizedComment,
+          },
+          select: {
+            id: true,
+            rating: true,
+            comment: true,
+            sellerReply: true,
+            replyCreatedAt: true,
+            createdAt: true,
+          },
+        });
+
+        return {
+          review: updatedReview,
+          context: review,
+        };
+      },
+      {
+        isolationLevel: Prisma.TransactionIsolationLevel.Serializable,
+      },
+    );
+
+    revalidateReviewRelatedPaths({
+      orderId: result.context.order.id,
+      sellerId: result.context.sellerId,
+      productId: result.context.order.productId,
+      gameSlug: result.context.order.product.game?.slug,
+    });
+
+    return {
+      ok: true,
+      review: {
+        ...result.review,
+        createdAt: result.review.createdAt.toISOString(),
+        replyCreatedAt: result.review.replyCreatedAt?.toISOString() ?? null,
+      },
+    };
+  } catch (error) {
+    return {
+      ok: false,
+      message:
+        error instanceof Error ? error.message : "Не удалось обновить отзыв.",
+    };
+  }
+}
+
+export async function deleteReview(reviewId: string) {
+  try {
+    const currentUser = await requireActiveReviewUser();
+    const normalizedReviewId = reviewId.trim();
+
+    if (!normalizedReviewId) {
+      return {
+        ok: false,
+        message: "reviewId is required.",
+      };
+    }
+
+    const result = await prisma.$transaction(
+      async (transactionClient) => {
+        const review = await getReviewMutationContext(
+          normalizedReviewId,
+          transactionClient,
+        );
+
+        if (!review) {
+          throw new Error("Отзыв не найден.");
+        }
+
+        if (!canManageReview(currentUser, review.authorId)) {
+          throw new Error(
+            "Удалять отзывы может только автор или администратор.",
+          );
+        }
+
+        await transactionClient.review.delete({
+          where: {
+            id: normalizedReviewId,
+          },
+        });
+
+        return review;
+      },
+      {
+        isolationLevel: Prisma.TransactionIsolationLevel.Serializable,
+      },
+    );
+
+    revalidateReviewRelatedPaths({
+      orderId: result.order.id,
+      sellerId: result.sellerId,
+      productId: result.order.productId,
+      gameSlug: result.order.product.game?.slug,
+    });
+
+    return {
+      ok: true,
+    };
+  } catch (error) {
+    return {
+      ok: false,
+      message:
+        error instanceof Error ? error.message : "Не удалось удалить отзыв.",
+    };
+  }
+}
+
 export async function replyToReview(reviewId: string, text: string) {
   try {
-    const userId = await requireActiveReviewUserId();
+    const currentUser = await requireActiveReviewUser();
     const normalizedReviewId = reviewId.trim();
     const normalizedReply = normalizeReplyText(text);
 
@@ -299,7 +514,7 @@ export async function replyToReview(reviewId: string, text: string) {
       };
     }
 
-    if (review.sellerId !== userId) {
+    if (review.sellerId !== currentUser.id) {
       return {
         ok: false,
         message: "Отвечать на отзыв может только продавец-получатель.",

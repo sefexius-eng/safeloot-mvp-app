@@ -1872,7 +1872,16 @@ export async function getOrderById(
           id: true,
           rating: true,
           comment: true,
+          sellerReply: true,
+          replyCreatedAt: true,
           createdAt: true,
+          author: {
+            select: {
+              id: true,
+              name: true,
+              image: true,
+            },
+          },
         },
       },
       product: {
@@ -1904,6 +1913,7 @@ export async function getOrderById(
       ? {
           ...order.review,
           createdAt: order.review.createdAt.toISOString(),
+          replyCreatedAt: order.review.replyCreatedAt?.toISOString() ?? null,
         }
       : null,
     buyer: {

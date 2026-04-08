@@ -20,6 +20,10 @@ import {
 import { createReview } from "@/app/actions/reviews";
 import CensoredText from "@/components/censored-text";
 import { RatingStars } from "@/components/reviews/rating-stars";
+import {
+  SellerReviewCard,
+  type SellerReviewCardData,
+} from "@/components/reviews/seller-review-card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { TeamBadge } from "@/components/ui/team-badge";
@@ -83,7 +87,14 @@ interface OrderDetail {
     id: string;
     rating: number;
     comment: string | null;
+    sellerReply: string | null;
+    replyCreatedAt: string | null;
     createdAt: string;
+    author: {
+      id: string;
+      name: string | null;
+      image: string | null;
+    };
   } | null;
   buyer: OrderParticipant;
   seller: OrderParticipant;
@@ -176,16 +187,6 @@ function formatAmountWithoutFractions(
   },
 ) {
   return formatStoredOrderAmount(value, options.currency);
-}
-
-function formatReviewTime(value: string) {
-  return new Intl.DateTimeFormat("ru-RU", {
-    day: "2-digit",
-    month: "long",
-    year: "numeric",
-    hour: "2-digit",
-    minute: "2-digit",
-  }).format(new Date(value));
 }
 
 function getUserDisplayName(
@@ -1018,7 +1019,19 @@ export function ActiveOrderView({ orderId }: ActiveOrderViewProps) {
             currentOrder
               ? {
                   ...currentOrder,
-                  review: result.review,
+                  review: {
+                    id: result.review.id,
+                    rating: result.review.rating,
+                    comment: result.review.comment,
+                    sellerReply: null,
+                    replyCreatedAt: null,
+                    createdAt: result.review.createdAt,
+                    author: {
+                      id: currentOrder.buyer.id,
+                      name: currentOrder.buyer.name,
+                      image: currentOrder.buyer.image,
+                    },
+                  },
                 }
               : currentOrder,
           );
@@ -1652,29 +1665,45 @@ export function ActiveOrderView({ orderId }: ActiveOrderViewProps) {
 
         {order.review ? (
           <div className="mt-6 rounded-[1.5rem] border border-amber-500/15 bg-amber-500/10 p-5">
-            <div className="flex flex-wrap items-start justify-between gap-4">
+            <div className="mb-4 flex flex-wrap items-start justify-between gap-4">
               <div>
                 <p className="text-xs font-semibold tracking-[0.24em] uppercase text-amber-200/80">
                   {reviewTitle}
                 </p>
                 <p className="mt-2 text-lg font-semibold text-white">
-                  Сделка оценена на {order.review.rating} из 5
+                  Сделка оценена и отображается в репутации продавца
                 </p>
               </div>
-              <RatingStars value={order.review.rating} size="md" />
             </div>
 
-            <p className="mt-3 text-sm text-zinc-400">
-              {formatReviewTime(order.review.createdAt)}
-            </p>
-
-            {order.review.comment ? (
-              <p className="mt-4 whitespace-pre-wrap text-sm leading-7 text-zinc-200">
-                <CensoredText text={order.review.comment} />
-              </p>
-            ) : (
-              <p className="mt-4 text-sm text-zinc-500">Комментарий не добавлен.</p>
-            )}
+            <SellerReviewCard
+              review={order.review satisfies SellerReviewCardData}
+              sellerId={order.sellerId}
+              currentUserId={currentUserId}
+              currentUserRole={currentUserAccountRole as Role}
+              onUpdated={(updatedReview) =>
+                setOrder((currentOrder) =>
+                  currentOrder
+                    ? {
+                        ...currentOrder,
+                        review: updatedReview,
+                      }
+                    : currentOrder,
+                )
+              }
+              onDeleted={(reviewId) => {
+                setOrder((currentOrder) =>
+                  currentOrder && currentOrder.review?.id === reviewId
+                    ? {
+                        ...currentOrder,
+                        review: null,
+                      }
+                    : currentOrder,
+                );
+                setReviewSuccess("Отзыв удален.");
+                setReviewError("");
+              }}
+            />
           </div>
         ) : canLeaveReview ? (
           <form

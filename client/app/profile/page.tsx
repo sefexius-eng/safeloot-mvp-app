@@ -310,6 +310,9 @@ export default async function ProfilePage() {
         <ProfileTabs
           products={profileProducts}
           reviews={profileReviews}
+          sellerId={sellerProfile.id}
+          currentUserId={session?.user?.id ?? sellerProfile.id}
+          currentUserRole={(session?.user?.role ?? currentProfileRole) ?? null}
         />
       ) : null}
 
