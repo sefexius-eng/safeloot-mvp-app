@@ -1,20 +1,26 @@
 "use client";
 
 import { Chess, type Color, type Square } from "chess.js";
-import { X } from "lucide-react";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { LogOut, X } from "lucide-react";
+import { useEffect, useMemo, useRef, useState, useTransition } from "react";
 import { Chessboard } from "react-chessboard";
 
-import { saveChessGameState, updateGameInviteStatus } from "@/app/actions/chat";
+import {
+  endMiniGame,
+  saveChessGameState,
+  updateGameInviteStatus,
+} from "@/app/actions/chat";
 import { Button } from "@/components/ui/button";
 import {
   getConversationChannelName,
   getPusherClient,
   PUSHER_GAME_CHESS_MOVE_EVENT,
+  PUSHER_GAME_ENDED_EVENT,
   type BrowserPusherChannel,
   type BrowserPusherClientEventChannel,
   type ConversationGameMetadata,
   type ConversationGameStatus,
+  type RealtimeGameEndedPayload,
   type RealtimeGameChessMovePayload,
 } from "@/lib/pusher";
 
@@ -103,6 +109,20 @@ function getChessResultSummary(
 ): ChessResultSummary | null {
   const game = createChessGame(position);
 
+  if (status === "ended") {
+    return {
+      title: "Партия завершена досрочно",
+      body: "Один из игроков сдался, партия завершена досрочно.",
+    };
+  }
+
+  if (status === "canceled") {
+    return {
+      title: "Партия остановлена",
+      body: "Игровая сессия была завершена вручную.",
+    };
+  }
+
   if (game.isCheckmate()) {
     return {
       title: "Мат",
@@ -181,6 +201,7 @@ export function ChessMiniGame({
   const isCompletingGameRef = useRef(false);
   const [position, setPosition] = useState(initialGame.fen());
   const [connectionWarning, setConnectionWarning] = useState<string | null>(null);
+  const [isEndingGame, startEndingGameTransition] = useTransition();
 
   const normalizedWhitePlayerId = whitePlayerId?.trim() || initiatorId;
   const normalizedBlackPlayerId =
@@ -197,7 +218,8 @@ export function ChessMiniGame({
     () => getChessResultSummary(position, status),
     [position, status],
   );
-  const isGameFinished = status === "completed" || Boolean(resultSummary);
+  const isGameFinished =
+    status === "completed" || status === "ended" || status === "canceled" || Boolean(resultSummary);
   const isPlayerTurn = turnColor === playerColor;
   const currentMoveHistory = useMemo(() => gameRef.current.history(), [position]);
   const verboseMoveHistory = useMemo(
@@ -264,7 +286,7 @@ export function ChessMiniGame({
             className="gap-2 rounded-xl border border-white/10 bg-white/5 px-4 text-zinc-100 hover:bg-white/10"
           >
             <X className="h-4 w-4" />
-            <span>Закрыть</span>
+            <span>Свернуть</span>
           </Button>
         </div>
 
@@ -316,6 +338,53 @@ export function ChessMiniGame({
       });
       return false;
     }
+  }
+
+  function handleEndGame() {
+    if (status !== "active" || isEndingGame) {
+      return;
+    }
+
+    const shouldEndGame = window.confirm(
+      "Вы уверены, что хотите завершить игру?\n\nВ шахматах это будет засчитано как поражение.",
+    );
+
+    if (!shouldEndGame) {
+      return;
+    }
+
+    startEndingGameTransition(() => {
+      void (async () => {
+        try {
+          const result = await endMiniGame(messageId, "surrender");
+
+          if (result.message.gameMetadata) {
+            onGameMetadataUpdate?.(messageId, result.message.gameMetadata);
+          }
+
+          const wasTriggered = triggerClientEvent(PUSHER_GAME_ENDED_EVENT, {
+            messageId,
+            reason: "surrender",
+          } satisfies RealtimeGameEndedPayload);
+
+          if (!wasTriggered) {
+            setConnectionWarning(
+              "Не удалось мгновенно синхронизировать завершение партии через Pusher. Сессия закроется после обновления чата.",
+            );
+          } else {
+            setConnectionWarning(null);
+          }
+
+          onClose();
+        } catch (error) {
+          setConnectionWarning(
+            error instanceof Error
+              ? error.message
+              : "Не удалось завершить шахматную партию.",
+          );
+        }
+      })();
+    });
   }
 
   function persistMove(nextFen: string, nextMoveHistory: string[], shouldCompleteGame: boolean) {
@@ -447,6 +516,14 @@ export function ChessMiniGame({
       });
     };
 
+    const handleRemoteGameEnded = (payload: RealtimeGameEndedPayload) => {
+      if (payload.messageId !== messageId) {
+        return;
+      }
+
+      onClose();
+    };
+
     void (async () => {
       const pusherClient = await getPusherClient();
 
@@ -461,6 +538,7 @@ export function ChessMiniGame({
       pusherChannelRef.current = pusherChannel;
       pusherChannel.bind("pusher:subscription_succeeded", handleSubscriptionSucceeded);
       pusherChannel.bind(PUSHER_GAME_CHESS_MOVE_EVENT, handleRemoteChessMove);
+      pusherChannel.bind(PUSHER_GAME_ENDED_EVENT, handleRemoteGameEnded);
     })();
 
     return () => {
@@ -473,6 +551,7 @@ export function ChessMiniGame({
 
       pusherChannel.unbind("pusher:subscription_succeeded", handleSubscriptionSucceeded);
       pusherChannel.unbind(PUSHER_GAME_CHESS_MOVE_EVENT, handleRemoteChessMove);
+      pusherChannel.unbind(PUSHER_GAME_ENDED_EVENT, handleRemoteGameEnded);
     };
   }, [conversationId, messageId, sessionId]);
 
@@ -486,14 +565,27 @@ export function ChessMiniGame({
           <h2 className="mt-1 text-xl font-semibold text-white">Шахматы</h2>
         </div>
 
-        <Button
-          variant="ghost"
-          onClick={onClose}
-          className="gap-2 rounded-xl border border-white/10 bg-white/5 px-4 text-zinc-100 hover:bg-white/10"
-        >
-          <X className="h-4 w-4" />
-          <span>Закрыть</span>
-        </Button>
+        <div className="flex items-center gap-2">
+          <Button
+            type="button"
+            variant="ghost"
+            onClick={handleEndGame}
+            disabled={status !== "active" || isEndingGame || isGameFinished}
+            className="gap-2 rounded-xl border border-red-400/20 bg-red-500/10 px-4 text-red-100 hover:bg-red-500/20"
+          >
+            <LogOut className="h-4 w-4" />
+            <span>{isEndingGame ? "Завершаем..." : "Сдаться"}</span>
+          </Button>
+
+          <Button
+            variant="ghost"
+            onClick={onClose}
+            className="gap-2 rounded-xl border border-white/10 bg-white/5 px-4 text-zinc-100 hover:bg-white/10"
+          >
+            <X className="h-4 w-4" />
+            <span>Свернуть</span>
+          </Button>
+        </div>
       </div>
 
       <div className="flex-1 overflow-y-auto p-5">
@@ -502,7 +594,13 @@ export function ChessMiniGame({
             <div className="flex flex-wrap items-start justify-between gap-4">
               <div>
                 <p className="text-xs font-semibold uppercase tracking-[0.22em] text-sky-200/80">
-                  {status === "completed" ? "Партия завершена" : "Партия активна"}
+                  {status === "completed"
+                    ? "Партия завершена"
+                    : status === "ended"
+                      ? "Поражение сдачей"
+                      : status === "canceled"
+                        ? "Партия остановлена"
+                        : "Партия активна"}
                 </p>
                 <h3 className="mt-2 text-3xl font-semibold text-white">
                   {isPlayerTurn && status === "active"
@@ -604,6 +702,10 @@ export function ChessMiniGame({
               <p className="mt-3 text-sm leading-7 text-sky-50/90">
                 {status === "completed"
                   ? "Партия завершена. Позиция сохранена в истории чата."
+                  : status === "ended"
+                    ? "Партия завершена досрочно. Сдача засчитана как поражение."
+                    : status === "canceled"
+                      ? "Игровая сессия была остановлена вручную."
                   : isPlayerTurn
                     ? "Сейчас ваш ход. Вы можете двигать только свои фигуры."
                     : "Сейчас ход соперника. Доска обновится сразу после его действия."}

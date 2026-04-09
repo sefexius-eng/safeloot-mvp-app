@@ -10,6 +10,7 @@ import { moderateAntiLeakageMessageText } from "@/lib/domain/shared";
 import {
   createChatMessage,
   createConversationMessage,
+  endConversationMiniGame as endConversationMiniGameRecord,
   getOrCreateDirectConversation as getOrCreateDirectConversationRecord,
   getOrCreateConversation as getOrCreateConversationRecord,
   getConversationRoom as getConversationRoomRecord,
@@ -21,7 +22,11 @@ import {
   updateConversationChessGameState as updateConversationChessGameStateRecord,
   updateConversationGameInviteStatus as updateConversationGameInviteStatusRecord,
 } from "@/lib/domain/chat-service";
-import type { ConversationGameStatus, ConversationGameType } from "@/lib/pusher";
+import type {
+  ConversationGameEndReason,
+  ConversationGameStatus,
+  ConversationGameType,
+} from "@/lib/pusher";
 
 const CHESS_START_FEN = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1";
 
@@ -220,8 +225,14 @@ function isSupportedConversationGameType(
 
 function isSupportedConversationGameStatus(
   status: string,
-): status is Exclude<ConversationGameStatus, "pending"> {
+): status is "active" | "completed" {
   return status === "active" || status === "completed";
+}
+
+function isSupportedConversationGameEndReason(
+  reason: string,
+): reason is ConversationGameEndReason {
+  return reason === "surrender" || reason === "cancel";
 }
 
 function getConversationGameInviteText(gameType: ConversationGameType) {
@@ -327,6 +338,27 @@ export async function saveChessGameState(
     userId,
     fen,
     moveHistory,
+  });
+
+  revalidateChatPaths(result.conversationId);
+
+  return result;
+}
+
+export async function endMiniGame(
+  messageId: string,
+  reason: ConversationGameEndReason,
+) {
+  const userId = await requireActiveChatUserId();
+
+  if (!isSupportedConversationGameEndReason(reason)) {
+    throw new Error("Unsupported mini-game end reason.");
+  }
+
+  const result = await endConversationMiniGameRecord({
+    messageId,
+    userId,
+    reason,
   });
 
   revalidateChatPaths(result.conversationId);

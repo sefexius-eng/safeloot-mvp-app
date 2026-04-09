@@ -12,6 +12,7 @@ import {
   publishConversationTypingStateEvent,
   publishOrderMessageEvent,
   publishOrderTypingStateEvent,
+  type ConversationGameEndReason,
   type ConversationGameMetadata,
   type ConversationGameStatus,
   type ConversationGameType,
@@ -49,7 +50,13 @@ function isConversationGameType(value: unknown): value is ConversationGameType {
 }
 
 function isConversationGameStatus(value: unknown): value is ConversationGameStatus {
-  return value === "pending" || value === "active" || value === "completed";
+  return (
+    value === "pending" ||
+    value === "active" ||
+    value === "completed" ||
+    value === "ended" ||
+    value === "canceled"
+  );
 }
 
 function isNonEmptyString(value: unknown): value is string {
@@ -93,12 +100,21 @@ function parseConversationGameMetadata(
   const whitePlayerId = metadata.whitePlayerId;
   const blackPlayerId = metadata.blackPlayerId;
   const moveHistory = metadata.moveHistory;
+  const winnerId = metadata.winnerId;
+  const endedBy = metadata.endedBy;
 
   if (
     !isConversationGameType(game) ||
     !isConversationGameStatus(status) ||
     typeof initiatorId !== "string" ||
     !initiatorId.trim()
+  ) {
+    return null;
+  }
+
+  if (
+    (winnerId !== undefined && winnerId !== null && !isNonEmptyString(winnerId)) ||
+    (endedBy !== undefined && endedBy !== null && !isNonEmptyString(endedBy))
   ) {
     return null;
   }
@@ -115,6 +131,16 @@ function parseConversationGameMetadata(
             ? canvasSnapshot
             : null,
         }),
+    ...(isNonEmptyString(winnerId)
+      ? {
+          winnerId,
+        }
+      : {}),
+    ...(isNonEmptyString(endedBy)
+      ? {
+          endedBy,
+        }
+      : {}),
   };
 
   if (game === "chess") {
@@ -166,6 +192,16 @@ function toConversationGameMetadataData(
     ...(gameMetadata.canvasSnapshot
       ? {
           canvasSnapshot: gameMetadata.canvasSnapshot,
+        }
+      : {}),
+    ...(gameMetadata.winnerId
+      ? {
+          winnerId: gameMetadata.winnerId,
+        }
+      : {}),
+    ...(gameMetadata.endedBy
+      ? {
+          endedBy: gameMetadata.endedBy,
         }
       : {}),
     ...(gameMetadata.game === "chess" &&
@@ -925,6 +961,10 @@ function serializeConversationMessage(message: {
   };
 }
 
+function getMiniGameEndSystemMessage(reason: ConversationGameEndReason) {
+  return reason === "surrender" ? "Соперник сдался." : "Игрок завершил игру.";
+}
+
 function mapConversationMessageToOrderMessage(
   message: RealtimeConversationMessagePayload,
 ): RealtimeOrderMessagePayload {
@@ -1326,6 +1366,179 @@ export async function updateConversationGameInviteStatus(input: {
   };
 }
 
+export async function endConversationMiniGame(input: {
+  messageId: string;
+  userId: string;
+  reason: ConversationGameEndReason;
+}) {
+  const messageId = normalizeText(input.messageId);
+  const userId = normalizeText(input.userId);
+
+  if (!messageId) {
+    throw new Error("messageId is required.");
+  }
+
+  if (!userId) {
+    throw new Error("userId is required.");
+  }
+
+  const existingMessage = await prisma.message.findUnique({
+    where: {
+      id: messageId,
+    },
+    select: {
+      id: true,
+      conversationId: true,
+      type: true,
+      gameMetadata: true,
+    },
+  });
+
+  if (!existingMessage) {
+    throw new Error(`Game invite message with id ${messageId} was not found.`);
+  }
+
+  if (existingMessage.type !== MessageType.GAME_INVITE) {
+    throw new Error("Only game invite messages can end a mini-game session.");
+  }
+
+  const conversation = await prisma.conversation.findUnique({
+    where: {
+      id: existingMessage.conversationId,
+    },
+    select: {
+      id: true,
+      buyerId: true,
+      sellerId: true,
+    },
+  });
+
+  if (!conversation) {
+    throw new Error(
+      `Conversation with id ${existingMessage.conversationId} was not found.`,
+    );
+  }
+
+  ensureConversationParticipant(userId, conversation);
+
+  const currentGameMetadata = parseConversationGameMetadata(existingMessage.gameMetadata);
+
+  if (!currentGameMetadata) {
+    throw new Error("Game invite metadata is missing or invalid.");
+  }
+
+  if (currentGameMetadata.status !== "active") {
+    throw new Error("Only active mini-games can be ended.");
+  }
+
+  const opponentId =
+    userId === conversation.buyerId ? conversation.sellerId : conversation.buyerId;
+  const nextGameMetadata: ConversationGameMetadata = {
+    ...currentGameMetadata,
+    status: input.reason === "surrender" ? "ended" : "canceled",
+    endedBy: userId,
+    ...(input.reason === "surrender"
+      ? {
+          winnerId: opponentId,
+        }
+      : {}),
+  };
+
+  const result = await prisma.$transaction(
+    async (transactionClient) => {
+      const message = await transactionClient.message.update({
+        where: {
+          id: existingMessage.id,
+        },
+        data: {
+          gameMetadata: toConversationGameMetadataData(nextGameMetadata),
+        },
+        select: {
+          id: true,
+          text: true,
+          type: true,
+          imageUrl: true,
+          gameMetadata: true,
+          isSystem: true,
+          isRead: true,
+          senderId: true,
+          createdAt: true,
+          updatedAt: true,
+          sender: {
+            select: {
+              id: true,
+              name: true,
+              image: true,
+              ...USER_APPEARANCE_SELECT,
+            },
+          },
+        },
+      });
+
+      const systemMessage = await transactionClient.message.create({
+        data: {
+          conversationId: conversation.id,
+          senderId: userId,
+          text: getMiniGameEndSystemMessage(input.reason),
+          type: MessageType.SYSTEM,
+          isSystem: true,
+        },
+        select: {
+          id: true,
+          text: true,
+          type: true,
+          imageUrl: true,
+          gameMetadata: true,
+          isSystem: true,
+          isRead: true,
+          senderId: true,
+          createdAt: true,
+          updatedAt: true,
+          sender: {
+            select: {
+              id: true,
+              name: true,
+              image: true,
+              ...USER_APPEARANCE_SELECT,
+            },
+          },
+        },
+      });
+
+      await transactionClient.conversation.update({
+        where: {
+          id: conversation.id,
+        },
+        data: {
+          updatedAt: new Date(),
+        },
+      });
+
+      return {
+        message,
+        systemMessage,
+      };
+    },
+    {
+      isolationLevel: Prisma.TransactionIsolationLevel.Serializable,
+    },
+  );
+
+  const serializedMessage = serializeConversationMessage(result.message);
+  const serializedSystemMessage = serializeConversationMessage(result.systemMessage);
+
+  await Promise.all([
+    publishConversationMessageEvent(conversation.id, serializedMessage),
+    publishConversationMessageEvent(conversation.id, serializedSystemMessage),
+  ]);
+
+  return {
+    conversationId: conversation.id,
+    message: serializedMessage,
+    systemMessage: serializedSystemMessage,
+  };
+}
+
 export async function updateConversationGameCanvasState(input: {
   conversationId: string;
   userId: string;
@@ -1533,6 +1746,10 @@ export async function updateConversationChessGameState(input: {
 
   if (!currentGameMetadata || currentGameMetadata.game !== "chess") {
     throw new Error("Chess game metadata is missing or invalid.");
+  }
+
+  if (currentGameMetadata.status !== "active") {
+    throw new Error("Only active chess games can update board state.");
   }
 
   if (

@@ -51,7 +51,14 @@ export type ConversationMessageType =
 
 export type ConversationGameType = "crocodile" | "chess";
 
-export type ConversationGameStatus = "pending" | "active" | "completed";
+export type ConversationGameStatus =
+  | "pending"
+  | "active"
+  | "completed"
+  | "ended"
+  | "canceled";
+
+export type ConversationGameEndReason = "surrender" | "cancel";
 
 export interface ConversationGameMetadata {
   game: ConversationGameType;
@@ -63,6 +70,8 @@ export interface ConversationGameMetadata {
   whitePlayerId?: string | null;
   blackPlayerId?: string | null;
   moveHistory?: string[] | null;
+  winnerId?: string | null;
+  endedBy?: string | null;
 }
 
 export interface RealtimeGameDrawPayload {
@@ -96,6 +105,11 @@ export interface RealtimeGameChessMovePayload {
   sessionId: string;
   fen: string;
   moveHistory: string[];
+}
+
+export interface RealtimeGameEndedPayload {
+  messageId: string;
+  reason: ConversationGameEndReason;
 }
 
 export interface RealtimeTypingUser {
@@ -160,6 +174,7 @@ export const PUSHER_GAME_GUESS_EVENT = "client-guess";
 export const PUSHER_GAME_WIN_EVENT = "client-win";
 export const PUSHER_GAME_CLEAR_EVENT = "client-clear";
 export const PUSHER_GAME_CHESS_MOVE_EVENT = "client-chess-move";
+export const PUSHER_GAME_ENDED_EVENT = "client-game-ended";
 export const PUSHER_ORDER_UPDATED_EVENT = "order-updated";
 export const PUSHER_GLOBAL_PRESENCE_CHANNEL = "presence-site-users";
 export const PUSHER_GLOBAL_TAVERN_CHANNEL = "tavern-chat";

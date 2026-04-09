@@ -128,6 +128,10 @@ function supportsInlineMiniGameRuntime(game: ConversationGameType) {
   return game === "crocodile" || game === "chess";
 }
 
+function canRenderInlineMiniGameStatus(status: ConversationGameStatus) {
+  return status === "active" || status === "completed";
+}
+
 function getGameInviteStatusLabel(status: ConversationGameStatus) {
   switch (status) {
     case "pending":
@@ -136,6 +140,10 @@ function getGameInviteStatusLabel(status: ConversationGameStatus) {
       return "Игра активна";
     case "completed":
       return "Инвайт закрыт";
+    case "ended":
+      return "Игра прервана";
+    case "canceled":
+      return "Игра отменена";
   }
 }
 
@@ -147,6 +155,49 @@ function getGameInviteHeadline(
   return isOwnMessage
     ? `🎮 Вы предлагаете сыграть в ${gameTitle}`
     : `🎮 ${senderName} предлагает сыграть в ${gameTitle}`;
+}
+
+function getGameInviteDescription(input: {
+  game: ConversationGameType;
+  status: ConversationGameStatus;
+  canAcceptInvite: boolean;
+  canCancelInvite: boolean;
+  canResumeGame: boolean;
+  isInlineRuntimeAvailable: boolean;
+}) {
+  if (
+    input.game === "chess" &&
+    input.status === "active" &&
+    !input.isInlineRuntimeAvailable
+  ) {
+    return "Шахматная партия уже создана и сохранена в чате. Игровая доска будет подключена следующим патчем.";
+  }
+
+  if (input.canAcceptInvite) {
+    return "Примите приглашение, чтобы открыть игровое окно у обоих участников.";
+  }
+
+  if (input.canCancelInvite) {
+    return "Вы можете отменить приглашение, пока собеседник его не принял.";
+  }
+
+  if (input.canResumeGame) {
+    return "Игровая сессия уже активна. Откройте её поверх диалога одним кликом.";
+  }
+
+  if (input.status === "ended") {
+    return "Игровая сессия была завершена досрочно.";
+  }
+
+  if (input.status === "canceled") {
+    return "Игровая сессия была остановлена вручную.";
+  }
+
+  if (input.status === "completed") {
+    return "Игровая сессия завершена и сохранена в истории чата.";
+  }
+
+  return "Инвайт остаётся в истории чата как точка входа в мини-игру.";
 }
 
 function readFileAsDataUrl(file: Blob) {
@@ -340,7 +391,10 @@ export function ChatMessages({
         (message) =>
           message.id === openGameMessageId &&
           message.type === "GAME_INVITE" &&
-          message.gameMetadata?.status !== "pending",
+          Boolean(
+            message.gameMetadata &&
+              canRenderInlineMiniGameStatus(message.gameMetadata.status),
+          ),
       )
     ) {
       setOpenGameMessageId(null);
@@ -863,7 +917,7 @@ export function ChatMessages({
         }
 
         return (
-          message.gameMetadata.status !== "pending" &&
+          canRenderInlineMiniGameStatus(message.gameMetadata.status) &&
           supportsInlineMiniGameRuntime(message.gameMetadata.game)
         );
       }) ?? null
@@ -992,18 +1046,14 @@ export function ChatMessages({
                         </div>
 
                         <p className="mt-3 text-sm leading-6 text-zinc-100/90">
-                          {message.type === "GAME_INVITE" &&
-                          message.gameMetadata?.game === "chess" &&
-                          message.gameMetadata.status === "active" &&
-                          !isInlineRuntimeAvailable
-                            ? "Шахматная партия уже создана и сохранена в чате. Игровая доска будет подключена следующим патчем."
-                            : canAcceptInvite
-                            ? "Примите приглашение, чтобы открыть игровое окно у обоих участников."
-                            : canCancelInvite
-                              ? "Вы можете отменить приглашение, пока собеседник его не принял."
-                              : canResumeGame
-                                ? "Игровая сессия уже активна. Откройте её поверх диалога одним кликом."
-                                : "Инвайт остаётся в истории чата как точка входа в мини-игру."}
+                          {getGameInviteDescription({
+                            game: message.gameMetadata.game,
+                            status: message.gameMetadata.status,
+                            canAcceptInvite,
+                            canCancelInvite,
+                            canResumeGame,
+                            isInlineRuntimeAvailable,
+                          })}
                         </p>
 
                         {message.text ? (

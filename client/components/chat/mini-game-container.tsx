@@ -1,10 +1,14 @@
 "use client";
 
-import { X } from "lucide-react";
+import { LogOut, X } from "lucide-react";
 import { useEffect, useMemo, useRef, useState, useTransition } from "react";
 
 import { ChessMiniGame } from "@/components/chat/chess-mini-game";
-import { saveGameCanvasState, updateGameInviteStatus } from "@/app/actions/chat";
+import {
+  endMiniGame,
+  saveGameCanvasState,
+  updateGameInviteStatus,
+} from "@/app/actions/chat";
 import { Button } from "@/components/ui/button";
 import {
   getMiniGameDefinition,
@@ -15,14 +19,17 @@ import {
   getPusherClient,
   PUSHER_GAME_CLEAR_EVENT,
   PUSHER_GAME_DRAW_EVENT,
+  PUSHER_GAME_ENDED_EVENT,
   PUSHER_GAME_GUESS_EVENT,
   PUSHER_GAME_WIN_EVENT,
   type BrowserPusherChannel,
   type BrowserPusherClientEventChannel,
+  type ConversationGameEndReason,
   type ConversationGameMetadata,
   type ConversationGameStatus,
   type ConversationGameType,
   type RealtimeGameClearPayload,
+  type RealtimeGameEndedPayload,
   type RealtimeGameDrawPayload,
   type RealtimeGameGuessPayload,
   type RealtimeGameWinPayload,
@@ -76,6 +83,16 @@ interface MiniGameContainerProps {
   onClose: () => void;
 }
 
+function isMiniGameSessionClosed(status: ConversationGameStatus) {
+  return status === "completed" || status === "ended" || status === "canceled";
+}
+
+function getMiniGameEndConfirmationMessage(reason: ConversationGameEndReason) {
+  return reason === "surrender"
+    ? "Вы уверены, что хотите завершить игру?\n\nВ шахматах это будет засчитано как поражение."
+    : "Вы уверены, что хотите завершить игру?";
+}
+
 function CrocodileMiniGame({
   conversationId,
   messageId,
@@ -87,6 +104,7 @@ function CrocodileMiniGame({
   initiatorName,
   guesserName,
   currentUserId,
+  onGameMetadataUpdate,
   onClose,
 }: MiniGameContainerProps) {
   const gameDefinition = getMiniGameDefinition(game);
@@ -114,10 +132,18 @@ function CrocodileMiniGame({
   const [winState, setWinState] = useState<WinState | null>(null);
   const [connectionWarning, setConnectionWarning] = useState<string | null>(null);
   const [isCompletingGame, startCompletingGameTransition] = useTransition();
+  const [isEndingGame, startEndingGameTransition] = useTransition();
   const isDrawer = currentUserId === initiatorId;
   const drawerRoleLabel = isDrawer ? "Вы как Рисующий" : `${initiatorName} как Рисующий`;
   const guesserRoleLabel = isDrawer ? "Угадывающий" : "Вы как Угадывающий";
-  const isReadOnlyCanvas = !isDrawer || status === "completed" || Boolean(winState);
+  const isSessionClosed = isMiniGameSessionClosed(status) || Boolean(winState);
+  const isReadOnlyCanvas = !isDrawer || isSessionClosed;
+  const roundStatusLabel =
+    status === "completed"
+      ? "Раунд завершён"
+      : status === "ended" || status === "canceled"
+        ? "Раунд остановлен"
+        : "Раунд активен";
   const wordStorageKey = useMemo(
     () => `mini-game-word:${game}:${sessionId}:${initiatorId}`,
     [game, initiatorId, sessionId],
@@ -308,6 +334,53 @@ function CrocodileMiniGame({
     closingTimerRef.current = window.setTimeout(() => {
       onClose();
     }, 1800);
+  }
+
+  function handleEndGame() {
+    if (status !== "active" || winState || isEndingGame) {
+      return;
+    }
+
+    const shouldEndGame = window.confirm(
+      getMiniGameEndConfirmationMessage("cancel"),
+    );
+
+    if (!shouldEndGame) {
+      return;
+    }
+
+    startEndingGameTransition(() => {
+      void (async () => {
+        try {
+          const result = await endMiniGame(messageId, "cancel");
+
+          if (result.message.gameMetadata) {
+            onGameMetadataUpdate?.(messageId, result.message.gameMetadata);
+          }
+
+          const wasTriggered = triggerClientEvent(PUSHER_GAME_ENDED_EVENT, {
+            messageId,
+            reason: "cancel",
+          } satisfies RealtimeGameEndedPayload);
+
+          if (!wasTriggered) {
+            setConnectionWarning(
+              "Не удалось мгновенно синхронизировать завершение игры через Pusher. Сессия закроется после обновления чата.",
+            );
+          } else {
+            setConnectionWarning(null);
+          }
+
+          onClose();
+        } catch (error) {
+          setConnectionWarning(
+            error instanceof Error
+              ? error.message
+              : "Не удалось завершить игровую сессию.",
+          );
+        }
+      })();
+    });
   }
 
   function resolveSecretWord() {
@@ -565,6 +638,14 @@ function CrocodileMiniGame({
       }, false);
     };
 
+    const handleRemoteGameEnded = (payload: RealtimeGameEndedPayload) => {
+      if (payload.messageId !== messageId) {
+        return;
+      }
+
+      onClose();
+    };
+
     void (async () => {
       const pusherClient = await getPusherClient();
 
@@ -580,6 +661,7 @@ function CrocodileMiniGame({
       pusherChannel.bind("pusher:subscription_succeeded", handleSubscriptionSucceeded);
       pusherChannel.bind(PUSHER_GAME_CLEAR_EVENT, handleRemoteClear);
       pusherChannel.bind(PUSHER_GAME_DRAW_EVENT, handleRemoteDraw);
+      pusherChannel.bind(PUSHER_GAME_ENDED_EVENT, handleRemoteGameEnded);
       pusherChannel.bind(PUSHER_GAME_GUESS_EVENT, handleRemoteGuess);
       pusherChannel.bind(PUSHER_GAME_WIN_EVENT, handleRemoteWin);
     })();
@@ -599,15 +681,16 @@ function CrocodileMiniGame({
       pusherChannel.unbind("pusher:subscription_succeeded", handleSubscriptionSucceeded);
       pusherChannel.unbind(PUSHER_GAME_CLEAR_EVENT, handleRemoteClear);
       pusherChannel.unbind(PUSHER_GAME_DRAW_EVENT, handleRemoteDraw);
+      pusherChannel.unbind(PUSHER_GAME_ENDED_EVENT, handleRemoteGameEnded);
       pusherChannel.unbind(PUSHER_GAME_GUESS_EVENT, handleRemoteGuess);
       pusherChannel.unbind(PUSHER_GAME_WIN_EVENT, handleRemoteWin);
     };
-  }, [conversationId, isDrawer, sessionId, status, winState]);
+  }, [conversationId, isDrawer, messageId, sessionId, status, winState]);
 
   function handleSubmitGuess(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
 
-    if (isDrawer || winState || status === "completed") {
+    if (isDrawer || isSessionClosed) {
       return;
     }
 
@@ -649,14 +732,27 @@ function CrocodileMiniGame({
           <h2 className="mt-1 text-xl font-semibold text-white">{title}</h2>
         </div>
 
-        <Button
-          variant="ghost"
-          onClick={onClose}
-          className="gap-2 rounded-xl border border-white/10 bg-white/5 px-4 text-zinc-100 hover:bg-white/10"
-        >
-          <X className="h-4 w-4" />
-          <span>Закрыть</span>
-        </Button>
+        <div className="flex items-center gap-2">
+          <Button
+            type="button"
+            variant="ghost"
+            onClick={handleEndGame}
+            disabled={status !== "active" || Boolean(winState) || isCompletingGame || isEndingGame}
+            className="gap-2 rounded-xl border border-red-400/20 bg-red-500/10 px-4 text-red-100 hover:bg-red-500/20"
+          >
+            <LogOut className="h-4 w-4" />
+            <span>{isEndingGame ? "Завершаем..." : "Завершить"}</span>
+          </Button>
+
+          <Button
+            variant="ghost"
+            onClick={onClose}
+            className="gap-2 rounded-xl border border-white/10 bg-white/5 px-4 text-zinc-100 hover:bg-white/10"
+          >
+            <X className="h-4 w-4" />
+            <span>Свернуть</span>
+          </Button>
+        </div>
       </div>
 
       <div className="flex-1 overflow-y-auto p-5">
@@ -665,7 +761,7 @@ function CrocodileMiniGame({
             <div className="flex flex-wrap items-start justify-between gap-4">
               <div>
                 <p className="text-xs font-semibold uppercase tracking-[0.22em] text-emerald-200/80">
-                  {status === "completed" ? "Раунд завершён" : "Раунд активен"}
+                  {roundStatusLabel}
                 </p>
                 <h3 className="mt-2 text-3xl font-semibold text-white">
                   {isDrawer
@@ -730,7 +826,7 @@ function CrocodileMiniGame({
                     <Button
                       variant="ghost"
                       onClick={handleClearCanvas}
-                      disabled={isReadOnlyCanvas}
+                      disabled={isReadOnlyCanvas || isEndingGame}
                       className="rounded-xl border border-white/10 bg-white/5 px-4 text-zinc-100 hover:bg-white/10"
                     >
                       Очистить холст
@@ -772,12 +868,12 @@ function CrocodileMiniGame({
                     value={guessDraft}
                     onChange={(event) => setGuessDraft(event.target.value)}
                     placeholder={gameDefinition.guessInputPlaceholder}
-                    disabled={Boolean(winState) || status === "completed" || isCompletingGame}
+                    disabled={isSessionClosed || isCompletingGame || isEndingGame}
                     className="h-12 flex-1 rounded-2xl border border-white/10 bg-white/5 px-4 text-sm text-white outline-none placeholder:text-zinc-500 focus:border-sky-400/40"
                   />
                   <Button
                     type="submit"
-                    disabled={!guessDraft.trim() || Boolean(winState) || status === "completed" || isCompletingGame}
+                    disabled={!guessDraft.trim() || isSessionClosed || isCompletingGame || isEndingGame}
                     className="rounded-2xl bg-sky-500 px-5 text-white hover:bg-sky-400"
                   >
                     {gameDefinition.guessSubmitLabel}
