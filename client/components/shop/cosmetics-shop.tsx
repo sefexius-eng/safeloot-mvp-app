@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
+import { Pencil } from "lucide-react";
 import type { CosmeticType, Role } from "@prisma/client";
 
 import {
@@ -53,7 +54,7 @@ const SHOP_ACTION_BUTTON_BASE_CLASS_NAME =
   "flex h-10 w-full items-center justify-center rounded-2xl text-sm font-semibold transition disabled:translate-y-0 disabled:cursor-not-allowed disabled:opacity-60";
 
 const SHOP_BUY_BUTTON_CLASS_NAME =
-  "border border-orange-400/30 bg-orange-500 px-5 text-white shadow-[0_16px_40px_rgba(249,115,22,0.28)] hover:-translate-y-0.5 hover:bg-orange-600";
+  "border border-orange-400/30 bg-orange-500 px-5 text-white shadow-[0_18px_42px_rgba(249,115,22,0.3)] hover:-translate-y-0.5 hover:bg-orange-400";
 
 const SHOP_SECONDARY_BUTTON_CLASS_NAME =
   "border border-white/20 bg-white/5 px-5 text-white hover:-translate-y-0.5 hover:bg-white/10";
@@ -62,7 +63,7 @@ const SHOP_SECONDARY_WIDE_BUTTON_CLASS_NAME =
   "border border-white/20 bg-white/5 px-4 text-white hover:-translate-y-0.5 hover:bg-white/10";
 
 const SHOP_PREVIEW_BUTTON_CLASS_NAME =
-  "border border-white/20 bg-white/5 px-4 text-white hover:-translate-y-0.5 hover:bg-white/10";
+  "border border-white/20 bg-transparent px-4 text-white hover:-translate-y-0.5 hover:bg-white/5";
 
 const SHOP_PREVIEW_ACTIVE_BUTTON_CLASS_NAME =
   "border border-sky-500/30 bg-sky-500/15 px-4 text-sky-100 hover:-translate-y-0.5 hover:bg-sky-500/20";
@@ -441,7 +442,7 @@ export function CosmeticsShop({
   onPreview: (type: CosmeticType, value: string | null) => void;
   onViewerChange: (viewer: CosmeticsViewerState) => void;
 }) {
-  const { formatPrice } = useCurrency();
+  const { currency, formatPrice } = useCurrency();
   const router = useRouter();
   const [activeType, setActiveType] = useState<CosmeticType>("COLOR");
   const [sortMode, setSortMode] = useState<ShopSortMode>("recommended");
@@ -991,7 +992,7 @@ export function CosmeticsShop({
             </div>
 
             {visibleCosmetics.length > 0 ? (
-              <div className="mt-6 grid grid-cols-1 gap-6 md:grid-cols-2 xl:grid-cols-3">
+              <div className="mt-6 grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
                 {visibleCosmetics.map((cosmetic) => {
                   const accent = getTypeAccent(cosmetic.type);
                   const rarity = getCosmeticRarity(cosmetic.price);
@@ -1028,8 +1029,8 @@ export function CosmeticsShop({
                             {cosmetic.name}
                           </h3>
                         </div>
-                        <div className="rounded-[1.1rem] border border-white/10 bg-black/20 px-3 py-2 text-right">
-                          <p className="text-[11px] uppercase tracking-[0.2em] text-zinc-500">Цена</p>
+                        <div className="relative rounded-[1.1rem] border border-white/10 bg-black/20 px-3 py-2 pr-10 text-right">
+                          <p className="text-[11px] uppercase tracking-[0.2em] text-zinc-500">Цена ({currency})</p>
                           <div className="mt-2">
                             <CosmeticPriceBlock
                               cosmetic={cosmetic}
@@ -1041,9 +1042,11 @@ export function CosmeticsShop({
                             <button
                               type="button"
                               onClick={() => startPriceEditing(cosmetic)}
-                              className="mt-3 inline-flex items-center justify-end text-xs font-semibold text-sky-200 transition hover:text-sky-100"
+                              aria-label={`Изменить цену для ${cosmetic.name}`}
+                              title="Изменить цену"
+                              className="absolute right-2 top-2 inline-flex h-7 w-7 items-center justify-center rounded-lg border border-white/10 bg-white/5 text-zinc-300 transition hover:bg-white/10 hover:text-white"
                             >
-                              ✏️ Изменить цену
+                              <Pencil className="h-3.5 w-3.5" />
                             </button>
                           ) : null}
                         </div>
@@ -1059,7 +1062,7 @@ export function CosmeticsShop({
                             <div className="grid gap-3 sm:grid-cols-2">
                               <label className="grid gap-1">
                                 <span className="text-[11px] font-semibold uppercase tracking-[0.18em] text-zinc-500">
-                                  Текущая цена ({SHOP_PRICE_EDITOR_BASE_CURRENCY_LABEL})
+                                  Базовая цена ({SHOP_PRICE_EDITOR_BASE_CURRENCY_LABEL})
                                 </span>
                                 <input
                                   type="number"
