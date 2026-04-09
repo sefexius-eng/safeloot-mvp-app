@@ -185,6 +185,8 @@ export function MiniGameContainer({
       return;
     }
 
+    context.lineCap = "round";
+    context.lineJoin = "round";
     context.strokeStyle = segment.color;
     context.beginPath();
     context.moveTo(segment.startX * canvas.width, segment.startY * canvas.height);
@@ -370,12 +372,11 @@ export function MiniGameContainer({
       return null;
     }
 
-    const nativeEvent = event.nativeEvent as PointerEvent & {
-      offsetX: number;
-      offsetY: number;
-    };
-    const relativeX = nativeEvent.offsetX / Math.max(canvas.clientWidth, 1);
-    const relativeY = nativeEvent.offsetY / Math.max(canvas.clientHeight, 1);
+    const rect = canvas.getBoundingClientRect();
+    const x = event.clientX - rect.left;
+    const y = event.clientY - rect.top;
+    const relativeX = x / Math.max(rect.width, 1);
+    const relativeY = y / Math.max(rect.height, 1);
 
     return {
       x: Math.min(1, Math.max(0, relativeX)),
@@ -387,6 +388,8 @@ export function MiniGameContainer({
     if (isReadOnlyCanvas) {
       return;
     }
+
+    event.preventDefault();
 
     const nextPoint = getPointFromEvent(event);
 
@@ -405,6 +408,8 @@ export function MiniGameContainer({
     if (isReadOnlyCanvas || !drawingStateRef.current.isDrawing) {
       return;
     }
+
+    event.preventDefault();
 
     const nextPoint = getPointFromEvent(event);
     const previousPoint = drawingStateRef.current.lastPoint;
@@ -800,7 +805,7 @@ export function MiniGameContainer({
                   onPointerDown={handlePointerDown}
                   onPointerMove={handlePointerMove}
                   onPointerUp={stopDrawing}
-                  onPointerLeave={stopDrawing}
+                  onPointerOut={stopDrawing}
                   onPointerCancel={stopDrawing}
                   className="aspect-video h-auto w-full touch-none rounded-[0.9rem] bg-white"
                 />
