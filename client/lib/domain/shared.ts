@@ -16,6 +16,7 @@ const TYPING_TTL_MS = 5000;
 export const MAX_MESSAGE_IMAGE_BASE64_LENGTH = 2_000_000;
 const MAX_PRODUCT_TITLE_LENGTH = 60;
 const MAX_PRODUCT_DESCRIPTION_LENGTH = 1000;
+const MAX_PRODUCT_AUTO_DELIVERY_CONTENT_LENGTH = 2000;
 const MAX_PRODUCT_IMAGE_COUNT = 3;
 const MAX_PRODUCT_IMAGE_BASE64_LENGTH = 2_000_000;
 const PRODUCT_IMAGE_BASE64_PATTERN =
@@ -412,6 +413,22 @@ export function validateProductTextFields(input: {
     title,
     description,
   };
+}
+
+export function validateOptionalProductAutoDeliveryContent(value?: string | null) {
+  const autoDeliveryContent = sanitizeProductText(value ?? undefined);
+
+  if (!autoDeliveryContent) {
+    return null;
+  }
+
+  if (autoDeliveryContent.length > MAX_PRODUCT_AUTO_DELIVERY_CONTENT_LENGTH) {
+    throw new Error(
+      `autoDeliveryContent must be at most ${MAX_PRODUCT_AUTO_DELIVERY_CONTENT_LENGTH} characters.`,
+    );
+  }
+
+  return autoDeliveryContent;
 }
 
 export function validateProductImages(images?: string[]) {

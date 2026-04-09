@@ -42,6 +42,7 @@ import {
   normalizeCurrencyCode,
 } from "@/lib/currency-config";
 import {
+  type ConversationMessageType,
   getOrderChannelName,
   getPusherClient,
   PUSHER_MESSAGE_EVENT,
@@ -124,6 +125,7 @@ interface OrderDetail {
 interface ChatMessage {
   id: string;
   content: string;
+  type: ConversationMessageType;
   imageUrl: string | null;
   isSystem: boolean;
   isRead: boolean;
@@ -1371,17 +1373,17 @@ export function ActiveOrderView({ orderId }: ActiveOrderViewProps) {
 
           <div className="space-y-3">
             {messages.map((message) => {
-              if (message.isSystem) {
+              if (message.isSystem || message.type === "SYSTEM") {
                 return (
                   <div key={message.id} className="flex justify-center">
-                    <div className="max-w-[92%] rounded-[1.5rem] border border-amber-500/20 bg-amber-500/10 px-4 py-3 text-center text-sm leading-7 text-amber-100 shadow-[0_12px_30px_rgba(0,0,0,0.18)]">
-                      <p className="text-xs font-semibold uppercase tracking-[0.18em] text-amber-200/80">
-                        Система SafeLoot
+                    <div className="max-w-[92%] rounded-[1.5rem] border border-white/10 bg-white/5 px-4 py-3 text-center text-sm leading-7 text-zinc-200 shadow-[0_12px_30px_rgba(0,0,0,0.18)]">
+                      <p className="text-xs font-semibold uppercase tracking-[0.18em] text-zinc-400">
+                        Системное сообщение SafeLoot
                       </p>
                       <p className="mt-2 whitespace-pre-wrap">
                         <CensoredText text={message.content} />
                       </p>
-                      <p className="mt-3 text-[11px] uppercase tracking-[0.16em] text-amber-200/70">
+                      <p className="mt-3 text-[11px] uppercase tracking-[0.16em] text-zinc-500">
                         {formatMessageTime(message.createdAt)}
                       </p>
                     </div>

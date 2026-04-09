@@ -13,6 +13,7 @@ import {
   normalizeText,
   validateCatalogSelection,
   validateProductImages,
+  validateOptionalProductAutoDeliveryContent,
   validateProductTextFields,
 } from "@/lib/domain/shared";
 
@@ -237,7 +238,18 @@ export async function getProductById(
     await mapProductsWithSellerReviewSummary([product]),
   );
 
-  return mappedProduct ?? null;
+  const canViewSensitiveFields =
+    product.sellerId === normalizeText(options?.viewerId ?? "") ||
+    ensureViewerCanAccessInactiveProduct(options?.viewerRole);
+
+  return mappedProduct
+    ? {
+        ...mappedProduct,
+        autoDeliveryContent: canViewSensitiveFields
+          ? product.autoDeliveryContent
+          : null,
+      }
+    : null;
 }
 
 function ensureViewerCanAccessInactiveProduct(role?: Role | string | null) {
@@ -247,6 +259,7 @@ function ensureViewerCanAccessInactiveProduct(role?: Role | string | null) {
 export async function createProduct(input: {
   title?: string;
   description?: string;
+  autoDeliveryContent?: string | null;
   images?: string[];
   price?: number;
   gameId?: string;
@@ -254,6 +267,9 @@ export async function createProduct(input: {
   sellerId?: string;
 }) {
   const { title, description } = validateProductTextFields(input);
+  const autoDeliveryContent = validateOptionalProductAutoDeliveryContent(
+    input.autoDeliveryContent,
+  );
   const images = validateProductImages(input.images);
   const gameId = normalizeText(input.gameId);
   const categoryId = normalizeText(input.categoryId);
@@ -296,6 +312,7 @@ export async function createProduct(input: {
     data: {
       title,
       description,
+      autoDeliveryContent,
       images,
       gameId,
       categoryId,
@@ -345,6 +362,7 @@ export async function updateProductByActor(input: {
   role?: Role;
   title?: string;
   description?: string;
+  autoDeliveryContent?: string | null;
   images?: string[];
   price?: number;
   gameId?: string;
@@ -356,6 +374,9 @@ export async function updateProductByActor(input: {
   const categoryId = normalizeText(input.categoryId);
   const price = Number(input.price);
   const { title, description } = validateProductTextFields(input);
+  const autoDeliveryContent = validateOptionalProductAutoDeliveryContent(
+    input.autoDeliveryContent,
+  );
   const images = validateProductImages(input.images);
 
   if (!productId) {
@@ -408,6 +429,7 @@ export async function updateProductByActor(input: {
     data: {
       title,
       description,
+      autoDeliveryContent,
       images,
       price: new Prisma.Decimal(price.toFixed(2)),
       gameId,

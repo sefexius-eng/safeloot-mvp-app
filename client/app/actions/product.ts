@@ -31,6 +31,7 @@ interface BulkProductVisibilityActionResult {
 interface UpdateProductPayload {
   title: string;
   description: string;
+  autoDeliveryContent?: string | null;
   images: string[];
   price: number;
   gameId: string;

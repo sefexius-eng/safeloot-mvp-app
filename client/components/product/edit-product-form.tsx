@@ -28,6 +28,7 @@ interface EditProductInitialData {
   id: string;
   title: string;
   description: string;
+  autoDeliveryContent: string;
   images: string[];
   price: string;
   gameId: string;
@@ -53,6 +54,7 @@ export function EditProductForm({ product, games }: EditProductFormProps) {
   const [formState, setFormState] = useState({
     title: product.title,
     description: product.description,
+    autoDeliveryContent: product.autoDeliveryContent,
     images: product.images,
     price: "",
     gameId: product.gameId,
@@ -109,6 +111,7 @@ export function EditProductForm({ product, games }: EditProductFormProps) {
       const result = await updateProduct(product.id, {
         title: formState.title,
         description: formState.description,
+        autoDeliveryContent: formState.autoDeliveryContent,
         images: formState.images,
         price: basePriceInUsdt,
         gameId: formState.gameId,
@@ -182,6 +185,23 @@ export function EditProductForm({ product, games }: EditProductFormProps) {
               maxLength={1000}
               required
             />
+          </EditFormField>
+
+          <EditFormField label="Автовыдача (необязательно)">
+            <Textarea
+              value={formState.autoDeliveryContent}
+              onChange={(event) =>
+                setFormState((current) => ({
+                  ...current,
+                  autoDeliveryContent: event.target.value,
+                }))
+              }
+              placeholder="Контент, который SafeLoot автоматически отправит в чат сделки после оплаты"
+              maxLength={2000}
+            />
+            <p className="text-xs leading-6 text-neutral-500">
+              Поле скрыто до оплаты и подходит для ключей, инструкций или учетных данных.
+            </p>
           </EditFormField>
 
           <ProductImageUploader

@@ -1,4 +1,4 @@
-import { MessageType, Prisma } from "@prisma/client";
+import { MessageType, OrderStatus, Prisma } from "@prisma/client";
 import { Chess } from "chess.js";
 
 import { USER_APPEARANCE_SELECT } from "@/lib/cosmetics";
@@ -291,6 +291,14 @@ async function getConversationContextById(conversationId: string) {
           price: true,
         },
       },
+      order: {
+        select: {
+          id: true,
+          status: true,
+          price: true,
+          createdAt: true,
+        },
+      },
       createdAt: true,
       updatedAt: true,
     },
@@ -301,7 +309,17 @@ async function getLatestConversationOrder(conversation: {
   buyerId: string;
   sellerId: string;
   productId: string | null;
+  order?: {
+    id: string;
+    status: OrderStatus;
+    price: Prisma.Decimal;
+    createdAt: Date;
+  } | null;
 }) {
+  if (conversation.order) {
+    return conversation.order;
+  }
+
   if (!conversation.productId) {
     return null;
   }
@@ -387,6 +405,7 @@ async function getOrCreateConversationRecord(input: {
           buyerId,
           sellerId,
           productId: productId ?? null,
+          orderId: null,
         },
         select: {
           id: true,
@@ -405,6 +424,7 @@ async function getOrCreateConversationRecord(input: {
           buyerId,
           sellerId,
           productId: productId ?? null,
+          orderId: null,
         },
         select: {
           id: true,
@@ -423,6 +443,7 @@ function buildDirectConversationWhere(
 ): Prisma.ConversationWhereInput {
   return {
     productId: null,
+    orderId: null,
     OR: [
       {
         buyerId: userId,
@@ -440,6 +461,170 @@ function getDirectConversationLockKey(userId: string, targetUserId: string) {
   const [firstParticipantId, secondParticipantId] = [userId, targetUserId].sort();
 
   return `direct-conversation:${firstParticipantId}:${secondParticipantId}`;
+}
+
+function getOrderConversationLockKey(orderId: string) {
+  return `order-conversation:${orderId}`;
+}
+
+async function getOrderConversationContext(orderId: string) {
+  return prisma.order.findUnique({
+    where: {
+      id: orderId,
+    },
+    select: {
+      id: true,
+      buyerId: true,
+      sellerId: true,
+      productId: true,
+      status: true,
+      conversation: {
+        select: {
+          id: true,
+        },
+      },
+      product: {
+        select: {
+          title: true,
+        },
+      },
+      buyer: {
+        select: {
+          id: true,
+          name: true,
+          telegramId: true,
+        },
+      },
+      seller: {
+        select: {
+          id: true,
+          name: true,
+          telegramId: true,
+        },
+      },
+    },
+  });
+}
+
+async function getLegacyConversationByOrder(order: {
+  buyerId: string;
+  sellerId: string;
+  productId: string;
+}) {
+  return prisma.conversation.findFirst({
+    where: {
+      buyerId: order.buyerId,
+      sellerId: order.sellerId,
+      productId: order.productId,
+      orderId: null,
+    },
+    select: {
+      id: true,
+    },
+    orderBy: {
+      createdAt: "desc",
+    },
+  });
+}
+
+async function getOrCreateDedicatedConversationByOrder(order: {
+  id: string;
+  buyerId: string;
+  sellerId: string;
+  productId: string;
+}) {
+  return prisma.$transaction(
+    async (transactionClient) => {
+      const existingConversation = await transactionClient.conversation.findUnique({
+        where: {
+          orderId: order.id,
+        },
+        select: {
+          id: true,
+        },
+      });
+
+      if (existingConversation) {
+        return existingConversation;
+      }
+
+      await transactionClient.$queryRaw(
+        Prisma.sql`SELECT pg_advisory_xact_lock(hashtext(${getOrderConversationLockKey(order.id)}))`,
+      );
+
+      const existingConversationInTransaction = await transactionClient.conversation.findUnique({
+        where: {
+          orderId: order.id,
+        },
+        select: {
+          id: true,
+        },
+      });
+
+      if (existingConversationInTransaction) {
+        return existingConversationInTransaction;
+      }
+
+      return transactionClient.conversation.create({
+        data: {
+          buyerId: order.buyerId,
+          sellerId: order.sellerId,
+          productId: order.productId,
+          orderId: order.id,
+        },
+        select: {
+          id: true,
+        },
+      });
+    },
+    {
+      isolationLevel: Prisma.TransactionIsolationLevel.Serializable,
+    },
+  );
+}
+
+async function resolveConversationByOrder(
+  orderId: string,
+  options?: {
+    ensureDedicatedConversation?: boolean;
+  },
+) {
+  const normalizedOrderId = normalizeText(orderId);
+
+  if (!normalizedOrderId) {
+    throw new Error("orderId is required.");
+  }
+
+  const order = await getOrderConversationContext(normalizedOrderId);
+
+  if (!order) {
+    throw new Error(`Order with id ${normalizedOrderId} was not found.`);
+  }
+
+  if (order.conversation) {
+    return {
+      id: order.conversation.id,
+      order,
+    };
+  }
+
+  if (!options?.ensureDedicatedConversation) {
+    const legacyConversation = await getLegacyConversationByOrder(order);
+
+    if (legacyConversation) {
+      return {
+        id: legacyConversation.id,
+        order,
+      };
+    }
+  }
+
+  const conversation = await getOrCreateDedicatedConversationByOrder(order);
+
+  return {
+    ...conversation,
+    order,
+  };
 }
 
 export async function getOrCreateDirectConversation(input: {
@@ -536,58 +721,7 @@ export async function getOrCreateDirectConversation(input: {
 }
 
 async function getOrCreateConversationByOrder(orderId: string) {
-  const normalizedOrderId = normalizeText(orderId);
-
-  if (!normalizedOrderId) {
-    throw new Error("orderId is required.");
-  }
-
-  const order = await prisma.order.findUnique({
-    where: {
-      id: normalizedOrderId,
-    },
-    select: {
-      id: true,
-      buyerId: true,
-      sellerId: true,
-      productId: true,
-      status: true,
-      product: {
-        select: {
-          title: true,
-        },
-      },
-      buyer: {
-        select: {
-          id: true,
-          name: true,
-          telegramId: true,
-        },
-      },
-      seller: {
-        select: {
-          id: true,
-          name: true,
-          telegramId: true,
-        },
-      },
-    },
-  });
-
-  if (!order) {
-    throw new Error(`Order with id ${normalizedOrderId} was not found.`);
-  }
-
-  const conversation = await getOrCreateConversationRecord({
-    buyerId: order.buyerId,
-    sellerId: order.sellerId,
-    productId: order.productId,
-  });
-
-  return {
-    ...conversation,
-    order,
-  };
+  return resolveConversationByOrder(orderId);
 }
 
 export async function getOrCreateConversation(input: {
@@ -1007,6 +1141,7 @@ function mapConversationMessageToOrderMessage(
   return {
     id: message.id,
     content: message.text,
+    type: message.type,
     imageUrl: message.imageUrl,
     isSystem: message.isSystem,
     isRead: message.isRead,
@@ -1231,6 +1366,130 @@ export async function createConversationMessage(input: {
     message: serializedMessage,
     systemMessage: serializedSystemMessage,
     typingUsers,
+  };
+}
+
+export async function createOrderSystemMessages(input: {
+  orderId: string;
+  senderId: string;
+  texts: string[];
+  ensureDedicatedConversation?: boolean;
+}) {
+  const senderId = normalizeText(input.senderId);
+  const texts = input.texts.map((text) => normalizeText(text)).filter(Boolean);
+
+  if (!senderId) {
+    throw new Error("senderId is required.");
+  }
+
+  if (texts.length === 0) {
+    return {
+      orderId: normalizeText(input.orderId),
+      chatRoomId: "",
+      messages: [] as RealtimeOrderMessagePayload[],
+    };
+  }
+
+  const { id: conversationId, order } = await resolveConversationByOrder(input.orderId, {
+    ensureDedicatedConversation: input.ensureDedicatedConversation,
+  });
+
+  if (senderId !== order.buyerId && senderId !== order.sellerId) {
+    throw new Error("Only order participants can author system messages.");
+  }
+
+  const createdMessages = await prisma.$transaction(
+    async (transactionClient) => {
+      const messages = [] as Array<{
+        id: string;
+        text: string;
+        type: MessageType;
+        imageUrl: string | null;
+        gameMetadata: Prisma.JsonValue | null;
+        isSystem: boolean;
+        isRead: boolean;
+        senderId: string;
+        createdAt: Date;
+        updatedAt: Date;
+        sender: {
+          id: string;
+          name: string | null;
+          image: string | null;
+          activeColor: string | null;
+          activeFont: string | null;
+          activeDecoration: string | null;
+        };
+      }>;
+
+      for (const text of texts) {
+        const message = await transactionClient.message.create({
+          data: {
+            conversationId,
+            senderId,
+            text,
+            type: MessageType.SYSTEM,
+            isSystem: true,
+          },
+          select: {
+            id: true,
+            text: true,
+            type: true,
+            imageUrl: true,
+            gameMetadata: true,
+            isSystem: true,
+            isRead: true,
+            senderId: true,
+            createdAt: true,
+            updatedAt: true,
+            sender: {
+              select: {
+                id: true,
+                name: true,
+                image: true,
+                ...USER_APPEARANCE_SELECT,
+              },
+            },
+          },
+        });
+
+        messages.push(message);
+      }
+
+      await transactionClient.conversation.update({
+        where: {
+          id: conversationId,
+        },
+        data: {
+          deletedByIds: [],
+          updatedAt: new Date(),
+        },
+      });
+
+      return messages;
+    },
+    {
+      isolationLevel: Prisma.TransactionIsolationLevel.Serializable,
+    },
+  );
+
+  const serializedMessages = createdMessages.map((message) =>
+    serializeConversationMessage(message),
+  );
+  const orderMessages = serializedMessages.map((message) =>
+    mapConversationMessageToOrderMessage(message),
+  );
+
+  await Promise.all(
+    serializedMessages.flatMap((message, index) => [
+      publishConversationMessageEvent(conversationId, message),
+      publishOrderMessageEvent(order.id, orderMessages[index]),
+    ]),
+  );
+
+  return {
+    orderId: order.id,
+    chatRoomId: conversationId,
+    messages: orderMessages,
   };
 }
 
@@ -1984,6 +2243,7 @@ export async function getChatMessages(
         select: {
           id: true,
           text: true,
+          type: true,
           imageUrl: true,
           isSystem: true,
           isRead: true,
@@ -2015,6 +2275,7 @@ export async function getChatMessages(
     messages: conversationRecord.messages.map((message) => ({
       id: message.id,
       content: message.text,
+      type: message.type,
       imageUrl: message.imageUrl,
       isSystem: message.isSystem,
       isRead: message.isRead,

@@ -10,6 +10,7 @@ import {
   sendNotificationEmails,
   type NotificationEmailDeliveryInput,
 } from "@/lib/notification-delivery";
+import { createOrderSystemMessages } from "@/lib/domain/chat-service";
 import { publishSystemTavernPurchaseAnnouncement } from "@/lib/domain/tavern";
 import { publishOrderUpdatedEvent } from "@/lib/pusher";
 import { prisma } from "@/lib/prisma";
@@ -47,6 +48,62 @@ import {
 } from "@/lib/domain/notifications-service";
 
 const ZERO_PLATFORM_FEE = formatMoney(ZERO_MONEY);
+const ORDER_PAID_SYSTEM_MESSAGE =
+  "Оплата получена. SafeLoot зарезервировал средства по сделке. Продавец может передать товар в этом чате.";
+const ORDER_COMPLETED_SYSTEM_MESSAGE =
+  "Сделка успешно завершена. Средства переведены продавцу.";
+const ORDER_REFUNDED_SYSTEM_MESSAGE =
+  "Возврат оформлен. Средства возвращены покупателю.";
+const ORDER_DISPUTE_RESOLVED_TO_BUYER_SYSTEM_MESSAGE =
+  "Спор завершен в пользу покупателя. Средства возвращены покупателю.";
+const ORDER_DISPUTE_RESOLVED_TO_SELLER_SYSTEM_MESSAGE =
+  "Спор завершен в пользу продавца. Сделка завершена, средства переведены продавцу.";
+
+function getOrderDisputeOpenedSystemMessage(openedBy: "buyer" | "seller") {
+  return openedBy === "buyer"
+    ? "Покупатель открыл спор. Команда SafeLoot подключится к разбору сделки."
+    : "Продавец открыл спор. Команда SafeLoot подключится к разбору сделки.";
+}
+
+function getAutoDeliverySystemMessage(autoDeliveryContent: string) {
+  return `Система SafeLoot: ${autoDeliveryContent}`;
+}
+
+async function publishPaidOrderRealtimeAndSystem(input: {
+  orderId: string;
+  buyerId: string;
+  sellerTelegramId: bigint | null;
+  productTitle: string;
+  orderPrice: string;
+  orderCurrency: string;
+  autoDeliveryContent: string | null;
+}) {
+  const systemMessages = [ORDER_PAID_SYSTEM_MESSAGE];
+
+  if (input.autoDeliveryContent) {
+    systemMessages.push(getAutoDeliverySystemMessage(input.autoDeliveryContent));
+  }
+
+  await Promise.all([
+    sendSellerOrderTelegramNotification({
+      telegramId: input.sellerTelegramId,
+      productTitle: input.productTitle,
+      price: input.orderPrice,
+      currency: input.orderCurrency,
+    }),
+    publishOrderUpdatedEvent({
+      orderId: input.orderId,
+      status: OrderStatus.PAID,
+      platformFee: ZERO_PLATFORM_FEE,
+    }),
+    createOrderSystemMessages({
+      orderId: input.orderId,
+      senderId: input.buyerId,
+      texts: systemMessages,
+      ensureDedicatedConversation: true,
+    }),
+  ]);
+}
 
 export async function createOrder(input: {
   productId?: string;
@@ -85,6 +142,7 @@ export async function createOrder(input: {
           select: {
             id: true,
             title: true,
+            autoDeliveryContent: true,
             price: true,
             sellerId: true,
             isActive: true,
@@ -240,6 +298,7 @@ export async function createOrder(input: {
         productTitle: product.title,
         orderPrice: formatMoney(orderPrice),
         orderCurrency,
+        autoDeliveryContent: product.autoDeliveryContent,
         buyerDisplayName:
           normalizeText(buyer.name ?? undefined) || buyer.email.split("@")[0],
         gameName: normalizeText(product.game.name) || "игры",
@@ -253,16 +312,14 @@ export async function createOrder(input: {
   await Promise.all([
     sendNotificationEmails(emailDeliveryQueue),
     sendNotificationRealtimeEvents(realtimeNotificationQueue),
-    sendSellerOrderTelegramNotification({
-      telegramId: result.sellerTelegramId,
-      productTitle: result.productTitle,
-      price: result.orderPrice,
-      currency: result.orderCurrency,
-    }),
-    publishOrderUpdatedEvent({
+    publishPaidOrderRealtimeAndSystem({
       orderId: result.orderId,
-      status: result.status,
-      platformFee: ZERO_PLATFORM_FEE,
+      buyerId,
+      sellerTelegramId: result.sellerTelegramId,
+      productTitle: result.productTitle,
+      orderPrice: result.orderPrice,
+      orderCurrency: result.orderCurrency,
+      autoDeliveryContent: result.autoDeliveryContent,
     }),
   ]);
 
@@ -395,6 +452,11 @@ export async function getOrderById(
           title: true,
         },
       },
+      conversation: {
+        select: {
+          id: true,
+        },
+      },
     },
   });
 
@@ -413,7 +475,7 @@ export async function getOrderById(
     currency: order.currency,
     platformFee: formatMoney(order.platformFee),
     status: order.status,
-    chatRoomId: null,
+    chatRoomId: order.conversation?.id ?? null,
     review: order.review
       ? {
           ...order.review,
@@ -467,6 +529,7 @@ export async function confirmOrder(input: { orderId?: string; buyerId: string })
           product: {
             select: {
               title: true,
+              autoDeliveryContent: true,
             },
           },
         },
@@ -535,6 +598,7 @@ export async function confirmOrder(input: { orderId?: string; buyerId: string })
         productTitle: checkoutOrder.product.title,
         orderPrice: formatMoney(escrowAmount),
         orderCurrency: checkoutOrder.currency,
+        autoDeliveryContent: checkoutOrder.product.autoDeliveryContent,
       };
     },
     {
@@ -545,16 +609,14 @@ export async function confirmOrder(input: { orderId?: string; buyerId: string })
   await Promise.all([
     sendNotificationEmails(emailDeliveryQueue),
     sendNotificationRealtimeEvents(realtimeNotificationQueue),
-    sendSellerOrderTelegramNotification({
-      telegramId: result.sellerTelegramId,
-      productTitle: result.productTitle,
-      price: result.orderPrice,
-      currency: result.orderCurrency,
-    }),
-    publishOrderUpdatedEvent({
+    publishPaidOrderRealtimeAndSystem({
       orderId: result.orderId,
-      status: result.status,
-      platformFee: ZERO_PLATFORM_FEE,
+      buyerId,
+      sellerTelegramId: result.sellerTelegramId,
+      productTitle: result.productTitle,
+      orderPrice: result.orderPrice,
+      orderCurrency: result.orderCurrency,
+      autoDeliveryContent: result.autoDeliveryContent,
     }),
   ]);
 
@@ -745,6 +807,11 @@ export async function completeOrder(input: { orderId: string; buyerId: string })
       status: result.status,
       platformFee: result.platformFee,
       sellerNetAmount: result.sellerNetAmount,
+    }),
+    createOrderSystemMessages({
+      orderId: result.orderId,
+      senderId: buyerId,
+      texts: [ORDER_COMPLETED_SYSTEM_MESSAGE],
     }),
   ]);
 
@@ -940,6 +1007,11 @@ export async function refundOrder(input: { orderId: string; sellerId: string }) 
       platformFee: ZERO_PLATFORM_FEE,
       refundAmount: result.refundAmount,
     }),
+    createOrderSystemMessages({
+      orderId: result.orderId,
+      senderId: sellerId,
+      texts: [ORDER_REFUNDED_SYSTEM_MESSAGE],
+    }),
   ]);
 
   return {
@@ -1051,6 +1123,11 @@ export async function openOrderDispute(input: {
       status: result.status,
       platformFee: ZERO_PLATFORM_FEE,
     }),
+    createOrderSystemMessages({
+      orderId: result.orderId,
+      senderId: userId,
+      texts: [getOrderDisputeOpenedSystemMessage(result.openedBy as "buyer" | "seller")],
+    }),
   ]);
 
   return {
@@ -1148,6 +1225,7 @@ export async function resolveOrderDisputeToBuyer(input: { orderId: string }) {
       return {
         orderId: order.id,
         status: OrderStatus.REFUNDED,
+        buyerId: order.buyerId,
         refundAmount: formatMoney(refundAmount),
       };
     },
@@ -1161,6 +1239,12 @@ export async function resolveOrderDisputeToBuyer(input: { orderId: string }) {
     status: result.status,
     platformFee: ZERO_PLATFORM_FEE,
     refundAmount: result.refundAmount,
+  });
+
+  await createOrderSystemMessages({
+    orderId: result.orderId,
+    senderId: result.buyerId,
+    texts: [ORDER_DISPUTE_RESOLVED_TO_BUYER_SYSTEM_MESSAGE],
   });
 
   return result;
@@ -1282,6 +1366,7 @@ export async function resolveOrderDisputeToSeller(input: { orderId: string }) {
       return {
         orderId: order.id,
         status: OrderStatus.COMPLETED,
+        sellerId: order.sellerId,
         platformFee: formatMoney(fee),
         sellerNetAmount: formatMoney(sellerPayout),
       };
@@ -1296,6 +1381,12 @@ export async function resolveOrderDisputeToSeller(input: { orderId: string }) {
     status: result.status,
     platformFee: result.platformFee,
     sellerNetAmount: result.sellerNetAmount,
+  });
+
+  await createOrderSystemMessages({
+    orderId: result.orderId,
+    senderId: result.sellerId,
+    texts: [ORDER_DISPUTE_RESOLVED_TO_SELLER_SYSTEM_MESSAGE],
   });
 
   return result;

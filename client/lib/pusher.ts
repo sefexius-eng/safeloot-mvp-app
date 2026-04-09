@@ -150,6 +150,7 @@ export interface RealtimeConversationMessagePayload {
 export interface RealtimeOrderMessagePayload {
   id: string;
   content: string;
+  type: ConversationMessageType;
   imageUrl: string | null;
   isSystem: boolean;
   isRead: boolean;

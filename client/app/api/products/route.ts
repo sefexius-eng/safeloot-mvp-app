@@ -10,6 +10,7 @@ import { requireActiveSessionUserId } from "@/lib/session-user";
 interface CreateProductPayload {
   title?: string;
   description?: string;
+  autoDeliveryContent?: string | null;
   images?: string[];
   price?: number;
   gameId?: string;

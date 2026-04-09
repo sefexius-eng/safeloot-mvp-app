@@ -34,6 +34,7 @@ function createInitialFormState(games: SellGame[]) {
   return {
     title: "",
     description: "",
+    autoDeliveryContent: "",
     images: [] as string[],
     price: "",
     gameId: firstGame?.id ?? "",
@@ -152,6 +153,23 @@ export function SellPageClient({ games }: SellPageClientProps) {
                 maxLength={1000}
                 required
               />
+            </FormField>
+
+            <FormField label="Автовыдача (необязательно)">
+              <Textarea
+                value={formState.autoDeliveryContent}
+                onChange={(event) =>
+                  setFormState((current) => ({
+                    ...current,
+                    autoDeliveryContent: event.target.value,
+                  }))
+                }
+                placeholder="Ключ, данные аккаунта или инструкция, которая автоматически уйдет в чат сделки после оплаты"
+                maxLength={2000}
+              />
+              <p className="text-xs leading-6 text-neutral-500">
+                Поле скрыто из публичной карточки и отправляется покупателю только после успешной оплаты.
+              </p>
             </FormField>
 
             <ProductImageUploader
