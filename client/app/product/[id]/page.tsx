@@ -1,3 +1,4 @@
+import Image from "next/image";
 import Link from "next/link";
 import type { Metadata } from "next";
 
@@ -13,6 +14,7 @@ import { formatCurrency } from "@/lib/formatters";
 import { getProductById } from "@/lib/domain/products";
 import { prisma } from "@/lib/prisma";
 import type { SellerReviewSummary } from "@/lib/review-summary";
+import { getSiteUrl } from "@/lib/site-url";
 
 type SellerRank = "BRONZE" | "SILVER" | "GOLD";
 
@@ -107,6 +109,50 @@ function getGalleryGridClassName(imageCount: number) {
   return "grid-cols-1 md:grid-cols-2 xl:grid-cols-3";
 }
 
+function serializeJsonLd(data: object) {
+  return JSON.stringify(data)
+    .replace(/</g, "\\u003c")
+    .replace(/>/g, "\\u003e")
+    .replace(/&/g, "\\u0026");
+}
+
+function buildProductJsonLd(product: ProductDetail) {
+  const baseUrl = getSiteUrl();
+  const firstImage = product.images.find((image) => image.trim()) ?? null;
+  const sellerReviewSummary = product.seller.reviewSummary;
+  const imageUrl = firstImage ? `${baseUrl}/product/${product.id}/image` : undefined;
+
+  return {
+    "@context": "https://schema.org",
+    "@type": "Product",
+    name: product.title,
+    description: product.description,
+    sku: product.id,
+    url: `${baseUrl}/product/${product.id}`,
+    image: imageUrl ? [imageUrl] : undefined,
+    category: product.category.name,
+    offers: {
+      "@type": "Offer",
+      price: product.price,
+      priceCurrency: "USD",
+      availability: "https://schema.org/InStock",
+      url: `${baseUrl}/product/${product.id}`,
+    },
+    ...(sellerReviewSummary.reviewCount > 0 && sellerReviewSummary.averageRating !== null
+      ? {
+          aggregateRating: {
+            "@type": "AggregateRating",
+            ratingValue: sellerReviewSummary.averageRating,
+            reviewCount: sellerReviewSummary.reviewCount,
+            ratingCount: sellerReviewSummary.reviewCount,
+            bestRating: 5,
+            worstRating: 1,
+          },
+        }
+      : {}),
+  };
+}
+
 export async function generateMetadata({ params }: ProductMetadataProps): Promise<Metadata> {
   try {
     const { id } = await params;
@@ -119,10 +165,7 @@ export async function generateMetadata({ params }: ProductMetadataProps): Promis
       return { title: "Товар не найден | SafeLoot" };
     }
 
-    const baseUrl = (process.env.NEXT_PUBLIC_APP_URL || "https://safeloot.vercel.app").replace(
-      /\/+$/,
-      "",
-    );
+    const baseUrl = getSiteUrl();
     const productImage = product.images.find((image) => image.trim());
     const imageUrl = productImage
       ? `${baseUrl}/product/${product.id}/image`
@@ -205,9 +248,17 @@ export default async function ProductPage({ params }: ProductPageProps) {
   const rankStyle = rankStyles[product.seller.rank];
   const categoryLabel = product.category.name;
   const canStartConversation = currentUser?.id !== product.seller.id;
+  const productJsonLd = buildProductJsonLd(product);
 
   return (
     <main className="mx-auto flex w-full max-w-7xl flex-col gap-8 px-4 py-10 sm:px-6 lg:px-8 lg:py-14">
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{
+          __html: serializeJsonLd(productJsonLd),
+        }}
+      />
+
       <section className="grid gap-6 lg:grid-cols-[minmax(0,1.2fr)_380px] lg:items-start">
         <article className="rounded-[2rem] border border-white/10 bg-zinc-900/80 p-6 shadow-[0_18px_48px_rgba(0,0,0,0.28)] backdrop-blur md:p-8 lg:p-10">
           <div className="flex flex-wrap items-center gap-3">
@@ -239,9 +290,12 @@ export default async function ProductPage({ params }: ProductPageProps) {
                     key={`${product.id}-image-${index + 1}`}
                     className="overflow-hidden rounded-lg border border-white/10 bg-black/20"
                   >
-                    <img
+                    <Image
                       src={image}
                       alt={`Скриншот ${index + 1} для ${product.title}`}
+                      width={1280}
+                      height={720}
+                      unoptimized
                       className="aspect-[16/9] h-full w-full rounded-lg object-cover"
                     />
                   </div>
