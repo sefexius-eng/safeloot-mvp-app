@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 
-import { prisma } from "@/lib/prisma";
+import { updateUserLastSeenById } from "@/lib/domain/users";
 import { requireSessionUserId } from "@/lib/session-user";
 
 export async function POST() {
@@ -11,14 +11,7 @@ export async function POST() {
       return sessionUser.response;
     }
 
-    await prisma.user.update({
-      where: {
-        id: sessionUser.userId,
-      },
-      data: {
-        lastSeen: new Date(),
-      },
-    });
+    await updateUserLastSeenById(sessionUser.userId);
 
     return NextResponse.json({ ok: true });
   } catch (error) {

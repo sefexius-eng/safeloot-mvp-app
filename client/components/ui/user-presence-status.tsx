@@ -87,6 +87,8 @@ export function UserPresenceInlineStatus({
   ...props
 }: UserPresenceInlineStatusProps) {
   const presence = useResolvedPresenceMeta(props);
+  const resolvedLabel = label === "long" ? presence.longLabel : presence.shortLabel;
+  const shouldShowDot = showDot && !resolvedLabel.startsWith("🟢");
 
   return (
     <span
@@ -94,7 +96,7 @@ export function UserPresenceInlineStatus({
       title={presence.title}
       className={cn("inline-flex items-center gap-1.5", className)}
     >
-      {showDot ? (
+      {shouldShowDot ? (
         <span
           className={cn(
             "h-2 w-2 rounded-full",
@@ -109,7 +111,7 @@ export function UserPresenceInlineStatus({
           textClassName,
         )}
       >
-        {label === "long" ? presence.longLabel : presence.shortLabel}
+        {resolvedLabel}
       </span>
     </span>
   );
@@ -121,6 +123,8 @@ export function UserPresencePill({
   ...props
 }: UserPresencePillProps) {
   const presence = useResolvedPresenceMeta(props);
+  const resolvedLabel = label === "long" ? presence.longLabel : presence.shortLabel;
+  const shouldShowDot = !resolvedLabel.startsWith("🟢");
 
   return (
     <span
@@ -134,13 +138,15 @@ export function UserPresencePill({
         className,
       )}
     >
-      <span
-        className={cn(
-          "h-2 w-2 rounded-full",
-          presence.isOnline ? "bg-emerald-400" : "bg-gray-500",
-        )}
-      />
-      {label === "long" ? presence.longLabel : presence.shortLabel}
+      {shouldShowDot ? (
+        <span
+          className={cn(
+            "h-2 w-2 rounded-full",
+            presence.isOnline ? "bg-emerald-400" : "bg-gray-500",
+          )}
+        />
+      ) : null}
+      {resolvedLabel}
     </span>
   );
 }

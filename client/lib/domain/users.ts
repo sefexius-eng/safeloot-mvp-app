@@ -51,3 +51,20 @@ export async function getUserById(userId: string) {
     reviewSummary,
   };
 }
+
+export async function updateUserLastSeenById(userId: string) {
+  const normalizedUserId = normalizeText(userId);
+
+  if (!normalizedUserId) {
+    throw new Error("userId is required.");
+  }
+
+  await prisma.user.update({
+    where: {
+      id: normalizedUserId,
+    },
+    data: {
+      lastSeen: new Date(),
+    },
+  });
+}

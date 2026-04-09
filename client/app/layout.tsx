@@ -6,6 +6,7 @@ import { Analytics as ExternalAnalytics } from "@/components/analytics";
 import { BannedModal } from "@/components/banned-modal";
 import { EmailVerificationBanner } from "@/components/layout/email-verification-banner";
 import { SiteHeader } from "@/components/layout/site-header";
+import { ActivityTracker } from "@/components/providers/activity-tracker";
 import { AuthSessionProvider } from "@/components/providers/session-provider";
 import { SiteFooter } from "@/components/site-footer";
 import { getAuthSession } from "@/lib/auth";
@@ -109,6 +110,7 @@ export default async function RootLayout({
     >
       <body className="min-h-screen flex flex-col bg-transparent text-gray-100">
         <AuthSessionProvider session={session}>
+          <ActivityTracker />
           <SiteHeader />
           {session?.user &&
           !session.user.emailVerified &&

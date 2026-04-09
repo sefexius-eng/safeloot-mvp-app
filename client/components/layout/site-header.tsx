@@ -32,7 +32,6 @@ import catalogSeedData from "@/lib/catalog-seed-data.json";
 import { isAdminRole } from "@/lib/roles";
 
 const BALANCE_REFRESH_EVENT = "safeloot:balances-refresh";
-const LAST_SEEN_UPDATE_INTERVAL_MS = 5 * 60 * 1000;
 const PROFILE_REFRESH_INTERVAL_MS = 5000;
 const SEARCH_DEBOUNCE_MS = 250;
 const POPULAR_GAMES = catalogSeedData.popularGames;
@@ -121,7 +120,6 @@ export function SiteHeader() {
   const [isSearching, setIsSearching] = useState(false);
   const [isUserSearchOpen, setIsUserSearchOpen] = useState(false);
   const searchContainerRef = useRef<HTMLDivElement | null>(null);
-  const lastSeenIntervalRef = useRef<number | null>(null);
   const isBanned = Boolean(session?.user?.isBanned);
 
   useEffect(() => {
@@ -192,40 +190,6 @@ export function SiteHeader() {
       window.clearInterval(intervalId);
     };
   }, [refreshToken, status, session?.user?.id]);
-
-  useEffect(() => {
-    if (lastSeenIntervalRef.current !== null) {
-      window.clearInterval(lastSeenIntervalRef.current);
-      lastSeenIntervalRef.current = null;
-    }
-
-    if (status !== "authenticated") {
-      return undefined;
-    }
-
-    async function updateLastSeen() {
-      try {
-        await fetch("/api/users/me/last-seen", {
-          method: "POST",
-          cache: "no-store",
-        });
-      } catch {
-        // Quiet heartbeat; ignore transient network failures.
-      }
-    }
-
-    void updateLastSeen();
-    lastSeenIntervalRef.current = window.setInterval(() => {
-      void updateLastSeen();
-    }, LAST_SEEN_UPDATE_INTERVAL_MS);
-
-    return () => {
-      if (lastSeenIntervalRef.current !== null) {
-        window.clearInterval(lastSeenIntervalRef.current);
-        lastSeenIntervalRef.current = null;
-      }
-    };
-  }, [status, session?.user?.id]);
 
   useEffect(() => {
     if (!query.trim()) {

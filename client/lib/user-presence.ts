@@ -1,6 +1,8 @@
 export const USER_ONLINE_WINDOW_MS = 5 * 60 * 1000;
 export const USER_RECENT_WINDOW_MS = 24 * 60 * 60 * 1000;
 
+import { formatLastSeen } from "@/lib/utils";
+
 export type UserPresenceState = "online" | "recent" | "offline";
 
 interface UserPresenceMetaOptions {
@@ -18,9 +20,9 @@ export function getUserPresenceMetaForState(
   options: UserPresenceMetaOptions = {},
 ) {
   const subjectLabel = options.subjectLabel ?? "Пользователь";
-  const onlineLabel = options.onlineLabel ?? "Онлайн";
-  const recentLabel = options.recentLabel ?? "Был(а) недавно";
-  const offlineLabel = options.offlineLabel ?? "Оффлайн";
+  const onlineLabel = options.onlineLabel ?? "🟢 Онлайн";
+  const recentLabel = options.recentLabel ?? "Был(а) в сети";
+  const offlineLabel = options.offlineLabel ?? "Был(а) в сети";
 
   switch (state) {
     case "online":
@@ -28,9 +30,9 @@ export function getUserPresenceMetaForState(
         state,
         isOnline: true,
         shortLabel: onlineLabel,
-        longLabel: options.onlineLongLabel ?? "Онлайн сейчас",
-        ariaLabel: `${subjectLabel} онлайн`,
-        title: `${subjectLabel} онлайн`,
+        longLabel: options.onlineLongLabel ?? onlineLabel,
+        ariaLabel: `${subjectLabel}: онлайн`,
+        title: `${subjectLabel}: онлайн`,
       };
     case "recent":
       return {
@@ -38,8 +40,8 @@ export function getUserPresenceMetaForState(
         isOnline: false,
         shortLabel: recentLabel,
         longLabel: options.recentLongLabel ?? recentLabel,
-        ariaLabel: `${subjectLabel} был(а) недавно`,
-        title: `${subjectLabel} был(а) недавно`,
+        ariaLabel: `${subjectLabel}: ${recentLabel}`,
+        title: `${subjectLabel}: ${recentLabel}`,
       };
     default:
       return {
@@ -47,8 +49,8 @@ export function getUserPresenceMetaForState(
         isOnline: false,
         shortLabel: offlineLabel,
         longLabel: options.offlineLongLabel ?? offlineLabel,
-        ariaLabel: `${subjectLabel} оффлайн`,
-        title: `${subjectLabel} оффлайн`,
+        ariaLabel: `${subjectLabel}: ${offlineLabel}`,
+        title: `${subjectLabel}: ${offlineLabel}`,
       };
   }
 }
@@ -88,5 +90,21 @@ export function getUserPresenceMeta(
   lastSeen?: Date | string | null,
   options: UserPresenceMetaOptions = {},
 ) {
-  return getUserPresenceMetaForState(getUserPresenceState(lastSeen), options);
+  const state = getUserPresenceState(lastSeen);
+
+  if (state === "online") {
+    return getUserPresenceMetaForState(state, options);
+  }
+
+  const subjectLabel = options.subjectLabel ?? "Пользователь";
+  const formattedLastSeen = formatLastSeen(lastSeen);
+
+  return {
+    state,
+    isOnline: false,
+    shortLabel: formattedLastSeen,
+    longLabel: formattedLastSeen,
+    ariaLabel: `${subjectLabel}: ${formattedLastSeen}`,
+    title: `${subjectLabel}: ${formattedLastSeen}`,
+  };
 }
