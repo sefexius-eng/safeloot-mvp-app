@@ -1,7 +1,7 @@
 @import "tailwindcss";
 
 :root {
-  --background: #0a0d14;
+  --background: #0b0e14;
   --background-strong: #0d1117;
   --foreground: #f5fff8;
   --muted: rgba(13, 17, 23, 0.92);
@@ -42,7 +42,12 @@ body {
   isolation: isolate;
   min-height: 100vh;
   overflow-x: hidden;
-  background: #0a0d14;
+  background: var(--background);
+  background-image:
+    radial-gradient(circle at 14% 12%, rgba(0, 200, 83, 0.16), transparent 24%),
+    radial-gradient(circle at 100% 0%, rgba(0, 128, 64, 0.15), transparent 22%),
+    radial-gradient(circle at 22% 100%, rgba(0, 200, 83, 0.1), transparent 20%),
+    linear-gradient(180deg, #0b0e14 0%, #0d1117 52%, #070a0f 100%);
   color: var(--foreground);
   font-family: var(--font-geist-sans), sans-serif;
 }
@@ -57,8 +62,13 @@ body::after {
 
 body::before {
   z-index: -2;
-  background: radial-gradient(circle at 50% 0%, rgba(255, 255, 255, 0.035), transparent 58%);
-  opacity: 0.5;
+  background:
+    radial-gradient(circle at 8% 10%, rgba(0, 200, 83, 0.18), transparent 26%),
+    radial-gradient(circle at 88% 8%, rgba(0, 143, 57, 0.16), transparent 23%),
+    radial-gradient(circle at 74% 78%, rgba(0, 200, 83, 0.12), transparent 24%),
+    radial-gradient(circle at 26% 72%, rgba(0, 74, 38, 0.22), transparent 28%);
+  filter: blur(46px);
+  opacity: 0.82;
 }
 
 body::after {
