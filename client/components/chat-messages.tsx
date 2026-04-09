@@ -1022,6 +1022,7 @@ export function ChatMessages({
           status={openGameMessage.gameMetadata.status}
           sessionId={openGameMessage.gameMetadata.sessionId ?? openGameMessage.id}
           initiatorId={openGameMessage.gameMetadata.initiatorId}
+          canvasSnapshot={openGameMessage.gameMetadata.canvasSnapshot ?? null}
           initiatorName={openGameInitiatorName}
           guesserName={openGameGuesserName}
           currentUserId={currentUserId}

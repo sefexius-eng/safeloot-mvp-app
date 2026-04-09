@@ -51,7 +51,22 @@ function isConversationGameStatus(value: unknown): value is ConversationGameStat
   return value === "pending" || value === "active" || value === "completed";
 }
 
-function parseConversationGameMetadata(value: unknown): ConversationGameMetadata | null {
+const MAX_GAME_CANVAS_SNAPSHOT_LENGTH = 1_500_000;
+
+function isConversationGameCanvasSnapshot(value: unknown): value is string {
+  return (
+    typeof value === "string" &&
+    value.startsWith("data:image/") &&
+    value.length <= MAX_GAME_CANVAS_SNAPSHOT_LENGTH
+  );
+}
+
+function parseConversationGameMetadata(
+  value: unknown,
+  options?: {
+    includeCanvasSnapshot?: boolean;
+  },
+): ConversationGameMetadata | null {
   if (!value || typeof value !== "object" || Array.isArray(value)) {
     return null;
   }
@@ -61,6 +76,7 @@ function parseConversationGameMetadata(value: unknown): ConversationGameMetadata
   const status = metadata.status;
   const initiatorId = metadata.initiatorId;
   const sessionId = metadata.sessionId;
+  const canvasSnapshot = metadata.canvasSnapshot;
 
   if (
     !isConversationGameType(game) ||
@@ -76,6 +92,13 @@ function parseConversationGameMetadata(value: unknown): ConversationGameMetadata
     status,
     initiatorId,
     sessionId: typeof sessionId === "string" ? sessionId : null,
+    ...(options?.includeCanvasSnapshot === false
+      ? {}
+      : {
+          canvasSnapshot: isConversationGameCanvasSnapshot(canvasSnapshot)
+            ? canvasSnapshot
+            : null,
+        }),
   };
 }
 
@@ -89,6 +112,11 @@ function toConversationGameMetadataData(
     ...(gameMetadata.sessionId
       ? {
           sessionId: gameMetadata.sessionId,
+        }
+      : {}),
+    ...(gameMetadata.canvasSnapshot
+      ? {
+          canvasSnapshot: gameMetadata.canvasSnapshot,
         }
       : {}),
   };
@@ -829,7 +857,9 @@ function serializeConversationMessage(message: {
 }): RealtimeConversationMessagePayload {
   return {
     ...message,
-    gameMetadata: parseConversationGameMetadata(message.gameMetadata),
+    gameMetadata: parseConversationGameMetadata(message.gameMetadata, {
+      includeCanvasSnapshot: false,
+    }),
     createdAt: message.createdAt.toISOString(),
     updatedAt: message.updatedAt.toISOString(),
   };
@@ -1233,6 +1263,126 @@ export async function updateConversationGameInviteStatus(input: {
   return {
     conversationId: conversation.id,
     message: serializedMessage,
+  };
+}
+
+export async function updateConversationGameCanvasState(input: {
+  conversationId: string;
+  userId: string;
+  canvasSnapshot: string;
+}) {
+  const conversationId = normalizeText(input.conversationId);
+  const userId = normalizeText(input.userId);
+  const canvasSnapshot = normalizeOptionalText(input.canvasSnapshot);
+
+  if (!conversationId) {
+    throw new Error("conversationId is required.");
+  }
+
+  if (!userId) {
+    throw new Error("userId is required.");
+  }
+
+  if (!canvasSnapshot) {
+    throw new Error("canvasSnapshot is required.");
+  }
+
+  if (!isConversationGameCanvasSnapshot(canvasSnapshot)) {
+    throw new Error("canvasSnapshot must be a supported image data URL.");
+  }
+
+  const conversation = await prisma.conversation.findUnique({
+    where: {
+      id: conversationId,
+    },
+    select: {
+      id: true,
+      buyerId: true,
+      sellerId: true,
+    },
+  });
+
+  if (!conversation) {
+    throw new Error(`Conversation with id ${conversationId} was not found.`);
+  }
+
+  ensureConversationParticipant(userId, conversation);
+
+  const gameInviteMessages = await prisma.message.findMany({
+    where: {
+      conversationId: conversation.id,
+      type: MessageType.GAME_INVITE,
+    },
+    orderBy: [
+      {
+        updatedAt: "desc",
+      },
+      {
+        createdAt: "desc",
+      },
+    ],
+    select: {
+      id: true,
+      gameMetadata: true,
+    },
+  });
+
+  const activeGameInvite = gameInviteMessages.find((message) => {
+    const metadata = parseConversationGameMetadata(message.gameMetadata);
+
+    return metadata?.status === "active";
+  });
+
+  if (!activeGameInvite) {
+    throw new Error("Активная игровая сессия для сохранения холста не найдена.");
+  }
+
+  const currentGameMetadata = parseConversationGameMetadata(activeGameInvite.gameMetadata);
+
+  if (!currentGameMetadata) {
+    throw new Error("Game invite metadata is missing or invalid.");
+  }
+
+  const nextGameMetadata: ConversationGameMetadata = {
+    ...currentGameMetadata,
+    canvasSnapshot,
+  };
+
+  const updatedMessage = await prisma.$transaction(
+    async (transactionClient) => {
+      const message = await transactionClient.message.update({
+        where: {
+          id: activeGameInvite.id,
+        },
+        data: {
+          gameMetadata: toConversationGameMetadataData(nextGameMetadata),
+        },
+        select: {
+          id: true,
+          gameMetadata: true,
+        },
+      });
+
+      await transactionClient.conversation.update({
+        where: {
+          id: conversation.id,
+        },
+        data: {
+          updatedAt: new Date(),
+        },
+      });
+
+      return message;
+    },
+    {
+      isolationLevel: Prisma.TransactionIsolationLevel.Serializable,
+    },
+  );
+
+  return {
+    conversationId: conversation.id,
+    messageId: updatedMessage.id,
+    gameMetadata: parseConversationGameMetadata(updatedMessage.gameMetadata),
   };
 }
 

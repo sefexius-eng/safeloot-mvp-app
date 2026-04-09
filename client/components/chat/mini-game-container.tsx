@@ -3,7 +3,7 @@
 import { X } from "lucide-react";
 import { useEffect, useMemo, useRef, useState, useTransition } from "react";
 
-import { updateGameInviteStatus } from "@/app/actions/chat";
+import { saveGameCanvasState, updateGameInviteStatus } from "@/app/actions/chat";
 import { Button } from "@/components/ui/button";
 import {
   getMiniGameDefinition,
@@ -15,15 +15,12 @@ import {
   PUSHER_GAME_CLEAR_EVENT,
   PUSHER_GAME_DRAW_EVENT,
   PUSHER_GAME_GUESS_EVENT,
-  PUSHER_GAME_REQUEST_CANVAS_EVENT,
-  PUSHER_GAME_SYNC_CANVAS_EVENT,
   PUSHER_GAME_WIN_EVENT,
   type BrowserPusherChannel,
   type BrowserPusherClientEventChannel,
   type ConversationGameStatus,
   type ConversationGameType,
   type RealtimeGameClearPayload,
-  type RealtimeGameCanvasSyncPayload,
   type RealtimeGameDrawPayload,
   type RealtimeGameGuessPayload,
   type RealtimeGameWinPayload,
@@ -62,6 +59,7 @@ interface MiniGameContainerProps {
   status: ConversationGameStatus;
   sessionId: string;
   initiatorId: string;
+  canvasSnapshot?: string | null;
   initiatorName: string;
   guesserName: string;
   currentUserId: string;
@@ -75,6 +73,7 @@ export function MiniGameContainer({
   status,
   sessionId,
   initiatorId,
+  canvasSnapshot,
   initiatorName,
   guesserName,
   currentUserId,
@@ -84,8 +83,11 @@ export function MiniGameContainer({
   const title = gameDefinition.title;
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const pusherChannelRef = useRef<BrowserPusherChannel | null>(null);
-  const strokesRef = useRef<DrawSegment[]>([]);
   const closingTimerRef = useRef<number | null>(null);
+  const saveCanvasTimerRef = useRef<number | null>(null);
+  const queuedCanvasSnapshotRef = useRef<string | null>(null);
+  const lastSavedCanvasSnapshotRef = useRef<string | null>(canvasSnapshot?.trim() || null);
+  const snapshotDrawTokenRef = useRef(0);
   const drawingStateRef = useRef<{
     isDrawing: boolean;
     lastPoint: { x: number; y: number } | null;
@@ -110,47 +112,9 @@ export function MiniGameContainer({
     () => `mini-game-word:${game}:${sessionId}:${initiatorId}`,
     [game, initiatorId, sessionId],
   );
-  const canvasSnapshotStorageKey = useMemo(
-    () => `crocodile_canvas_${conversationId}`,
-    [conversationId],
-  );
-  const strokesStorageKey = useMemo(
-    () => `mini-game-strokes:${game}:${sessionId}`,
-    [game, sessionId],
-  );
 
   function getRandomWord() {
     return pickRandomMiniGameWord(game);
-  }
-
-  function isCanvasCoordinate(value: unknown): value is number {
-    return typeof value === "number" && Number.isFinite(value) && value >= 0;
-  }
-
-  function isCanvasDrawSegment(value: unknown): value is DrawSegment {
-    if (!value || typeof value !== "object" || Array.isArray(value)) {
-      return false;
-    }
-
-    const segment = value as Record<string, unknown>;
-    const { startX, startY, endX, endY, color } = segment;
-
-    if (
-      !isCanvasCoordinate(startX) ||
-      !isCanvasCoordinate(startY) ||
-      !isCanvasCoordinate(endX) ||
-      !isCanvasCoordinate(endY) ||
-      typeof color !== "string"
-    ) {
-      return false;
-    }
-
-    return (
-      startX <= CANVAS_WIDTH &&
-      endX <= CANVAS_WIDTH &&
-      startY <= CANVAS_HEIGHT &&
-      endY <= CANVAS_HEIGHT
-    );
   }
 
   function normalizeGuess(value: string) {
@@ -207,17 +171,7 @@ export function MiniGameContainer({
     context.stroke();
   }
 
-  function persistStrokes(segments: DrawSegment[]) {
-    try {
-      sessionStorage.setItem(strokesStorageKey, JSON.stringify(segments));
-    } catch {
-      return;
-    }
-  }
-
   function appendSegment(segment: DrawSegment) {
-    strokesRef.current = [...strokesRef.current, segment];
-    persistStrokes(strokesRef.current);
     drawSegment(segment);
   }
 
@@ -229,109 +183,93 @@ export function MiniGameContainer({
       return;
     }
 
-    const pendingSegments = [...strokesRef.current];
+    const drawToken = ++snapshotDrawTokenRef.current;
     const snapshotImage = new window.Image();
 
     snapshotImage.onload = () => {
-      resetCanvas();
-      context.drawImage(snapshotImage, 0, 0, canvas.width, canvas.height);
-
-      if (pendingSegments.length === 0) {
+      if (snapshotDrawTokenRef.current !== drawToken) {
         return;
       }
 
-      strokesRef.current = pendingSegments;
-
-      for (const segment of pendingSegments) {
-        drawSegment(segment);
-      }
+      resetCanvas();
+      context.drawImage(snapshotImage, 0, 0, CANVAS_WIDTH, CANVAS_HEIGHT);
     };
 
     snapshotImage.src = imageData;
   }
 
-  function persistCanvasSnapshotToStorage() {
-    const canvas = canvasRef.current;
-
-    if (!canvas || !isDrawer) {
-      return;
-    }
-
-    try {
-      sessionStorage.setItem(canvasSnapshotStorageKey, canvas.toDataURL());
-    } catch {
-      return;
+  function clearScheduledCanvasSave() {
+    if (saveCanvasTimerRef.current) {
+      window.clearTimeout(saveCanvasTimerRef.current);
+      saveCanvasTimerRef.current = null;
     }
   }
 
-  function restoreCanvasSnapshotFromStorage() {
-    if (!isDrawer) {
-      return false;
+  function scheduleCanvasStateSave() {
+    if (!isDrawer || status !== "active" || winState) {
+      return;
     }
 
-    try {
-      const savedSnapshot = sessionStorage.getItem(canvasSnapshotStorageKey)?.trim();
+    const canvas = canvasRef.current;
 
-      if (!savedSnapshot) {
-        return false;
+    if (!canvas) {
+      return;
+    }
+
+    const nextSnapshot = canvas.toDataURL("image/jpeg", 0.5);
+
+    if (
+      !nextSnapshot ||
+      nextSnapshot === queuedCanvasSnapshotRef.current ||
+      nextSnapshot === lastSavedCanvasSnapshotRef.current
+    ) {
+      return;
+    }
+
+    queuedCanvasSnapshotRef.current = nextSnapshot;
+    clearScheduledCanvasSave();
+
+    saveCanvasTimerRef.current = window.setTimeout(() => {
+      saveCanvasTimerRef.current = null;
+
+      const snapshotToPersist = queuedCanvasSnapshotRef.current;
+
+      if (!snapshotToPersist) {
+        return;
       }
 
-      drawCanvasSnapshot(savedSnapshot);
-      return true;
-    } catch {
-      return false;
-    }
+      void (async () => {
+        try {
+          await saveGameCanvasState(conversationId, snapshotToPersist);
+          lastSavedCanvasSnapshotRef.current = snapshotToPersist;
+
+          setConnectionWarning((currentWarning) =>
+            currentWarning === "Не удалось сохранить снимок холста."
+              ? null
+              : currentWarning,
+          );
+        } catch (error) {
+          setConnectionWarning(
+            error instanceof Error
+              ? error.message
+              : "Не удалось сохранить снимок холста.",
+          );
+        } finally {
+          if (queuedCanvasSnapshotRef.current === snapshotToPersist) {
+            queuedCanvasSnapshotRef.current = null;
+          }
+        }
+      })();
+    }, 700);
   }
 
   function clearCanvasState() {
+    snapshotDrawTokenRef.current += 1;
     resetCanvas();
-    strokesRef.current = [];
     drawingStateRef.current = {
       isDrawing: false,
       lastPoint: null,
     };
-
-    try {
-      sessionStorage.removeItem(strokesStorageKey);
-      sessionStorage.removeItem(canvasSnapshotStorageKey);
-    } catch {
-      return;
-    }
-  }
-
-  function hydrateCanvasFromStorage() {
-    resetCanvas();
-
-    try {
-      const rawSegments = sessionStorage.getItem(strokesStorageKey);
-
-      if (!rawSegments) {
-        strokesRef.current = [];
-        return;
-      }
-
-      const parsedSegments = JSON.parse(rawSegments) as DrawSegment[];
-
-      if (!Array.isArray(parsedSegments)) {
-        strokesRef.current = [];
-        return;
-      }
-
-      const drawSegments = parsedSegments.filter(isCanvasDrawSegment);
-
-      if (drawSegments.length !== parsedSegments.length) {
-        clearCanvasState();
-        return;
-      }
-
-      strokesRef.current = drawSegments;
-
-      for (const segment of drawSegments) {
-        drawSegment(segment);
-      }
-    } catch {
-      strokesRef.current = [];
-    }
   }
 
   function triggerClientEvent(eventName: string, payload: unknown) {
@@ -488,6 +426,7 @@ export function MiniGameContainer({
     }
 
     clearCanvasState();
+    scheduleCanvasStateSave();
 
     const wasTriggered = triggerClientEvent(PUSHER_GAME_CLEAR_EVENT, {
       sessionId,
@@ -513,52 +452,36 @@ export function MiniGameContainer({
 
   function handlePointerUp(event: React.PointerEvent<HTMLCanvasElement>) {
     stopDrawing(event);
-    persistCanvasSnapshotToStorage();
+    scheduleCanvasStateSave();
   }
 
   useEffect(() => {
-    const canvas = canvasRef.current;
+    const nextCanvasSnapshot = canvasSnapshot?.trim() || null;
 
-    if (!canvas) {
-      return;
-    }
+    lastSavedCanvasSnapshotRef.current = nextCanvasSnapshot;
 
-    if (isDrawer) {
-      if (!restoreCanvasSnapshotFromStorage()) {
-        hydrateCanvasFromStorage();
-      }
+    if (nextCanvasSnapshot) {
+      drawCanvasSnapshot(nextCanvasSnapshot);
     } else {
       clearCanvasState();
     }
 
     resolveSecretWord();
-  }, [canvasSnapshotStorageKey, isDrawer, strokesStorageKey, wordStorageKey]);
+  }, [canvasSnapshot, isDrawer, wordStorageKey]);
+
+  useEffect(() => {
+    return () => {
+      clearScheduledCanvasSave();
+    };
+  }, []);
 
   useEffect(() => {
     let isCancelled = false;
     let pusherChannel: BrowserPusherChannel | null = null;
 
-    const requestCanvasSnapshot = () => {
-      if (isDrawer || status !== "active" || winState) {
-        return;
-      }
-
-      const wasTriggered = triggerClientEvent(PUSHER_GAME_REQUEST_CANVAS_EVENT, {});
-
-      if (!wasTriggered) {
-        setConnectionWarning(
-          "Не удалось запросить актуальный snapshot холста через Pusher. Убедитесь, что client events включены в настройках приложения.",
-        );
-      }
-    };
-
     const handleSubscriptionSucceeded = () => {
       isSubscribedRef.current = true;
       setConnectionWarning(null);
-
-      if (!isDrawer && status === "active") {
-        requestCanvasSnapshot();
-      }
     };
 
     const handleRemoteDraw = (payload: RealtimeGameDrawPayload) => {
@@ -583,37 +506,6 @@ export function MiniGameContainer({
       }
 
       clearCanvasState();
-    };
-
-    const handleRemoteCanvasRequest = () => {
-      if (!isDrawer || status !== "active" || winState) {
-        return;
-      }
-
-      const canvas = canvasRef.current;
-
-      if (!canvas) {
-        return;
-      }
-
-      const snapshot = canvas.toDataURL("image/png");
-      const wasTriggered = triggerClientEvent(PUSHER_GAME_SYNC_CANVAS_EVENT, {
-        image: snapshot,
-      } satisfies RealtimeGameCanvasSyncPayload);
-
-      if (!wasTriggered) {
-        setConnectionWarning(
-          "Не удалось отправить snapshot холста через Pusher. Убедитесь, что client events включены в настройках приложения.",
-        );
-      }
-    };
-
-    const handleRemoteCanvasSync = (payload: RealtimeGameCanvasSyncPayload) => {
-      if (isDrawer || winState || !payload.image) {
-        return;
-      }
-
-      drawCanvasSnapshot(payload.image);
     };
 
     const handleRemoteGuess = (payload: RealtimeGameGuessPayload) => {
@@ -678,8 +570,6 @@ export function MiniGameContainer({
       pusherChannel.bind("pusher:subscription_succeeded", handleSubscriptionSucceeded);
       pusherChannel.bind(PUSHER_GAME_CLEAR_EVENT, handleRemoteClear);
       pusherChannel.bind(PUSHER_GAME_DRAW_EVENT, handleRemoteDraw);
-      pusherChannel.bind(PUSHER_GAME_REQUEST_CANVAS_EVENT, handleRemoteCanvasRequest);
-      pusherChannel.bind(PUSHER_GAME_SYNC_CANVAS_EVENT, handleRemoteCanvasSync);
       pusherChannel.bind(PUSHER_GAME_GUESS_EVENT, handleRemoteGuess);
       pusherChannel.bind(PUSHER_GAME_WIN_EVENT, handleRemoteWin);
     })();
@@ -699,8 +589,6 @@ export function MiniGameContainer({
       pusherChannel.unbind("pusher:subscription_succeeded", handleSubscriptionSucceeded);
       pusherChannel.unbind(PUSHER_GAME_CLEAR_EVENT, handleRemoteClear);
       pusherChannel.unbind(PUSHER_GAME_DRAW_EVENT, handleRemoteDraw);
-      pusherChannel.unbind(PUSHER_GAME_REQUEST_CANVAS_EVENT, handleRemoteCanvasRequest);
-      pusherChannel.unbind(PUSHER_GAME_SYNC_CANVAS_EVENT, handleRemoteCanvasSync);
       pusherChannel.unbind(PUSHER_GAME_GUESS_EVENT, handleRemoteGuess);
       pusherChannel.unbind(PUSHER_GAME_WIN_EVENT, handleRemoteWin);
     };

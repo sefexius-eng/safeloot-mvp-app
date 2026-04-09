@@ -58,6 +58,7 @@ export interface ConversationGameMetadata {
   status: ConversationGameStatus;
   initiatorId: string;
   sessionId?: string | null;
+  canvasSnapshot?: string | null;
 }
 
 export interface RealtimeGameDrawPayload {
@@ -85,10 +86,6 @@ export interface RealtimeGameWinPayload {
 
 export interface RealtimeGameClearPayload {
   sessionId: string;
-}
-
-export interface RealtimeGameCanvasSyncPayload {
-  image: string;
 }
 
 export interface RealtimeTypingUser {
@@ -152,8 +149,6 @@ export const PUSHER_GAME_DRAW_EVENT = "client-draw-line";
 export const PUSHER_GAME_GUESS_EVENT = "client-guess";
 export const PUSHER_GAME_WIN_EVENT = "client-win";
 export const PUSHER_GAME_CLEAR_EVENT = "client-clear";
-export const PUSHER_GAME_REQUEST_CANVAS_EVENT = "client-request-canvas";
-export const PUSHER_GAME_SYNC_CANVAS_EVENT = "client-sync-canvas";
 export const PUSHER_ORDER_UPDATED_EVENT = "order-updated";
 export const PUSHER_GLOBAL_PRESENCE_CHANNEL = "presence-site-users";
 export const PUSHER_GLOBAL_TAVERN_CHANNEL = "tavern-chat";
