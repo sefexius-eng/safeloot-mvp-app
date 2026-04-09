@@ -6,7 +6,9 @@ import { useEffect, useRef, useState, useTransition } from "react";
 import {
   markConversationMessagesAsRead,
   sendGameInvite,
+  updateGameInviteStatus,
 } from "@/app/actions/chat";
+import { MiniGameContainer } from "@/components/chat/mini-game-container";
 import CensoredText from "@/components/censored-text";
 import { Button } from "@/components/ui/button";
 import { CosmeticName } from "@/components/ui/cosmetic-name";
@@ -125,10 +127,20 @@ function getGameInviteStatusLabel(status: ConversationGameStatus) {
     case "pending":
       return "Ожидает ответа";
     case "active":
-      return "Игра идет";
+      return "Игра активна";
     case "completed":
-      return "Игра завершена";
+      return "Инвайт закрыт";
   }
+}
+
+function getGameInviteHeadline(
+  isOwnMessage: boolean,
+  senderName: string,
+  gameTitle: string,
+) {
+  return isOwnMessage
+    ? `🎮 Вы предлагаете сыграть в ${gameTitle}`
+    : `🎮 ${senderName} предлагает сыграть в ${gameTitle}`;
 }
 
 function readFileAsDataUrl(file: Blob) {
@@ -249,6 +261,9 @@ export function ChatMessages({
   const [isProcessingAttachment, setIsProcessingAttachment] = useState(false);
   const [errorMessage, setErrorMessage] = useState("");
   const [isSendingInvite, startSendingInviteTransition] = useTransition();
+  const [isUpdatingGameInvite, startGameInviteTransition] = useTransition();
+  const [pendingGameInviteMessageId, setPendingGameInviteMessageId] = useState<string | null>(null);
+  const [openGameMessageId, setOpenGameMessageId] = useState<string | null>(null);
   const previousMessageCountRef = useRef(initialMessages.length);
   const latestMessageCreatedAtRef = useRef<string | null>(
     initialMessages[initialMessages.length - 1]?.createdAt ?? null,
@@ -257,6 +272,7 @@ export function ChatMessages({
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const typingTimeoutRef = useRef<number | null>(null);
   const hasActiveTypingRef = useRef(false);
+  const autoOpenedGameMessageIdsRef = useRef<Set<string>>(new Set());
   const remoteTypingUsers = typingUsers.filter(
     (typingUser) => typingUser.senderId !== currentUserId,
   );
@@ -267,7 +283,10 @@ export function ChatMessages({
     setDraftMessage("");
     setDraftImageBase64(null);
     setErrorMessage("");
+    setOpenGameMessageId(null);
+    setPendingGameInviteMessageId(null);
     previousMessageCountRef.current = initialMessages.length;
+    autoOpenedGameMessageIdsRef.current = new Set();
     latestMessageCreatedAtRef.current =
       initialMessages[initialMessages.length - 1]?.createdAt ?? null;
   }, [conversationId, initialMessages]);
@@ -279,6 +298,34 @@ export function ChatMessages({
       latestMessageCreatedAtRef.current = latestMessage.createdAt;
     }
   }, [messages]);
+
+  useEffect(() => {
+    const activeGameMessages = messages.filter(
+      (message) =>
+        message.type === "GAME_INVITE" &&
+        message.gameMetadata?.status === "active",
+    );
+    const latestActiveGameMessage =
+      activeGameMessages[activeGameMessages.length - 1] ?? null;
+
+    if (
+      openGameMessageId &&
+      !activeGameMessages.some((message) => message.id === openGameMessageId)
+    ) {
+      setOpenGameMessageId(null);
+    }
+
+    if (!latestActiveGameMessage) {
+      return;
+    }
+
+    if (autoOpenedGameMessageIdsRef.current.has(latestActiveGameMessage.id)) {
+      return;
+    }
+
+    autoOpenedGameMessageIdsRef.current.add(latestActiveGameMessage.id);
+    setOpenGameMessageId(latestActiveGameMessage.id);
+  }, [messages, openGameMessageId]);
 
   useEffect(() => {
     let isMounted = true;
@@ -717,10 +764,66 @@ export function ChatMessages({
     });
   }
 
+  function handleUpdateInviteStatus(
+    message: ChatMessage,
+    status: "active" | "completed",
+  ) {
+    setErrorMessage("");
+    setPendingGameInviteMessageId(message.id);
+
+    startGameInviteTransition(() => {
+      void (async () => {
+        try {
+          const result = await updateGameInviteStatus(
+            conversationId,
+            message.id,
+            status,
+          );
+
+          setMessages((currentMessages) =>
+            mergeMessages(currentMessages, [result.message]),
+          );
+
+          if (status === "active") {
+            autoOpenedGameMessageIdsRef.current.add(result.message.id);
+            setOpenGameMessageId(result.message.id);
+          }
+
+          if (status === "completed") {
+            setOpenGameMessageId((currentOpenGameMessageId) =>
+              currentOpenGameMessageId === message.id ? null : currentOpenGameMessageId,
+            );
+          }
+        } catch (error) {
+          setErrorMessage(
+            error instanceof Error
+              ? error.message
+              : "Не удалось обновить состояние игровой сессии.",
+          );
+        } finally {
+          setPendingGameInviteMessageId(null);
+        }
+      })();
+    });
+  }
+
   const isMutating = isSending || isProcessingAttachment || isSendingInvite;
+  const openGameMessage = openGameMessageId
+    ? messages.find(
+        (message) =>
+          message.id === openGameMessageId &&
+          message.type === "GAME_INVITE" &&
+          message.gameMetadata?.status === "active",
+      ) ?? null
+    : null;
+  const openGameHostName = openGameMessage
+    ? openGameMessage.senderId === currentUserId
+      ? "Вы"
+      : getConversationUserLabel(openGameMessage.sender.name)
+    : "";
 
   return (
-    <section className="flex min-h-0 flex-1 flex-col bg-[#0f1318]">
+    <section className="relative flex min-h-0 flex-1 flex-col overflow-hidden bg-[#0f1318]">
       <div ref={chatScrollContainerRef} className="flex-1 overflow-y-auto p-4">
         <div className="space-y-4">
           {messages.length === 0 ? (
@@ -757,9 +860,30 @@ export function ChatMessages({
               const inviteGameTitle = message.gameMetadata
                 ? getGameTitle(message.gameMetadata.game)
                 : null;
-              const inviteDescription = isOwnMessage
-                ? "Вы отправили приглашение в мини-игру."
-                : "Собеседник приглашает вас сыграть прямо в этом чате.";
+              const isInviteInitiator =
+                message.type === "GAME_INVITE" &&
+                message.gameMetadata?.initiatorId === currentUserId;
+              const canAcceptInvite =
+                message.type === "GAME_INVITE" &&
+                message.gameMetadata?.status === "pending" &&
+                !isInviteInitiator;
+              const canCancelInvite =
+                message.type === "GAME_INVITE" &&
+                message.gameMetadata?.status === "pending" &&
+                isInviteInitiator;
+              const canResumeGame =
+                message.type === "GAME_INVITE" &&
+                message.gameMetadata?.status === "active";
+              const isInviteActionPending =
+                isUpdatingGameInvite && pendingGameInviteMessageId === message.id;
+              const inviteHeadline =
+                message.type === "GAME_INVITE" && inviteGameTitle
+                  ? getGameInviteHeadline(
+                      isOwnMessage,
+                      getConversationUserLabel(message.sender.name),
+                      inviteGameTitle,
+                    )
+                  : null;
 
               return (
                 <div
@@ -787,25 +911,71 @@ export function ChatMessages({
                       )}
                     </p>
                     {message.type === "GAME_INVITE" && message.gameMetadata ? (
-                      <div className="mt-2 rounded-[1.25rem] border border-emerald-400/15 bg-emerald-500/10 p-4 text-left shadow-[0_12px_30px_rgba(0,0,0,0.16)]">
-                        <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-emerald-200/80">
-                          Мини-игра
+                      <div className="mt-2 rounded-[1.35rem] border border-emerald-400/20 bg-[linear-gradient(180deg,rgba(16,185,129,0.16),rgba(6,95,70,0.12))] p-4 text-left shadow-[0_18px_40px_rgba(0,0,0,0.22)]">
+                        <div className="flex flex-wrap items-start justify-between gap-3">
+                          <div>
+                            <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-emerald-200/80">
+                              Игровой инвайт
+                            </p>
+                            <p className="mt-2 text-base font-semibold leading-7 text-white">
+                              {inviteHeadline}
+                            </p>
+                          </div>
+                          {inviteStatusLabel ? (
+                            <span className="inline-flex rounded-full border border-emerald-300/20 bg-emerald-400/10 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.16em] text-emerald-100">
+                              {inviteStatusLabel}
+                            </span>
+                          ) : null}
+                        </div>
+
+                        <p className="mt-3 text-sm leading-6 text-zinc-100/90">
+                          {canAcceptInvite
+                            ? "Примите приглашение, чтобы открыть игровое окно у обоих участников."
+                            : canCancelInvite
+                              ? "Вы можете отменить приглашение, пока собеседник его не принял."
+                              : canResumeGame
+                                ? "Игровая сессия уже активна. Откройте её поверх диалога одним кликом."
+                                : "Инвайт остаётся в истории чата как точка входа в мини-игру."}
                         </p>
-                        <p className="mt-2 text-base font-semibold text-white">
-                          {inviteGameTitle}
-                        </p>
-                        <p className="mt-2 text-sm leading-6 text-zinc-100/90">
-                          {inviteDescription}
-                        </p>
+
                         {message.text ? (
                           <p className="mt-3 text-sm leading-6 text-zinc-300">
                             <CensoredText text={message.text} />
                           </p>
                         ) : null}
-                        {inviteStatusLabel ? (
-                          <span className="mt-3 inline-flex rounded-full border border-emerald-300/20 bg-emerald-400/10 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.16em] text-emerald-100">
-                            {inviteStatusLabel}
-                          </span>
+
+                        {canAcceptInvite || canCancelInvite || canResumeGame ? (
+                          <div className="mt-4 flex flex-wrap gap-3">
+                            {canAcceptInvite ? (
+                              <Button
+                                onClick={() => handleUpdateInviteStatus(message, "active")}
+                                disabled={isInviteActionPending}
+                                className="rounded-xl bg-emerald-500 px-4 text-white hover:bg-emerald-400"
+                              >
+                                {isInviteActionPending ? "Подключаем..." : "Принять"}
+                              </Button>
+                            ) : null}
+
+                            {canCancelInvite ? (
+                              <Button
+                                variant="ghost"
+                                onClick={() => handleUpdateInviteStatus(message, "completed")}
+                                disabled={isInviteActionPending}
+                                className="rounded-xl border border-red-400/20 bg-red-500/10 px-4 text-red-100 hover:bg-red-500/20"
+                              >
+                                {isInviteActionPending ? "Отменяем..." : "Отменить"}
+                              </Button>
+                            ) : null}
+
+                            {canResumeGame ? (
+                              <Button
+                                onClick={() => setOpenGameMessageId(message.id)}
+                                className="rounded-xl bg-sky-500 px-4 text-white hover:bg-sky-400"
+                              >
+                                Вернуться к игре
+                              </Button>
+                            ) : null}
+                          </div>
                         ) : null}
                       </div>
                     ) : message.text ? (
@@ -833,6 +1003,15 @@ export function ChatMessages({
           )}
         </div>
       </div>
+
+      {openGameMessage?.gameMetadata ? (
+        <MiniGameContainer
+          game={openGameMessage.gameMetadata.game}
+          sessionId={openGameMessage.gameMetadata.sessionId ?? openGameMessage.id}
+          hostName={openGameHostName}
+          onClose={() => setOpenGameMessageId(null)}
+        />
+      ) : null}
 
       <div className="shrink-0 border-t border-gray-800 bg-[#11151b] p-4">
         {remoteTypingUsers.length > 0 ? (

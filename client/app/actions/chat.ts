@@ -16,8 +16,9 @@ import {
   markConversationMessagesAsRead as markConversationMessagesAsReadRecord,
   softDeleteConversationByUser,
   toggleArchiveConversationByUser,
+  updateConversationGameInviteStatus as updateConversationGameInviteStatusRecord,
 } from "@/lib/domain/chat-service";
-import type { ConversationGameType } from "@/lib/pusher";
+import type { ConversationGameStatus, ConversationGameType } from "@/lib/pusher";
 
 interface StartDirectConversationResult {
   ok: boolean;
@@ -212,6 +213,12 @@ function isSupportedConversationGameType(
   return gameType === "crocodile";
 }
 
+function isSupportedConversationGameStatus(
+  status: string,
+): status is Exclude<ConversationGameStatus, "pending"> {
+  return status === "active" || status === "completed";
+}
+
 function getConversationGameInviteText(gameType: ConversationGameType) {
   switch (gameType) {
     case "crocodile":
@@ -239,6 +246,29 @@ export async function sendGameInvite(
       status: "pending",
       initiatorId: userId,
     },
+  });
+
+  revalidateChatPaths(result.conversationId);
+
+  return result;
+}
+
+export async function updateGameInviteStatus(
+  conversationId: string,
+  messageId: string,
+  status: "active" | "completed",
+) {
+  const userId = await requireActiveChatUserId();
+
+  if (!isSupportedConversationGameStatus(status)) {
+    throw new Error("Unsupported game invite status.");
+  }
+
+  const result = await updateConversationGameInviteStatusRecord({
+    conversationId,
+    messageId,
+    userId,
+    status,
   });
 
   revalidateChatPaths(result.conversationId);

@@ -79,6 +79,21 @@ function parseConversationGameMetadata(value: unknown): ConversationGameMetadata
   };
 }
 
+function toConversationGameMetadataData(
+  gameMetadata: ConversationGameMetadata,
+): Prisma.InputJsonObject {
+  return {
+    game: gameMetadata.game,
+    status: gameMetadata.status,
+    initiatorId: gameMetadata.initiatorId,
+    ...(gameMetadata.sessionId
+      ? {
+          sessionId: gameMetadata.sessionId,
+        }
+      : {}),
+  };
+}
+
 async function getConversationContextById(conversationId: string) {
   return prisma.conversation.findUnique({
     where: {
@@ -855,17 +870,8 @@ export async function createConversationMessage(input: {
     messageType === MessageType.GAME_INVITE
       ? parseConversationGameMetadata(gameMetadataInput)
       : null;
-  const gameMetadataData: Prisma.InputJsonObject | null = gameMetadata
-    ? {
-        game: gameMetadata.game,
-        status: gameMetadata.status,
-        initiatorId: gameMetadata.initiatorId,
-        ...(gameMetadata.sessionId
-          ? {
-              sessionId: gameMetadata.sessionId,
-            }
-          : {}),
-      }
+  const gameMetadataData = gameMetadata
+    ? toConversationGameMetadataData(gameMetadata)
     : null;
 
   if (!conversationId) {
@@ -1059,6 +1065,174 @@ export async function createConversationMessage(input: {
     message: serializedMessage,
     systemMessage: serializedSystemMessage,
     typingUsers,
+  };
+}
+
+export async function updateConversationGameInviteStatus(input: {
+  conversationId: string;
+  messageId: string;
+  userId: string;
+  status: "active" | "completed";
+}) {
+  const conversationId = normalizeText(input.conversationId);
+  const messageId = normalizeText(input.messageId);
+  const userId = normalizeText(input.userId);
+
+  if (!conversationId) {
+    throw new Error("conversationId is required.");
+  }
+
+  if (!messageId) {
+    throw new Error("messageId is required.");
+  }
+
+  if (!userId) {
+    throw new Error("userId is required.");
+  }
+
+  const conversation = await prisma.conversation.findUnique({
+    where: {
+      id: conversationId,
+    },
+    select: {
+      id: true,
+      buyerId: true,
+      sellerId: true,
+    },
+  });
+
+  if (!conversation) {
+    throw new Error(`Conversation with id ${conversationId} was not found.`);
+  }
+
+  ensureConversationParticipant(userId, conversation);
+
+  const existingMessage = await prisma.message.findUnique({
+    where: {
+      id: messageId,
+    },
+    select: {
+      id: true,
+      conversationId: true,
+      text: true,
+      type: true,
+      imageUrl: true,
+      gameMetadata: true,
+      isSystem: true,
+      isRead: true,
+      senderId: true,
+      createdAt: true,
+      updatedAt: true,
+      sender: {
+        select: {
+          id: true,
+          name: true,
+          image: true,
+          ...USER_APPEARANCE_SELECT,
+        },
+      },
+    },
+  });
+
+  if (!existingMessage || existingMessage.conversationId !== conversation.id) {
+    throw new Error(`Game invite message with id ${messageId} was not found.`);
+  }
+
+  if (existingMessage.type !== MessageType.GAME_INVITE) {
+    throw new Error("Only game invite messages can update game state.");
+  }
+
+  const currentGameMetadata = parseConversationGameMetadata(existingMessage.gameMetadata);
+
+  if (!currentGameMetadata) {
+    throw new Error("Game invite metadata is missing or invalid.");
+  }
+
+  const isInitiator = currentGameMetadata.initiatorId === userId;
+
+  if (input.status === "active") {
+    if (currentGameMetadata.status !== "pending") {
+      throw new Error("Only pending game invites can be accepted.");
+    }
+
+    if (isInitiator) {
+      throw new Error("Only the invited user can accept this game invite.");
+    }
+  }
+
+  if (input.status === "completed") {
+    if (currentGameMetadata.status !== "pending") {
+      throw new Error("Only pending game invites can be cancelled.");
+    }
+
+    if (!isInitiator) {
+      throw new Error("Only the initiator can cancel this game invite.");
+    }
+  }
+
+  const nextGameMetadata: ConversationGameMetadata = {
+    ...currentGameMetadata,
+    status: input.status,
+    sessionId:
+      input.status === "active"
+        ? currentGameMetadata.sessionId ?? existingMessage.id
+        : currentGameMetadata.sessionId ?? null,
+  };
+
+  const updatedMessage = await prisma.$transaction(
+    async (transactionClient) => {
+      const message = await transactionClient.message.update({
+        where: {
+          id: existingMessage.id,
+        },
+        data: {
+          gameMetadata: toConversationGameMetadataData(nextGameMetadata),
+        },
+        select: {
+          id: true,
+          text: true,
+          type: true,
+          imageUrl: true,
+          gameMetadata: true,
+          isSystem: true,
+          isRead: true,
+          senderId: true,
+          createdAt: true,
+          updatedAt: true,
+          sender: {
+            select: {
+              id: true,
+              name: true,
+              image: true,
+              ...USER_APPEARANCE_SELECT,
+            },
+          },
+        },
+      });
+
+      await transactionClient.conversation.update({
+        where: {
+          id: conversation.id,
+        },
+        data: {
+          updatedAt: new Date(),
+        },
+      });
+
+      return message;
+    },
+    {
+      isolationLevel: Prisma.TransactionIsolationLevel.Serializable,
+    },
+  );
+
+  const serializedMessage = serializeConversationMessage(updatedMessage);
+
+  await publishConversationMessageEvent(conversation.id, serializedMessage);
+
+  return {
+    conversationId: conversation.id,
+    message: serializedMessage,
   };
 }
 
