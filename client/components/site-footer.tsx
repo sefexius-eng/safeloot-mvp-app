@@ -22,7 +22,18 @@ const INFO_LINKS = [
   },
 ];
 
-const COMMUNITY_LINKS = ["Telegram", "Discord"];
+const COMMUNITY_LINKS = [
+  {
+    label: "Telegram",
+    href: "https://t.me/safelootmarket",
+    external: true,
+  },
+  {
+    label: "Discord",
+    href: "#",
+    external: false,
+  },
+];
 
 const PAYMENT_METHODS = ["Visa", "Mastercard", "USDT", "TON"];
 
@@ -82,13 +93,15 @@ export function SiteFooter() {
               Соцсети
             </p>
             <div className="mt-4 flex flex-col gap-3 text-sm text-zinc-400">
-              {COMMUNITY_LINKS.map((label) => (
+              {COMMUNITY_LINKS.map((link) => (
                 <Link
-                  key={label}
-                  href="/help"
+                  key={link.label}
+                  href={link.href}
+                  target={link.external ? "_blank" : undefined}
+                  rel={link.external ? "noopener noreferrer" : undefined}
                   className="transition hover:text-white"
                 >
-                  {label}
+                  {link.label}
                 </Link>
               ))}
             </div>
