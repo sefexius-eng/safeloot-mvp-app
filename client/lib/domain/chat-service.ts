@@ -22,7 +22,7 @@ import {
   formatMoney,
   getTypingUsers,
   MAX_MESSAGE_IMAGE_BASE64_LENGTH,
-  moderateDealRoomMessageText,
+  moderateAntiLeakageMessageText,
   normalizeOptionalText,
   normalizeText,
   setTypingState,
@@ -544,7 +544,7 @@ export async function createConversationMessage(input: {
 }) {
   const conversationId = normalizeText(input.conversationId);
   const senderId = normalizeText(input.senderId);
-  const moderationResult = moderateDealRoomMessageText(input.text);
+  const moderationResult = moderateAntiLeakageMessageText(input.text);
   const text = moderationResult.text;
   const imageBase64 = normalizeOptionalText(input.imageBase64);
 

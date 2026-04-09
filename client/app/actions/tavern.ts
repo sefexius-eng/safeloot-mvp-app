@@ -52,6 +52,12 @@ async function requireTavernModerator() {
 export async function sendTavernMessage(
   text: string,
 ): Promise<SendTavernMessageResult> {
+  return sendGlobalMessage(text);
+}
+
+export async function sendGlobalMessage(
+  text: string,
+): Promise<SendTavernMessageResult> {
   try {
     const currentUser = await requireActiveTavernUser();
     const tavernMessage = await createTavernMessage({

@@ -21,7 +21,8 @@ const MAX_PRODUCT_IMAGE_BASE64_LENGTH = 2_000_000;
 const PRODUCT_IMAGE_BASE64_PATTERN =
   /^data:image\/webp;base64,[A-Za-z0-9+/=]+$/;
 export const ZERO_MONEY = new Prisma.Decimal(0);
-const DEAL_ROOM_CONTACTS_PLACEHOLDER = "[КОНТАКТЫ СКРЫТЫ]";
+const ANTI_LEAKAGE_REDACTED_PLACEHOLDER = "[СКРЫТО]";
+const ANTI_LEAKAGE_LINK_PLACEHOLDER = "[ССЫЛКА УДАЛЕНА]";
 export const DEAL_ROOM_SECURITY_WARNING =
   "⚠️ Внимание! Переход в сторонние мессенджеры и передача личных контактов запрещены. Это лишает вас защиты SafeLoot и может привести к блокировке.";
 const TERMINAL_ORDER_STATUSES = [
@@ -30,18 +31,20 @@ const TERMINAL_ORDER_STATUSES = [
   OrderStatus.CANCELLED,
 ] as const;
 
-const DEAL_ROOM_CONTACT_BLACKLIST_REGEX =
+const MESSAGE_CONTACT_BLACKLIST_REGEX =
   /(?<![\p{L}\p{N}_])(?:discord|дискорд|tg|тг|telegram|телеграм|skype|whatsapp|вк|vk|номер|кидай\s+на|на\s+карту)(?![\p{L}\p{N}_])/giu;
-const DEAL_ROOM_LINK_REGEX =
+const MESSAGE_COMPETITOR_BLACKLIST_REGEX =
+  /(?<![\p{L}\p{N}_])(?:funpay|фанпей|player\s*ok|playerok|плеерок|g2g|plati(?:\.ru)?|плати|ggsel|ггсел|eldorado|эльдорадо|zaka(?:-|\s)?zaka|lolz|лолз|zelenka|зеленка)(?![\p{L}\p{N}_])/giu;
+const MESSAGE_LINK_REGEX =
   /(?:https?:\/\/|www\.)\S+|(?<![\p{L}\p{N}_])(?:[a-z0-9-]+\.)+(?:com|ru|net|org|gg|me|io|app|dev|xyz|info|biz|link|shop|su|ua|tv|cc|to)(?:\/\S*)?/giu;
-const DEAL_ROOM_USERNAME_REGEX = /@[a-z0-9_]{2,}/giu;
-const DEAL_ROOM_EMAIL_REGEX =
+const MESSAGE_USERNAME_REGEX = /@[a-z0-9_]{2,}/giu;
+const MESSAGE_EMAIL_REGEX =
   /\b[a-z0-9._%+-]+@[a-z0-9.-]+\.[a-z]{2,}\b/giu;
-const DEAL_ROOM_CARD_CANDIDATE_REGEX =
+const MESSAGE_CARD_CANDIDATE_REGEX =
   /(?<![\p{L}\p{N}])(?:\d[\s-]?){13,19}(?![\p{L}\p{N}])/gu;
-const DEAL_ROOM_PHONE_CANDIDATE_REGEX =
+const MESSAGE_PHONE_CANDIDATE_REGEX =
   /(?<![\p{L}\p{N}])(?:\+?\d[\d\s().-]{8,}\d)(?![\p{L}\p{N}])/gu;
-const DEAL_ROOM_CRYPTO_WALLET_REGEX =
+const MESSAGE_CRYPTO_WALLET_REGEX =
   /(?<![\p{L}\p{N}])(?:0x[a-f0-9]{40}|bc1[a-z0-9]{25,62}|[13][a-km-zA-HJ-NP-Z1-9]{25,34}|T[a-zA-HJ-NP-Z1-9]{33})(?![\p{L}\p{N}])/giu;
 
 const chatTypingState = new Map<string, Map<string, number>>();
@@ -321,9 +324,10 @@ function countDigits(value: string) {
   return value.replace(/\D/g, "").length;
 }
 
-function replaceSensitiveDealRoomMatches(
+function replaceSensitiveMessageMatches(
   value: string,
   pattern: RegExp,
+  replacement: string,
   predicate?: (match: string) => boolean,
 ) {
   return value.replace(pattern, (match) => {
@@ -331,7 +335,7 @@ function replaceSensitiveDealRoomMatches(
       return match;
     }
 
-    return DEAL_ROOM_CONTACTS_PLACEHOLDER;
+    return replacement;
   });
 }
 
@@ -355,7 +359,7 @@ function isLikelyPhoneNumber(value: string) {
   return true;
 }
 
-export function moderateDealRoomMessageText(value?: string) {
+export function moderateAntiLeakageMessageText(value?: string) {
   const normalizedValue = normalizeText(value);
 
   if (!normalizedValue) {
@@ -365,52 +369,72 @@ export function moderateDealRoomMessageText(value?: string) {
     };
   }
 
-  let sanitizedValue = replaceSensitiveDealRoomMatches(
+  let sanitizedValue = replaceSensitiveMessageMatches(
     normalizedValue,
-    DEAL_ROOM_EMAIL_REGEX,
+    MESSAGE_EMAIL_REGEX,
+    ANTI_LEAKAGE_REDACTED_PLACEHOLDER,
   );
 
-  sanitizedValue = replaceSensitiveDealRoomMatches(
+  sanitizedValue = replaceSensitiveMessageMatches(
     sanitizedValue,
-    DEAL_ROOM_LINK_REGEX,
+    MESSAGE_COMPETITOR_BLACKLIST_REGEX,
+    ANTI_LEAKAGE_REDACTED_PLACEHOLDER,
   );
-  sanitizedValue = replaceSensitiveDealRoomMatches(
+  sanitizedValue = replaceSensitiveMessageMatches(
     sanitizedValue,
-    DEAL_ROOM_USERNAME_REGEX,
+    MESSAGE_LINK_REGEX,
+    ANTI_LEAKAGE_LINK_PLACEHOLDER,
   );
-  sanitizedValue = replaceSensitiveDealRoomMatches(
+  sanitizedValue = replaceSensitiveMessageMatches(
     sanitizedValue,
-    DEAL_ROOM_CONTACT_BLACKLIST_REGEX,
+    MESSAGE_USERNAME_REGEX,
+    ANTI_LEAKAGE_REDACTED_PLACEHOLDER,
   );
-  sanitizedValue = replaceSensitiveDealRoomMatches(
+  sanitizedValue = replaceSensitiveMessageMatches(
     sanitizedValue,
-    DEAL_ROOM_CARD_CANDIDATE_REGEX,
+    MESSAGE_CONTACT_BLACKLIST_REGEX,
+    ANTI_LEAKAGE_REDACTED_PLACEHOLDER,
+  );
+  sanitizedValue = replaceSensitiveMessageMatches(
+    sanitizedValue,
+    MESSAGE_CARD_CANDIDATE_REGEX,
+    ANTI_LEAKAGE_REDACTED_PLACEHOLDER,
     isLikelyCardNumber,
   );
-  sanitizedValue = replaceSensitiveDealRoomMatches(
+  sanitizedValue = replaceSensitiveMessageMatches(
     sanitizedValue,
-    DEAL_ROOM_PHONE_CANDIDATE_REGEX,
+    MESSAGE_PHONE_CANDIDATE_REGEX,
+    ANTI_LEAKAGE_REDACTED_PLACEHOLDER,
     isLikelyPhoneNumber,
   );
-  sanitizedValue = replaceSensitiveDealRoomMatches(
+  sanitizedValue = replaceSensitiveMessageMatches(
     sanitizedValue,
-    DEAL_ROOM_CRYPTO_WALLET_REGEX,
+    MESSAGE_CRYPTO_WALLET_REGEX,
+    ANTI_LEAKAGE_REDACTED_PLACEHOLDER,
   )
     .replace(
-      /(?:\[КОНТАКТЫ СКРЫТЫ\](?:\s*[,:;.-]?\s*)?){2,}/g,
-      `${DEAL_ROOM_CONTACTS_PLACEHOLDER} `,
+      /(?:\[СКРЫТО\](?:\s*[,:;.-]?\s*)?){2,}/g,
+      `${ANTI_LEAKAGE_REDACTED_PLACEHOLDER} `,
+    )
+    .replace(
+      /(?:\[ССЫЛКА УДАЛЕНА\](?:\s*[,:;.-]?\s*)?){2,}/g,
+      `${ANTI_LEAKAGE_LINK_PLACEHOLDER} `,
     )
     .replace(/\s{2,}/g, " ")
     .trim();
 
   if (!sanitizedValue) {
-    sanitizedValue = DEAL_ROOM_CONTACTS_PLACEHOLDER;
+    sanitizedValue = ANTI_LEAKAGE_REDACTED_PLACEHOLDER;
   }
 
   return {
     text: sanitizedValue,
     wasBlocked: sanitizedValue !== normalizedValue,
   };
+}
+
+export function moderateDealRoomMessageText(value?: string) {
+  return moderateAntiLeakageMessageText(value);
 }
 
 export function ensureOrderParticipant(

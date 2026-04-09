@@ -7,7 +7,10 @@ import {
   type RealtimeTavernMessagePayload,
 } from "@/lib/pusher";
 
-import { normalizeText } from "@/lib/domain/shared";
+import {
+  moderateAntiLeakageMessageText,
+  normalizeText,
+} from "@/lib/domain/shared";
 
 const DEFAULT_TAVERN_MESSAGES_LIMIT = 30;
 const MAX_TAVERN_MESSAGE_LENGTH = 280;
@@ -108,9 +111,15 @@ export async function createTavernMessage(input: {
   userId?: string | null;
   isSystem?: boolean;
 }) {
-  const text = normalizeText(input.text);
-  const userId = normalizeText(input.userId ?? undefined);
   const isSystem = Boolean(input.isSystem);
+  const moderationResult = isSystem
+    ? {
+        text: normalizeText(input.text),
+        wasBlocked: false,
+      }
+    : moderateAntiLeakageMessageText(input.text);
+  const text = moderationResult.text;
+  const userId = normalizeText(input.userId ?? undefined);
 
   if (!text) {
     throw new Error("Введите сообщение для таверны.");
