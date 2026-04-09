@@ -1,3 +1,5 @@
+import type { Role } from "@prisma/client";
+
 type PusherServerConstructor = typeof import("pusher");
 
 export type BrowserPusherChannel = import("pusher-js").Channel;
@@ -14,6 +16,11 @@ export interface RealtimeUserIdentity {
   id: string;
   name: string | null;
   image: string | null;
+}
+
+export interface RealtimeTavernUserIdentity extends RealtimeUserIdentity {
+  role: Role | null;
+  badges: string[];
 }
 
 export interface RealtimeNotificationPayload {
@@ -73,7 +80,7 @@ export interface RealtimeTavernMessagePayload {
   isSystem: boolean;
   createdAt: string;
   displayName: string;
-  user: RealtimeUserIdentity | null;
+  user: RealtimeTavernUserIdentity | null;
 }
 
 export const PUSHER_MESSAGE_EVENT = "new-message";

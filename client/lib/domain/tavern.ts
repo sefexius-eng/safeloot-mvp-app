@@ -1,3 +1,5 @@
+import type { Role } from "@prisma/client";
+
 import { prisma } from "@/lib/prisma";
 import {
   publishTavernMessageEvent,
@@ -19,6 +21,8 @@ interface TavernMessageRecord {
     name: string | null;
     email: string;
     image: string | null;
+    role: Role;
+    badges: string[];
   } | null;
 }
 
@@ -59,6 +63,8 @@ function mapTavernMessage(
           id: message.user.id,
           name: displayName,
           image: message.user.image,
+          role: message.user.role,
+          badges: message.user.badges,
         }
       : null,
   };
@@ -76,6 +82,8 @@ function getTavernMessageSelect() {
         name: true,
         email: true,
         image: true,
+        role: true,
+        badges: true,
       },
     },
   } as const;

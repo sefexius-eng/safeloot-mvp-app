@@ -6,6 +6,7 @@ import { useSession } from "next-auth/react";
 
 import { sendTavernMessage } from "@/app/actions/tavern";
 import { Button } from "@/components/ui/button";
+import { UserAvatar } from "@/components/ui/user-avatar";
 import {
   getGlobalTavernChannelName,
   getPusherClient,
@@ -54,6 +55,14 @@ function getMessageInitial(message: RealtimeTavernMessagePayload) {
   }
 
   return message.displayName.slice(0, 1).toUpperCase() || "T";
+}
+
+function getTavernProfileHref(message: RealtimeTavernMessagePayload) {
+  if (!message.user?.id) {
+    return null;
+  }
+
+  return `/user/${message.user.id}`;
 }
 
 export function TavernPanel({ initialMessages }: TavernPanelProps) {
@@ -226,22 +235,47 @@ export function TavernPanel({ initialMessages }: TavernPanelProps) {
                   )}
                 >
                   <div className="flex items-start gap-3">
-                    <div
-                      className={cn(
-                        "flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl border text-xs font-semibold uppercase shadow-[0_12px_28px_rgba(0,0,0,0.18)]",
-                        message.isSystem
-                          ? "border-orange-200/20 bg-orange-500/15 text-orange-50"
-                          : "border-white/10 bg-black/20 text-white",
-                      )}
-                    >
-                      {getMessageInitial(message)}
-                    </div>
+                    {getTavernProfileHref(message) ? (
+                      <Link
+                        href={getTavernProfileHref(message)!}
+                        className="shrink-0 transition hover:scale-[1.03] hover:opacity-95"
+                        aria-label={`Открыть профиль ${message.displayName}`}
+                      >
+                        <UserAvatar
+                          src={message.user?.image}
+                          name={message.user?.name ?? message.displayName}
+                          alt={`Аватар ${message.displayName}`}
+                          className="h-10 w-10 border-white/10 bg-zinc-900/80 shadow-[0_12px_28px_rgba(0,0,0,0.18)]"
+                          imageClassName="rounded-full object-cover"
+                        />
+                      </Link>
+                    ) : (
+                      <div
+                        className={cn(
+                          "flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl border text-xs font-semibold uppercase shadow-[0_12px_28px_rgba(0,0,0,0.18)]",
+                          message.isSystem
+                            ? "border-orange-200/20 bg-orange-500/15 text-orange-50"
+                            : "border-white/10 bg-black/20 text-white",
+                        )}
+                      >
+                        {getMessageInitial(message)}
+                      </div>
+                    )}
 
                     <div className="min-w-0 flex-1">
                       <div className="flex flex-wrap items-center gap-2">
-                        <p className="text-sm font-semibold text-white">
-                          {message.displayName}
-                        </p>
+                        {getTavernProfileHref(message) ? (
+                          <Link
+                            href={getTavernProfileHref(message)!}
+                            className="text-sm font-semibold text-white transition hover:text-orange-100 hover:underline underline-offset-4"
+                          >
+                            {message.displayName}
+                          </Link>
+                        ) : (
+                          <p className="text-sm font-semibold text-white">
+                            {message.displayName}
+                          </p>
+                        )}
                         {message.isSystem ? (
                           <span className="rounded-full border border-orange-200/20 bg-orange-950/20 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.18em] text-orange-100">
                             Информатор
