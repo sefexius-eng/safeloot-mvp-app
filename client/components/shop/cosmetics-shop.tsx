@@ -22,17 +22,16 @@ import {
   COSMETIC_RARITY_ORDER,
   COSMETIC_TYPE_LABELS,
   COSMETIC_TYPE_ORDER,
-  extractUserAppearance,
   getActiveAppearanceValue,
   getCosmeticRarity,
   type CosmeticRarity,
   type CosmeticCatalogItem,
   type CosmeticsShopState,
   type CosmeticsViewerState,
+  type UserAppearanceData,
 } from "@/lib/cosmetics";
 import { isAdminRole } from "@/lib/roles";
 import { cn } from "@/lib/utils";
-import { ProfileHero } from "@/components/profile/profile-hero";
 
 const BALANCE_REFRESH_EVENT = "safeloot:balances-refresh";
 
@@ -61,6 +60,12 @@ const SHOP_SECONDARY_BUTTON_CLASS_NAME =
 
 const SHOP_SECONDARY_WIDE_BUTTON_CLASS_NAME =
   "border border-white/20 bg-white/5 px-4 text-white hover:-translate-y-0.5 hover:bg-white/10";
+
+const SHOP_PREVIEW_BUTTON_CLASS_NAME =
+  "border border-white/20 bg-white/5 px-4 text-white hover:-translate-y-0.5 hover:bg-white/10";
+
+const SHOP_PREVIEW_ACTIVE_BUTTON_CLASS_NAME =
+  "border border-sky-500/30 bg-sky-500/15 px-4 text-sky-100 hover:-translate-y-0.5 hover:bg-sky-500/20";
 
 const SHOP_INLINE_EDITOR_INPUT_CLASS_NAME =
   "h-9 w-full rounded-xl border border-white/10 bg-white/5 px-3 text-sm text-white outline-none transition placeholder:text-zinc-500 focus:border-white/20 focus:bg-white/10";
@@ -426,16 +431,21 @@ function CosmeticPreview({
 export function CosmeticsShop({
   initialState,
   currentUserRole,
+  previewAppearance,
+  onPreview,
+  onViewerChange,
 }: {
   initialState: CosmeticsShopState;
   currentUserRole: Role | null;
+  previewAppearance: UserAppearanceData;
+  onPreview: (type: CosmeticType, value: string | null) => void;
+  onViewerChange: (viewer: CosmeticsViewerState) => void;
 }) {
-  const { formatBalance, formatPrice } = useCurrency();
+  const { formatPrice } = useCurrency();
   const router = useRouter();
   const [activeType, setActiveType] = useState<CosmeticType>("COLOR");
   const [sortMode, setSortMode] = useState<ShopSortMode>("recommended");
   const [searchQuery, setSearchQuery] = useState("");
-  const [previewCosmeticId, setPreviewCosmeticId] = useState<string | null>(null);
   const [viewer, setViewer] = useState(initialState.viewer);
   const [cosmetics, setCosmetics] = useState(initialState.cosmetics);
   const [feedback, setFeedback] = useState<ShopMessageState>(null);
@@ -453,8 +463,7 @@ export function CosmeticsShop({
   const typeCosmetics = cosmetics.filter((cosmetic) => cosmetic.type === activeType);
   const visibleCosmetics = sortVisibleCosmetics(
     typeCosmetics.filter(
-      (cosmetic) =>
-        matchesCosmeticSearch(cosmetic, normalizedSearchQuery),
+      (cosmetic) => matchesCosmeticSearch(cosmetic, normalizedSearchQuery),
     ),
     sortMode,
     viewerBalance,
@@ -487,19 +496,6 @@ export function CosmeticsShop({
       cosmetic,
     };
   }).filter((value): value is RarityRecommendation => value !== null);
-  const previewCosmetic =
-    typeCosmetics.find((cosmetic) => cosmetic.id === previewCosmeticId) ??
-    slotItems[activeType] ??
-    visibleCosmetics[0] ??
-    typeCosmetics[0] ??
-    null;
-  const previewAppearance = previewCosmetic
-    ? getCosmeticPreviewAppearance(previewCosmetic, viewer)
-    : extractUserAppearance(viewer);
-  const previewRarity = previewCosmetic ? getCosmeticRarity(previewCosmetic.price) : null;
-  const previewRarityAccent = previewRarity ? getRarityAccent(previewRarity) : null;
-  const previewDisplayName = viewer?.name ?? "SafeLoot Player";
-  const previewEmail = viewer?.email ?? "player@safeloot.net";
   const previewCountBase = typeCosmetics.length;
   const canManagePrices = isAdminRole(currentUserRole);
 
@@ -507,6 +503,7 @@ export function CosmeticsShop({
     setViewer(nextViewer);
     setCosmetics((currentCosmetics) => updateCosmeticsForViewer(currentCosmetics, nextViewer));
     setFeedback(message);
+    onViewerChange(nextViewer);
     window.dispatchEvent(new Event(BALANCE_REFRESH_EVENT));
     router.refresh();
   }
@@ -556,289 +553,272 @@ export function CosmeticsShop({
     startTransition(() => {
       void equipCosmeticAction(cosmeticId)
         .then((result) => {
-          if (!result.ok || !result.viewer) {
+            if (!result.ok || !result.viewer) {
+              setFeedback({
+                tone: "error",
+                text: result.message ?? "Не удалось экипировать косметику.",
+              });
+              return;
+            }
+
+            applyViewerState(result.viewer, {
+              tone: "success",
+              text: result.message ?? "Косметика экипирована.",
+            });
+          })
+          .catch(() => {
             setFeedback({
               tone: "error",
-              text: result.message ?? "Не удалось экипировать косметику.",
+              text: "Не удалось экипировать косметику.",
             });
-            return;
-          }
-
-          applyViewerState(result.viewer, {
-            tone: "success",
-            text: result.message ?? "Косметика экипирована.",
+          })
+          .finally(() => {
+            setPendingCosmeticId(null);
           });
-        })
-        .catch(() => {
-          setFeedback({
-            tone: "error",
-            text: "Не удалось экипировать косметику.",
-          });
-        })
-        .finally(() => {
-          setPendingCosmeticId(null);
-        });
-    });
-  }
+      });
+    }
 
-  function handleUnequip(cosmeticType: CosmeticType) {
-    setPendingUnequipType(cosmeticType);
-    setFeedback(null);
+    function handleUnequip(cosmeticType: CosmeticType) {
+      setPendingUnequipType(cosmeticType);
+      setFeedback(null);
 
-    startTransition(() => {
-      void unequipCosmeticAction(cosmeticType)
-        .then((result) => {
-          if (!result.ok || !result.viewer) {
+      startTransition(() => {
+        void unequipCosmeticAction(cosmeticType)
+          .then((result) => {
+            if (!result.ok || !result.viewer) {
+              setFeedback({
+                tone: "error",
+                text: result.message ?? "Не удалось снять косметику.",
+              });
+              return;
+            }
+
+            applyViewerState(result.viewer, {
+              tone: "success",
+              text: result.message ?? getUnequipSuccessMessage(cosmeticType),
+            });
+          })
+          .catch(() => {
             setFeedback({
               tone: "error",
-              text: result.message ?? "Не удалось снять косметику.",
+              text: "Не удалось снять косметику.",
             });
-            return;
-          }
-
-          applyViewerState(result.viewer, {
-            tone: "success",
-            text: result.message ?? getUnequipSuccessMessage(cosmeticType),
+          })
+          .finally(() => {
+            setPendingUnequipType(null);
           });
-        })
-        .catch(() => {
-          setFeedback({
-            tone: "error",
-            text: "Не удалось снять косметику.",
-          });
-        })
-        .finally(() => {
-          setPendingUnequipType(null);
-        });
-    });
-  }
+      });
+    }
 
-  function handleResetAll() {
-    setIsResettingAll(true);
-    setFeedback(null);
+    function handleResetAll() {
+      setIsResettingAll(true);
+      setFeedback(null);
 
-    startTransition(() => {
-      void clearActiveCosmeticsAction()
-        .then((result) => {
-          if (!result.ok || !result.viewer) {
+      startTransition(() => {
+        void clearActiveCosmeticsAction()
+          .then((result) => {
+            if (!result.ok || !result.viewer) {
+              setFeedback({
+                tone: "error",
+                text: result.message ?? "Не удалось сбросить активную косметику.",
+              });
+              return;
+            }
+
+            applyViewerState(result.viewer, {
+              tone: "success",
+              text: result.message ?? "Активный косметический образ сброшен.",
+            });
+          })
+          .catch(() => {
             setFeedback({
               tone: "error",
-              text: result.message ?? "Не удалось сбросить активную косметику.",
+              text: "Не удалось сбросить активную косметику.",
             });
-            return;
-          }
+          })
+          .finally(() => {
+            setIsResettingAll(false);
+          });
+      });
+    }
 
-          applyViewerState(result.viewer, {
-            tone: "success",
-            text: result.message ?? "Активный косметический образ сброшен.",
-          });
-        })
-        .catch(() => {
-          setFeedback({
-            tone: "error",
-            text: "Не удалось сбросить активную косметику.",
-          });
-        })
-        .finally(() => {
-          setIsResettingAll(false);
+    function handleSavePrice(cosmeticId: string) {
+      const normalizedPriceInput = draftPrice.trim();
+      const normalizedOldPriceInput = draftOldPrice.trim();
+
+      if (!normalizedPriceInput) {
+        setFeedback({
+          tone: "error",
+          text: "Укажите текущую цену перед сохранением.",
         });
-    });
-  }
+        return;
+      }
 
-  function handleSavePrice(cosmeticId: string) {
-    const normalizedPriceInput = draftPrice.trim();
-    const normalizedOldPriceInput = draftOldPrice.trim();
+      const parsedPrice = Number(normalizedPriceInput);
 
-    if (!normalizedPriceInput) {
-      setFeedback({
-        tone: "error",
-        text: "Укажите текущую цену перед сохранением.",
-      });
-      return;
-    }
-
-    const parsedPrice = Number(normalizedPriceInput);
-
-    if (!Number.isFinite(parsedPrice) || parsedPrice < 0) {
-      setFeedback({
-        tone: "error",
-        text: "Текущая цена должна быть неотрицательным числом.",
-      });
-      return;
-    }
-
-    const parsedOldPrice = normalizedOldPriceInput
-      ? Number(normalizedOldPriceInput)
-      : null;
-
-    if (
-      parsedOldPrice !== null &&
-      (!Number.isFinite(parsedOldPrice) || parsedOldPrice < 0)
-    ) {
-      setFeedback({
-        tone: "error",
-        text: "Старая цена должна быть неотрицательным числом.",
-      });
-      return;
-    }
-
-    setPendingPriceCosmeticId(cosmeticId);
-    setFeedback(null);
-
-    startTransition(() => {
-      void updateCosmeticPriceAction(cosmeticId, parsedPrice, parsedOldPrice)
-        .then((updatedCosmetic) => {
-          setCosmetics((currentCosmetics) =>
-            currentCosmetics.map((cosmetic) =>
-              cosmetic.id === updatedCosmetic.id
-                ? {
-                    ...cosmetic,
-                    price: updatedCosmetic.price,
-                    oldPrice: updatedCosmetic.oldPrice,
-                  }
-                : cosmetic,
-            ),
-          );
-          setEditingCosmeticId(null);
-          setDraftPrice("");
-          setDraftOldPrice("");
-          setFeedback({
-            tone: "success",
-            text: `Цена для ${updatedCosmetic.name} обновлена.`,
-          });
-          router.refresh();
-        })
-        .catch((error) => {
-          setFeedback({
-            tone: "error",
-            text:
-              error instanceof Error
-                ? error.message
-                : "Не удалось обновить цену косметики.",
-          });
-        })
-        .finally(() => {
-          setPendingPriceCosmeticId(null);
+      if (!Number.isFinite(parsedPrice) || parsedPrice < 0) {
+        setFeedback({
+          tone: "error",
+          text: "Текущая цена должна быть неотрицательным числом.",
         });
-    });
-  }
+        return;
+      }
 
-  return (
-    <section className="grid gap-6 xl:grid-cols-[360px_minmax(0,1fr)]">
-      <aside className="rounded-[2rem] border border-white/10 bg-[linear-gradient(180deg,rgba(24,24,27,0.96),rgba(15,23,42,0.96))] p-6 shadow-[0_22px_64px_rgba(0,0,0,0.28)]">
-        <p className="text-xs font-semibold uppercase tracking-[0.24em] text-zinc-500">
-          Текущий образ
-        </p>
+      const parsedOldPrice = normalizedOldPriceInput
+        ? Number(normalizedOldPriceInput)
+        : null;
+
+      if (
+        parsedOldPrice !== null &&
+        (!Number.isFinite(parsedOldPrice) || parsedOldPrice < 0)
+      ) {
+        setFeedback({
+          tone: "error",
+          text: "Старая цена должна быть неотрицательным числом.",
+        });
+        return;
+      }
+
+      setPendingPriceCosmeticId(cosmeticId);
+      setFeedback(null);
+
+      startTransition(() => {
+        void updateCosmeticPriceAction(cosmeticId, parsedPrice, parsedOldPrice)
+          .then((updatedCosmetic) => {
+            setCosmetics((currentCosmetics) =>
+              currentCosmetics.map((cosmetic) =>
+                cosmetic.id === updatedCosmetic.id
+                  ? {
+                      ...cosmetic,
+                      price: updatedCosmetic.price,
+                      oldPrice: updatedCosmetic.oldPrice,
+                    }
+                  : cosmetic,
+              ),
+            );
+            setEditingCosmeticId(null);
+            setDraftPrice("");
+            setDraftOldPrice("");
+            setFeedback({
+              tone: "success",
+              text: `Цена для ${updatedCosmetic.name} обновлена.`,
+            });
+            router.refresh();
+          })
+          .catch((error) => {
+            setFeedback({
+              tone: "error",
+              text:
+                error instanceof Error
+                  ? error.message
+                  : "Не удалось обновить цену косметики.",
+            });
+          })
+          .finally(() => {
+            setPendingPriceCosmeticId(null);
+          });
+      });
+    }
+
+    return (
+      <section className="flex flex-col gap-6">
+        {feedback ? (
+          <div
+            className={cn(
+              "rounded-[1.35rem] border p-4 text-sm leading-7",
+              feedback.tone === "success"
+                ? "border-emerald-500/20 bg-emerald-500/10 text-emerald-100"
+                : "border-red-500/20 bg-red-500/10 text-red-100",
+            )}
+          >
+            {feedback.text}
+          </div>
+        ) : null}
 
         {viewer ? (
-          <>
-            <div className="mt-5 flex items-center gap-4 rounded-[1.6rem] border border-white/10 bg-white/6 p-4">
-              <UserAvatar
-                src={viewer.image}
-                name={viewer.name}
-                email={viewer.email}
-                decoration={viewer.activeDecoration}
-                className="h-[72px] w-[72px] shrink-0 border-white/10 bg-zinc-900/80 text-zinc-100"
-                imageClassName="rounded-full object-cover"
-              />
-              <div className="min-w-0 flex-1">
-                <CosmeticName
-                  text={viewer.name}
-                  appearance={viewer}
-                  className="block truncate text-xl font-semibold text-white"
-                />
-                <p className="mt-1 truncate text-sm text-zinc-400">{viewer.email}</p>
-              </div>
-            </div>
-
-            <div className="mt-5 grid gap-3">
-              <div className="rounded-[1.4rem] border border-emerald-500/20 bg-emerald-500/10 p-4">
-                <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-emerald-200/80">
-                  Баланс
+          <div className="rounded-[1.85rem] border border-white/10 bg-[linear-gradient(180deg,rgba(24,24,27,0.92),rgba(15,23,42,0.92))] p-5 shadow-[0_18px_48px_rgba(0,0,0,0.22)]">
+            <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+              <div>
+                <p className="text-xs font-semibold uppercase tracking-[0.24em] text-zinc-500">
+                  Текущий образ
                 </p>
-                <p className="mt-2 text-2xl font-semibold text-white">
-                  {formatBalance(viewer.availableBalance)}
-                </p>
-              </div>
-
-              <div className="rounded-[1.4rem] border border-white/10 bg-white/6 p-4 text-sm text-zinc-300">
-                <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-zinc-500">
-                  Владение
-                </p>
-                <p className="mt-2">Куплено предметов: <span className="font-semibold text-white">{ownedCount}</span></p>
-                <p className="mt-2">Цвет: <span className="font-semibold text-white">{equippedColor?.name ?? "Не выбран"}</span></p>
-                <p className="mt-2">Шрифт: <span className="font-semibold text-white">{equippedFont?.name ?? "Не выбран"}</span></p>
-                <p className="mt-2">Рамка: <span className="font-semibold text-white">{equippedDecoration?.name ?? "Не выбрана"}</span></p>
-              </div>
-
-              <div className="rounded-[1.4rem] border border-white/10 bg-white/6 p-4 text-sm text-zinc-300">
-                <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-zinc-500">
-                  Быстрые слоты
-                </p>
-                {hasAnyEquipped ? (
-                  <Button
-                    type="button"
-                    onClick={handleResetAll}
-                    disabled={isPending || isResettingAll}
-                    className="mt-3 h-10 w-full rounded-2xl border border-red-500/20 bg-red-500/10 px-4 text-sm font-semibold text-red-100 hover:bg-red-500/15"
-                  >
-                    {isResettingAll ? "Сбрасываем образ..." : "Снять всё сразу"}
-                  </Button>
-                ) : null}
-                <div className="mt-3 grid gap-3">
-                  {COSMETIC_TYPE_ORDER.map((type) => {
-                    const slotItem = slotItems[type];
-                    const isClearing = isPending && pendingUnequipType === type;
-
-                    return (
-                      <div
-                        key={type}
-                        className="rounded-[1.1rem] border border-white/10 bg-black/20 p-3"
-                      >
-                        <div className="flex items-center justify-between gap-3">
-                          <span className="text-[11px] font-semibold uppercase tracking-[0.18em] text-zinc-500">
-                            {COSMETIC_TYPE_LABELS[type]}
-                          </span>
-                          <button
-                            type="button"
-                            onClick={() => {
-                              setActiveType(type);
-                              setPreviewCosmeticId(null);
-                            }}
-                            className="text-[11px] font-semibold uppercase tracking-[0.18em] text-sky-200 transition hover:text-sky-100"
-                          >
-                            Открыть
-                          </button>
-                        </div>
-
-                        <p className="mt-2 text-sm font-semibold text-white">
-                          {slotItem?.name ?? getSlotEmptyLabel(type)}
-                        </p>
-
-                        {slotItem ? (
-                          <button
-                            type="button"
-                            onClick={() => handleUnequip(type)}
-                            disabled={isPending || isClearing}
-                            className={cn(
-                              SHOP_ACTION_BUTTON_BASE_CLASS_NAME,
-                              SHOP_SECONDARY_WIDE_BUTTON_CLASS_NAME,
-                              "mt-3",
-                            )}
-                          >
-                            {isClearing ? "Снимаем..." : "Снять"}
-                          </button>
-                        ) : null}
-                      </div>
-                    );
-                  })}
+                <div className="mt-2 flex flex-wrap items-center gap-3 text-sm text-zinc-300">
+                  <span>
+                    Куплено предметов: <span className="font-semibold text-white">{ownedCount}</span>
+                  </span>
+                  <span>
+                    Цвет: <span className="font-semibold text-white">{equippedColor?.name ?? "Не выбран"}</span>
+                  </span>
+                  <span>
+                    Шрифт: <span className="font-semibold text-white">{equippedFont?.name ?? "Не выбран"}</span>
+                  </span>
+                  <span>
+                    Рамка: <span className="font-semibold text-white">{equippedDecoration?.name ?? "Не выбрана"}</span>
+                  </span>
                 </div>
               </div>
+
+              {hasAnyEquipped ? (
+                <Button
+                  type="button"
+                  onClick={handleResetAll}
+                  disabled={isPending || isResettingAll}
+                  className="h-10 rounded-2xl border border-red-500/20 bg-red-500/10 px-4 text-sm font-semibold text-red-100 hover:bg-red-500/15"
+                >
+                  {isResettingAll ? "Сбрасываем образ..." : "Снять всё сразу"}
+                </Button>
+              ) : null}
             </div>
-          </>
+
+            <div className="mt-4 grid gap-3 md:grid-cols-3">
+              {COSMETIC_TYPE_ORDER.map((type) => {
+                const slotItem = slotItems[type];
+                const isClearing = isPending && pendingUnequipType === type;
+
+                return (
+                  <div
+                    key={type}
+                    className="rounded-[1.1rem] border border-white/10 bg-black/20 p-3"
+                  >
+                    <div className="flex items-center justify-between gap-3">
+                      <span className="text-[11px] font-semibold uppercase tracking-[0.18em] text-zinc-500">
+                        {COSMETIC_TYPE_LABELS[type]}
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => setActiveType(type)}
+                        className="text-[11px] font-semibold uppercase tracking-[0.18em] text-sky-200 transition hover:text-sky-100"
+                      >
+                        Открыть
+                      </button>
+                    </div>
+
+                    <p className="mt-2 text-sm font-semibold text-white">
+                      {slotItem?.name ?? getSlotEmptyLabel(type)}
+                    </p>
+
+                    {slotItem ? (
+                      <button
+                        type="button"
+                        onClick={() => handleUnequip(type)}
+                        disabled={isPending || isClearing}
+                        className={cn(
+                          SHOP_ACTION_BUTTON_BASE_CLASS_NAME,
+                          SHOP_SECONDARY_WIDE_BUTTON_CLASS_NAME,
+                          "mt-3",
+                        )}
+                      >
+                        {isClearing ? "Снимаем..." : "Снять"}
+                      </button>
+                    ) : null}
+                  </div>
+                );
+              })}
+            </div>
+          </div>
         ) : (
-          <div className="mt-5 rounded-[1.6rem] border border-dashed border-white/10 bg-white/5 p-5 text-sm leading-7 text-zinc-400">
-            Каталог открыт всем, но покупать и экипировать косметику можно только после авторизации.
+          <div className="rounded-[1.85rem] border border-dashed border-white/10 bg-white/5 p-5 text-sm leading-7 text-zinc-400">
+            Каталог и примерочная открыты всем, но покупать и экипировать косметику можно только после авторизации.
             <div className="mt-4">
               <Link
                 href="/login?callbackUrl=/shop"
@@ -850,169 +830,151 @@ export function CosmeticsShop({
           </div>
         )}
 
-        {feedback ? (
-          <div
-            className={cn(
-              "mt-5 rounded-[1.35rem] border p-4 text-sm leading-7",
-              feedback.tone === "success"
-                ? "border-emerald-500/20 bg-emerald-500/10 text-emerald-100"
-                : "border-red-500/20 bg-red-500/10 text-red-100",
-            )}
-          >
-            {feedback.text}
-          </div>
-        ) : null}
-      </aside>
-
-      <div className="overflow-visible rounded-[2rem] border border-white/10 bg-zinc-900/80 p-6 shadow-[0_24px_80px_rgba(0,0,0,0.28)] backdrop-blur md:p-8">
-        <div className="border-b border-white/10 pb-5">
-          <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
-            <div>
-              <p className="text-xs font-semibold uppercase tracking-[0.24em] text-zinc-500">
-                Каталог магазина
-              </p>
-              <h2 className="mt-2 text-2xl font-semibold tracking-tight text-white">
-                {COSMETIC_TYPE_LABELS[activeType]}
-              </h2>
-              <p className="mt-2 max-w-2xl text-sm leading-6 text-zinc-400">
-                {getShopHeadline(activeType)}
-              </p>
-            </div>
-
-            <div className="flex w-full flex-col gap-3 lg:max-w-[520px] lg:items-end">
-              <label className="w-full">
-                <span className="sr-only">Поиск по косметике</span>
-                <input
-                  type="search"
-                  value={searchQuery}
-                  onChange={(event) => setSearchQuery(event.target.value)}
-                  placeholder="Поиск по названию, типу или значению"
-                  className="h-11 w-full rounded-2xl border border-white/10 bg-white/5 px-4 text-sm text-white outline-none transition placeholder:text-zinc-500 focus:border-white/20 focus:bg-white/10"
-                />
-              </label>
-
-              <div className="flex flex-wrap gap-2 lg:justify-end">
-                {([
-                  ["recommended", "Сначала нужное"],
-                  ["price-asc", "Дешевле"],
-                  ["price-desc", "Дороже"],
-                  ["name", "По имени"],
-                ] as const).map(([mode, label]) => (
-                  <button
-                    key={mode}
-                    type="button"
-                    onClick={() => setSortMode(mode)}
-                    className={cn(
-                      "inline-flex items-center rounded-full border px-4 py-2 text-sm font-semibold transition",
-                      sortMode === mode
-                        ? "border-white/20 bg-white/12 text-white"
-                        : "border-white/10 bg-white/5 text-zinc-300 hover:bg-white/10 hover:text-white",
-                    )}
-                  >
-                    {label}
-                  </button>
-                ))}
-              </div>
-            </div>
-          </div>
-
-          <div className="mt-5 flex flex-wrap gap-2">
-            {COSMETIC_TYPE_ORDER.map((type) => {
-              const isActive = type === activeType;
-              const accent = getTypeAccent(type);
-              const count = cosmetics.filter((cosmetic) => cosmetic.type === type).length;
-
-              return (
-                <button
-                  key={type}
-                  type="button"
-                  onClick={() => {
-                    setActiveType(type);
-                    setPreviewCosmeticId(null);
-                  }}
-                  className={cn(
-                    "inline-flex items-center gap-2 rounded-full border px-4 py-2 text-sm font-semibold transition",
-                    isActive
-                      ? accent.tab
-                      : "border-white/10 bg-white/5 text-zinc-300 hover:bg-white/10 hover:text-white",
-                  )}
-                >
-                  <span>{COSMETIC_TYPE_LABELS[type]}</span>
-                  <span className="rounded-full bg-black/20 px-2 py-0.5 text-xs text-inherit">
-                    {count}
-                  </span>
-                </button>
-              );
-            })}
-          </div>
-        </div>
-
-        {rarityRecommendations.length > 0 ? (
-          <section className="mt-6">
-            <div className="flex flex-col gap-2 md:flex-row md:items-end md:justify-between">
+        <div className="overflow-visible rounded-[2rem] border border-white/10 bg-zinc-900/80 p-6 shadow-[0_24px_80px_rgba(0,0,0,0.28)] backdrop-blur md:p-8">
+          <div className="border-b border-white/10 pb-5">
+            <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
               <div>
                 <p className="text-xs font-semibold uppercase tracking-[0.24em] text-zinc-500">
-                  Подборка по редкости
+                  Каталог магазина
                 </p>
-                <p className="mt-2 text-sm leading-6 text-zinc-400">
-                  Быстрые рекомендации внутри текущей категории: от мягкого акцента до самых выразительных предметов.
+                <h2 className="mt-2 text-2xl font-semibold tracking-tight text-white">
+                  {COSMETIC_TYPE_LABELS[activeType]}
+                </h2>
+                <p className="mt-2 max-w-2xl text-sm leading-6 text-zinc-400">
+                  {getShopHeadline(activeType)}
                 </p>
               </div>
-              <p className="text-xs uppercase tracking-[0.18em] text-zinc-500">
-                Нажмите или наведите на карточку, чтобы обновить большой preview ниже.
-              </p>
+
+              <div className="flex w-full flex-col gap-3 lg:max-w-[520px] lg:items-end">
+                <label className="w-full">
+                  <span className="sr-only">Поиск по косметике</span>
+                  <input
+                    type="search"
+                    value={searchQuery}
+                    onChange={(event) => setSearchQuery(event.target.value)}
+                    placeholder="Поиск по названию, типу или значению"
+                    className="h-11 w-full rounded-2xl border border-white/10 bg-white/5 px-4 text-sm text-white outline-none transition placeholder:text-zinc-500 focus:border-white/20 focus:bg-white/10"
+                  />
+                </label>
+
+                <div className="flex flex-wrap gap-2 lg:justify-end">
+                  {([
+                    ["recommended", "Сначала нужное"],
+                    ["price-asc", "Дешевле"],
+                    ["price-desc", "Дороже"],
+                    ["name", "По имени"],
+                  ] as const).map(([mode, label]) => (
+                    <button
+                      key={mode}
+                      type="button"
+                      onClick={() => setSortMode(mode)}
+                      className={cn(
+                        "inline-flex items-center rounded-full border px-4 py-2 text-sm font-semibold transition",
+                        sortMode === mode
+                          ? "border-white/20 bg-white/12 text-white"
+                          : "border-white/10 bg-white/5 text-zinc-300 hover:bg-white/10 hover:text-white",
+                      )}
+                    >
+                      {label}
+                    </button>
+                  ))}
+                </div>
+              </div>
             </div>
 
-            <div className="mt-4 grid gap-3 md:grid-cols-2 xl:grid-cols-4">
-              {rarityRecommendations.map(({ rarity, cosmetic }) => {
-                const rarityAccent = getRarityAccent(rarity);
-                const isPreviewActive = previewCosmetic?.id === cosmetic.id;
+            <div className="mt-5 flex flex-wrap gap-2">
+              {COSMETIC_TYPE_ORDER.map((type) => {
+                const isActive = type === activeType;
+                const accent = getTypeAccent(type);
+                const count = cosmetics.filter((cosmetic) => cosmetic.type === type).length;
 
                 return (
                   <button
-                    key={`${rarity}-${cosmetic.id}`}
+                    key={type}
                     type="button"
-                    onClick={() => setPreviewCosmeticId(cosmetic.id)}
+                    onClick={() => setActiveType(type)}
                     className={cn(
-                      "rounded-[1.35rem] border p-4 text-left transition hover:-translate-y-0.5",
-                      rarityAccent.card,
-                      isPreviewActive
-                        ? "ring-1 ring-white/20"
-                        : "hover:border-white/20",
+                      "inline-flex items-center gap-2 rounded-full border px-4 py-2 text-sm font-semibold transition",
+                      isActive
+                        ? accent.tab
+                        : "border-white/10 bg-white/5 text-zinc-300 hover:bg-white/10 hover:text-white",
                     )}
                   >
-                    <span
-                      className={cn(
-                        "inline-flex rounded-full border px-2.5 py-1 text-[11px] font-semibold uppercase tracking-[0.18em]",
-                        rarityAccent.pill,
-                      )}
-                    >
-                      {COSMETIC_RARITY_LABELS[rarity]}
+                    <span>{COSMETIC_TYPE_LABELS[type]}</span>
+                    <span className="rounded-full bg-black/20 px-2 py-0.5 text-xs text-inherit">
+                      {count}
                     </span>
-                    <p className="mt-3 text-base font-semibold text-white">{cosmetic.name}</p>
-                    <p className="mt-2 text-sm leading-6 text-zinc-300">
-                      {COSMETIC_RARITY_DESCRIPTIONS[rarity]}
-                    </p>
-                    <div className="mt-4 flex items-center justify-between gap-3 text-sm">
-                      <span className="text-zinc-400">{COSMETIC_TYPE_LABELS[cosmetic.type]}</span>
-                      <CosmeticPriceBlock
-                        cosmetic={cosmetic}
-                        formatPrice={formatPrice}
-                        align="right"
-                        compact
-                      />
-                    </div>
                   </button>
                 );
               })}
             </div>
-          </section>
-        ) : null}
+          </div>
 
-        <div className="mt-6">
-          <div className="flex flex-col lg:flex-row gap-8 items-start relative w-full">
-            <div className="flex-1 min-w-0 w-full">
-              <div className="flex items-center justify-between gap-3 text-sm text-zinc-400">
+          {rarityRecommendations.length > 0 ? (
+            <section className="mt-6">
+              <div className="flex flex-col gap-2 md:flex-row md:items-end md:justify-between">
+                <div>
+                  <p className="text-xs font-semibold uppercase tracking-[0.24em] text-zinc-500">
+                    Подборка по редкости
+                  </p>
+                  <p className="mt-2 text-sm leading-6 text-zinc-400">
+                    Быстрые рекомендации внутри текущей категории: от мягкого акцента до самых выразительных предметов.
+                  </p>
+                </div>
+                <p className="text-xs uppercase tracking-[0.18em] text-zinc-500">
+                  Нажмите на карточку, чтобы сразу примерить предмет в верхней примерочной.
+                </p>
+              </div>
+
+              <div className="mt-4 grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+                {rarityRecommendations.map(({ rarity, cosmetic }) => {
+                  const rarityAccent = getRarityAccent(rarity);
+                  const isPreviewActive =
+                    getActiveAppearanceValue(previewAppearance, cosmetic.type) === cosmetic.value;
+
+                  return (
+                    <button
+                      key={`${rarity}-${cosmetic.id}`}
+                      type="button"
+                      onClick={() => onPreview(cosmetic.type, cosmetic.value)}
+                      className={cn(
+                        "rounded-[1.35rem] border p-4 text-left transition hover:-translate-y-0.5",
+                        rarityAccent.card,
+                        isPreviewActive
+                          ? "ring-1 ring-white/20"
+                          : "hover:border-white/20",
+                      )}
+                    >
+                      <span
+                        className={cn(
+                          "inline-flex rounded-full border px-2.5 py-1 text-[11px] font-semibold uppercase tracking-[0.18em]",
+                          rarityAccent.pill,
+                        )}
+                      >
+                        {COSMETIC_RARITY_LABELS[rarity]}
+                      </span>
+                      <p className="mt-3 text-base font-semibold text-white">{cosmetic.name}</p>
+                      <p className="mt-2 text-sm leading-6 text-zinc-300">
+                        {COSMETIC_RARITY_DESCRIPTIONS[rarity]}
+                      </p>
+                      <div className="mt-4 flex items-center justify-between gap-3 text-sm">
+                        <span className="text-zinc-400">{COSMETIC_TYPE_LABELS[cosmetic.type]}</span>
+                        <CosmeticPriceBlock
+                          cosmetic={cosmetic}
+                          formatPrice={formatPrice}
+                          align="right"
+                          compact
+                        />
+                      </div>
+                    </button>
+                  );
+                })}
+              </div>
+            </section>
+          ) : null}
+
+          <div className="mt-6">
+            <div className="flex items-center justify-between gap-3 text-sm text-zinc-400">
               <p>
                 Найдено предметов: <span className="font-semibold text-white">{visibleCosmetics.length}</span>
                 <span className="text-zinc-500"> / {previewCountBase}</span>
@@ -1028,321 +990,244 @@ export function CosmeticsShop({
               ) : null}
             </div>
 
-              {visibleCosmetics.length > 0 ? (
-                <div className="mt-6 grid grid-cols-1 gap-6 md:grid-cols-2 xl:grid-cols-3">
-                  {visibleCosmetics.map((cosmetic) => {
-              const accent = getTypeAccent(cosmetic.type);
-              const rarity = getCosmeticRarity(cosmetic.price);
-              const rarityAccent = getRarityAccent(rarity);
-              const isMutating = isPending && pendingCosmeticId === cosmetic.id;
-              const isAffordable = viewer ? cosmetic.price <= viewerBalance : false;
+            {visibleCosmetics.length > 0 ? (
+              <div className="mt-6 grid grid-cols-1 gap-6 md:grid-cols-2 xl:grid-cols-3">
+                {visibleCosmetics.map((cosmetic) => {
+                  const accent = getTypeAccent(cosmetic.type);
+                  const rarity = getCosmeticRarity(cosmetic.price);
+                  const rarityAccent = getRarityAccent(rarity);
+                  const isMutating = isPending && pendingCosmeticId === cosmetic.id;
+                  const isAffordable = viewer ? cosmetic.price <= viewerBalance : false;
+                  const isPreviewing =
+                    getActiveAppearanceValue(previewAppearance, cosmetic.type) === cosmetic.value;
 
-              return (
-                <article
-                  key={cosmetic.id}
-                  onMouseEnter={() => setPreviewCosmeticId(cosmetic.id)}
-                  onFocusCapture={() => setPreviewCosmeticId(cosmetic.id)}
-                  className={cn(
-                    "flex h-full flex-col rounded-[1.65rem] border bg-[linear-gradient(180deg,rgba(255,255,255,0.06),rgba(255,255,255,0.02))] p-5 shadow-[0_18px_48px_rgba(0,0,0,0.2)] transition",
-                    cosmetic.isEquipped
-                      ? "border-sky-400/30"
-                      : cosmetic.isOwned
-                        ? "border-emerald-400/20"
-                        : "border-white/10",
-                  )}
-                >
-                  <div className="flex items-start justify-between gap-3">
-                    <div>
-                      <div className="flex flex-wrap gap-2">
-                        <span className={cn("inline-flex rounded-full border px-2.5 py-1 text-[11px] font-semibold uppercase tracking-[0.18em]", accent.pill)}>
-                          {COSMETIC_TYPE_LABELS[cosmetic.type]}
-                        </span>
-                        <span className={cn("inline-flex rounded-full border px-2.5 py-1 text-[11px] font-semibold uppercase tracking-[0.18em]", rarityAccent.pill)}>
-                          {COSMETIC_RARITY_LABELS[rarity]}
-                        </span>
-                      </div>
-                      <h3 className="mt-4 text-xl font-semibold tracking-tight text-white">
-                        {cosmetic.name}
-                      </h3>
-                    </div>
-                    <div className="rounded-[1.1rem] border border-white/10 bg-black/20 px-3 py-2 text-right">
-                      <p className="text-[11px] uppercase tracking-[0.2em] text-zinc-500">Цена</p>
-                      <div className="mt-2">
-                        <CosmeticPriceBlock
-                          cosmetic={cosmetic}
-                          formatPrice={formatPrice}
-                          align="right"
-                        />
-                      </div>
-                      {canManagePrices && editingCosmeticId !== cosmetic.id ? (
-                        <button
-                          type="button"
-                          onClick={() => startPriceEditing(cosmetic)}
-                          className="mt-3 inline-flex items-center justify-end text-xs font-semibold text-sky-200 transition hover:text-sky-100"
-                        >
-                          ✏️ Изменить цену
-                        </button>
-                      ) : null}
-                    </div>
-                  </div>
-
-                  <div className="mt-5">
-                    <CosmeticPreview cosmetic={cosmetic} viewer={viewer} />
-                  </div>
-
-                  <div className="mt-auto flex flex-col gap-3 pt-5">
-                    {canManagePrices && editingCosmeticId === cosmetic.id ? (
-                      <div className="rounded-[1.15rem] border border-white/10 bg-white/5 p-3.5">
-                        <div className="grid gap-3 sm:grid-cols-2">
-                          <label className="grid gap-1">
-                            <span className="text-[11px] font-semibold uppercase tracking-[0.18em] text-zinc-500">
-                              Текущая цена ({SHOP_PRICE_EDITOR_BASE_CURRENCY_LABEL})
+                  return (
+                    <article
+                      key={cosmetic.id}
+                      className={cn(
+                        "flex h-full flex-col rounded-[1.65rem] border bg-[linear-gradient(180deg,rgba(255,255,255,0.06),rgba(255,255,255,0.02))] p-5 shadow-[0_18px_48px_rgba(0,0,0,0.2)] transition",
+                        isPreviewing ? "ring-1 ring-sky-400/30" : "",
+                        cosmetic.isEquipped
+                          ? "border-sky-400/30"
+                          : cosmetic.isOwned
+                            ? "border-emerald-400/20"
+                            : "border-white/10",
+                      )}
+                    >
+                      <div className="flex items-start justify-between gap-3">
+                        <div>
+                          <div className="flex flex-wrap gap-2">
+                            <span className={cn("inline-flex rounded-full border px-2.5 py-1 text-[11px] font-semibold uppercase tracking-[0.18em]", accent.pill)}>
+                              {COSMETIC_TYPE_LABELS[cosmetic.type]}
                             </span>
-                            <input
-                              type="number"
-                              min="0"
-                              step="0.01"
-                              value={draftPrice}
-                              onChange={(event) => setDraftPrice(event.target.value)}
-                              className={SHOP_INLINE_EDITOR_INPUT_CLASS_NAME}
-                              inputMode="decimal"
-                            />
-                          </label>
-                          <label className="grid gap-1">
-                            <span className="text-[11px] font-semibold uppercase tracking-[0.18em] text-zinc-500">
-                              Старая цена ({SHOP_PRICE_EDITOR_BASE_CURRENCY_LABEL})
+                            <span className={cn("inline-flex rounded-full border px-2.5 py-1 text-[11px] font-semibold uppercase tracking-[0.18em]", rarityAccent.pill)}>
+                              {COSMETIC_RARITY_LABELS[rarity]}
                             </span>
-                            <input
-                              type="number"
-                              min="0"
-                              step="0.01"
-                              value={draftOldPrice}
-                              onChange={(event) => setDraftOldPrice(event.target.value)}
-                              className={SHOP_INLINE_EDITOR_INPUT_CLASS_NAME}
-                              inputMode="decimal"
-                              placeholder="Не задана"
-                            />
-                          </label>
+                          </div>
+                          <h3 className="mt-4 text-xl font-semibold tracking-tight text-white">
+                            {cosmetic.name}
+                          </h3>
                         </div>
-                        <p className="mt-3 rounded-xl border border-white/10 bg-black/20 px-3 py-2 text-xs leading-5 text-zinc-400">
-                          Заполните &quot;Старую цену&quot;, чтобы на витрине появилась скидка. Оставьте поле пустым для обычного изменения цены.
-                        </p>
-                        <div className="mt-3 flex gap-2">
-                          <button
-                            type="button"
-                            onClick={() => handleSavePrice(cosmetic.id)}
-                            disabled={isPending || pendingPriceCosmeticId === cosmetic.id}
-                            className={cn(
-                              SHOP_INLINE_EDITOR_ACTION_CLASS_NAME,
-                              "border-emerald-500/20 bg-emerald-500/10 text-emerald-100 hover:bg-emerald-500/15",
-                            )}
-                          >
-                            {pendingPriceCosmeticId === cosmetic.id ? "Сохраняем..." : "✅ Сохранить"}
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => {
-                              setEditingCosmeticId(null);
-                              setDraftPrice("");
-                              setDraftOldPrice("");
-                            }}
-                            disabled={isPending || pendingPriceCosmeticId === cosmetic.id}
-                            className={cn(
-                              SHOP_INLINE_EDITOR_ACTION_CLASS_NAME,
-                              "border-white/10 bg-white/5 text-zinc-200 hover:bg-white/10",
-                            )}
-                          >
-                            Отмена
-                          </button>
+                        <div className="rounded-[1.1rem] border border-white/10 bg-black/20 px-3 py-2 text-right">
+                          <p className="text-[11px] uppercase tracking-[0.2em] text-zinc-500">Цена</p>
+                          <div className="mt-2">
+                            <CosmeticPriceBlock
+                              cosmetic={cosmetic}
+                              formatPrice={formatPrice}
+                              align="right"
+                            />
+                          </div>
+                          {canManagePrices && editingCosmeticId !== cosmetic.id ? (
+                            <button
+                              type="button"
+                              onClick={() => startPriceEditing(cosmetic)}
+                              className="mt-3 inline-flex items-center justify-end text-xs font-semibold text-sky-200 transition hover:text-sky-100"
+                            >
+                              ✏️ Изменить цену
+                            </button>
+                          ) : null}
                         </div>
                       </div>
-                    ) : null}
 
-                    <div className="flex flex-wrap gap-2 text-[11px] font-semibold uppercase tracking-[0.18em]">
-                      {cosmetic.isOwned ? (
-                        <span className="rounded-full border border-emerald-500/20 bg-emerald-500/10 px-2.5 py-1 text-emerald-100">
-                          Куплено
-                        </span>
-                      ) : null}
-                      {cosmetic.isEquipped ? (
-                        <span className="rounded-full border border-sky-500/20 bg-sky-500/10 px-2.5 py-1 text-sky-100">
-                          Экипировано
-                        </span>
-                      ) : null}
-                      {viewer && !cosmetic.isOwned && isAffordable ? (
-                        <span className="rounded-full border border-white/10 bg-white/5 px-2.5 py-1 text-zinc-200">
-                          Доступно сейчас
-                        </span>
-                      ) : null}
-                      {viewer && !cosmetic.isOwned && !isAffordable ? (
-                        <span className="rounded-full border border-red-500/20 bg-red-500/10 px-2.5 py-1 text-red-100">
-                          Не хватает баланса
-                        </span>
-                      ) : null}
-                    </div>
+                      <div className="mt-5">
+                        <CosmeticPreview cosmetic={cosmetic} viewer={viewer} />
+                      </div>
 
-                    {viewer ? (
-                      cosmetic.isOwned ? (
-                        <button
-                          type="button"
-                          onClick={() => handleEquip(cosmetic.id)}
-                          disabled={cosmetic.isEquipped || isPending || isMutating}
-                          className={cn(
-                            SHOP_ACTION_BUTTON_BASE_CLASS_NAME,
-                            SHOP_SECONDARY_BUTTON_CLASS_NAME,
+                      <div className="mt-auto flex flex-col gap-3 pt-5">
+                        {canManagePrices && editingCosmeticId === cosmetic.id ? (
+                          <div className="rounded-[1.15rem] border border-white/10 bg-white/5 p-3.5">
+                            <div className="grid gap-3 sm:grid-cols-2">
+                              <label className="grid gap-1">
+                                <span className="text-[11px] font-semibold uppercase tracking-[0.18em] text-zinc-500">
+                                  Текущая цена ({SHOP_PRICE_EDITOR_BASE_CURRENCY_LABEL})
+                                </span>
+                                <input
+                                  type="number"
+                                  min="0"
+                                  step="0.01"
+                                  value={draftPrice}
+                                  onChange={(event) => setDraftPrice(event.target.value)}
+                                  className={SHOP_INLINE_EDITOR_INPUT_CLASS_NAME}
+                                  inputMode="decimal"
+                                />
+                              </label>
+                              <label className="grid gap-1">
+                                <span className="text-[11px] font-semibold uppercase tracking-[0.18em] text-zinc-500">
+                                  Старая цена ({SHOP_PRICE_EDITOR_BASE_CURRENCY_LABEL})
+                                </span>
+                                <input
+                                  type="number"
+                                  min="0"
+                                  step="0.01"
+                                  value={draftOldPrice}
+                                  onChange={(event) => setDraftOldPrice(event.target.value)}
+                                  className={SHOP_INLINE_EDITOR_INPUT_CLASS_NAME}
+                                  inputMode="decimal"
+                                  placeholder="Не задана"
+                                />
+                              </label>
+                            </div>
+                            <p className="mt-3 rounded-xl border border-white/10 bg-black/20 px-3 py-2 text-xs leading-5 text-zinc-400">
+                              Заполните &quot;Старую цену&quot;, чтобы на витрине появилась скидка. Оставьте поле пустым для обычного изменения цены.
+                            </p>
+                            <div className="mt-3 flex gap-2">
+                              <button
+                                type="button"
+                                onClick={() => handleSavePrice(cosmetic.id)}
+                                disabled={isPending || pendingPriceCosmeticId === cosmetic.id}
+                                className={cn(
+                                  SHOP_INLINE_EDITOR_ACTION_CLASS_NAME,
+                                  "border-emerald-500/20 bg-emerald-500/10 text-emerald-100 hover:bg-emerald-500/15",
+                                )}
+                              >
+                                {pendingPriceCosmeticId === cosmetic.id ? "Сохраняем..." : "✅ Сохранить"}
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setEditingCosmeticId(null);
+                                  setDraftPrice("");
+                                  setDraftOldPrice("");
+                                }}
+                                disabled={isPending || pendingPriceCosmeticId === cosmetic.id}
+                                className={cn(
+                                  SHOP_INLINE_EDITOR_ACTION_CLASS_NAME,
+                                  "border-white/10 bg-white/5 text-zinc-200 hover:bg-white/10",
+                                )}
+                              >
+                                Отмена
+                              </button>
+                            </div>
+                          </div>
+                        ) : null}
+
+                        <div className="flex flex-wrap gap-2 text-[11px] font-semibold uppercase tracking-[0.18em]">
+                          {cosmetic.isOwned ? (
+                            <span className="rounded-full border border-emerald-500/20 bg-emerald-500/10 px-2.5 py-1 text-emerald-100">
+                              Куплено
+                            </span>
+                          ) : null}
+                          {cosmetic.isEquipped ? (
+                            <span className="rounded-full border border-sky-500/20 bg-sky-500/10 px-2.5 py-1 text-sky-100">
+                              Экипировано
+                            </span>
+                          ) : null}
+                          {viewer && !cosmetic.isOwned && isAffordable ? (
+                            <span className="rounded-full border border-white/10 bg-white/5 px-2.5 py-1 text-zinc-200">
+                              Доступно сейчас
+                            </span>
+                          ) : null}
+                          {viewer && !cosmetic.isOwned && !isAffordable ? (
+                            <span className="rounded-full border border-red-500/20 bg-red-500/10 px-2.5 py-1 text-red-100">
+                              Не хватает баланса
+                            </span>
+                          ) : null}
+                        </div>
+
+                        <div className="grid gap-2 sm:grid-cols-2">
+                          <button
+                            type="button"
+                            onClick={() => onPreview(cosmetic.type, cosmetic.value)}
+                            className={cn(
+                              SHOP_ACTION_BUTTON_BASE_CLASS_NAME,
+                              isPreviewing
+                                ? SHOP_PREVIEW_ACTIVE_BUTTON_CLASS_NAME
+                                : SHOP_PREVIEW_BUTTON_CLASS_NAME,
+                            )}
+                          >
+                            {isPreviewing ? "В примерке" : "Примерить"}
+                          </button>
+
+                          {viewer ? (
+                            cosmetic.isOwned ? (
+                              <button
+                                type="button"
+                                onClick={() => handleEquip(cosmetic.id)}
+                                disabled={cosmetic.isEquipped || isPending || isMutating}
+                                className={cn(
+                                  SHOP_ACTION_BUTTON_BASE_CLASS_NAME,
+                                  SHOP_SECONDARY_BUTTON_CLASS_NAME,
+                                )}
+                              >
+                                {cosmetic.isEquipped
+                                  ? "Уже надето"
+                                  : isMutating
+                                    ? "Экипируем..."
+                                    : "Экипировать"}
+                              </button>
+                            ) : (
+                              <button
+                                type="button"
+                                onClick={() => handleBuy(cosmetic.id)}
+                                disabled={isPending || isMutating || !isAffordable}
+                                className={cn(
+                                  SHOP_ACTION_BUTTON_BASE_CLASS_NAME,
+                                  SHOP_BUY_BUTTON_CLASS_NAME,
+                                )}
+                              >
+                                {isMutating
+                                  ? "Покупаем..."
+                                  : isAffordable
+                                    ? "Купить"
+                                    : "Недостаточно"}
+                              </button>
+                            )
+                          ) : (
+                            <Link
+                              href="/login?callbackUrl=/shop"
+                              className={cn(
+                                SHOP_ACTION_BUTTON_BASE_CLASS_NAME,
+                                SHOP_SECONDARY_BUTTON_CLASS_NAME,
+                              )}
+                            >
+                              Войти
+                            </Link>
                           )}
-                        >
-                          {cosmetic.isEquipped
-                            ? "Уже надето"
-                            : isMutating
-                              ? "Экипируем..."
-                              : "Экипировать"}
-                        </button>
-                      ) : (
-                        <button
-                          type="button"
-                          onClick={() => handleBuy(cosmetic.id)}
-                          disabled={isPending || isMutating || !isAffordable}
-                          className={cn(
-                            SHOP_ACTION_BUTTON_BASE_CLASS_NAME,
-                            SHOP_BUY_BUTTON_CLASS_NAME,
-                          )}
-                        >
-                          {isMutating
-                            ? "Покупаем..."
-                            : isAffordable
-                              ? "Купить"
-                              : "Недостаточно"}
-                        </button>
-                      )
-                    ) : (
-                      <Link
-                        href="/login?callbackUrl=/shop"
-                        className={cn(
-                          SHOP_ACTION_BUTTON_BASE_CLASS_NAME,
-                          SHOP_SECONDARY_BUTTON_CLASS_NAME,
-                        )}
-                      >
-                        Войти
-                      </Link>
-                    )}
-                  </div>
+                        </div>
+                      </div>
                     </article>
                   );
                 })}
-                </div>
-              ) : (
-                <div className="mt-6 rounded-[1.7rem] border border-dashed border-white/10 bg-white/[0.04] px-6 py-10 text-center">
-                  <p className="text-lg font-semibold text-white">Ничего не найдено</p>
-                  <p className="mt-2 text-sm leading-6 text-zinc-400">
-                    Попробуйте другой запрос или откройте соседний тип косметики, чтобы расширить выбор.
-                  </p>
-                  {normalizedSearchQuery ? (
-                    <Button
-                      type="button"
-                      onClick={() => setSearchQuery("")}
-                      className="mt-5 rounded-2xl bg-white/10 px-5 text-sm font-semibold text-white hover:bg-white/15"
-                    >
-                      Очистить поиск
-                    </Button>
-                  ) : null}
-                </div>
-              )}
-            </div>
-
-            <div className="w-full lg:w-[350px] shrink-0 sticky top-24 z-20">
-              <div className="overflow-visible rounded-[1.85rem] border border-white/10 bg-[linear-gradient(180deg,rgba(9,9,11,0.92),rgba(17,24,39,0.92))] p-4 shadow-[0_18px_48px_rgba(0,0,0,0.24)] backdrop-blur md:p-5">
-              <div className="flex flex-col gap-2 md:flex-row md:items-end md:justify-between lg:flex-col lg:items-start">
-                <div>
-                  <p className="text-xs font-semibold uppercase tracking-[0.24em] text-zinc-500">
-                    Полный preview профиля
-                  </p>
-                  <p className="mt-2 text-sm leading-6 text-zinc-400">
-                    Большой блок справа остаётся в кадре, чтобы изменения аватара и ника были видны даже на нижних карточках.
-                  </p>
-                </div>
-                {previewCosmeticId ? (
-                  <button
+              </div>
+            ) : (
+              <div className="mt-6 rounded-[1.7rem] border border-dashed border-white/10 bg-white/[0.04] px-6 py-10 text-center">
+                <p className="text-lg font-semibold text-white">Ничего не найдено</p>
+                <p className="mt-2 text-sm leading-6 text-zinc-400">
+                  Попробуйте другой запрос или откройте соседний тип косметики, чтобы расширить выбор.
+                </p>
+                {normalizedSearchQuery ? (
+                  <Button
                     type="button"
-                    onClick={() => setPreviewCosmeticId(null)}
-                    className="text-sm font-semibold text-sky-200 transition hover:text-sky-100"
+                    onClick={() => setSearchQuery("")}
+                    className="mt-5 rounded-2xl bg-white/10 px-5 text-sm font-semibold text-white hover:bg-white/15"
                   >
-                    Вернуть текущий образ
-                  </button>
+                    Очистить поиск
+                  </Button>
                 ) : null}
               </div>
-
-                <div className="mt-4">
-                  <ProfileHero
-                    eyebrow="Preview в магазине"
-                    displayName={previewDisplayName}
-                    avatarName={previewDisplayName}
-                    avatarSrc={viewer?.image ?? null}
-                    appearance={previewAppearance}
-                    roleBadge={
-                      <span className="inline-flex rounded-full border border-orange-500/20 bg-orange-500/10 px-3 py-1 text-xs font-semibold uppercase tracking-[0.16em] text-orange-100">
-                        SELLER VIEW
-                      </span>
-                    }
-                    details={
-                      <>
-                        <span className="inline-flex rounded-full border border-white/10 bg-white/5 px-3 py-1 text-zinc-200">
-                          {previewEmail}
-                        </span>
-                        <span className="inline-flex rounded-full border border-white/10 bg-white/5 px-3 py-1 text-zinc-200">
-                          Витрина и отзывы SafeLoot
-                        </span>
-                        <span className="inline-flex rounded-full border border-white/10 bg-white/5 px-3 py-1 text-zinc-200">
-                          Видно в каталоге, чатах и профиле
-                        </span>
-                      </>
-                    }
-                    aside={
-                      <div className="rounded-[1.4rem] border border-white/10 bg-black/20 p-4 text-sm text-zinc-300">
-                        <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-zinc-500">
-                          Сейчас в фокусе
-                        </p>
-                        <p className="mt-3 text-xl font-semibold text-white">
-                          {previewCosmetic?.name ?? "Текущий образ"}
-                        </p>
-                        {previewRarity && previewRarityAccent ? (
-                          <span
-                            className={cn(
-                              "mt-3 inline-flex rounded-full border px-2.5 py-1 text-[11px] font-semibold uppercase tracking-[0.18em]",
-                              previewRarityAccent.pill,
-                            )}
-                          >
-                            {COSMETIC_RARITY_LABELS[previewRarity]}
-                          </span>
-                        ) : null}
-                        <p className="mt-3 leading-6 text-zinc-300">
-                          {previewRarity
-                            ? COSMETIC_RARITY_DESCRIPTIONS[previewRarity]
-                            : "Сейчас показан ваш текущий косметический образ без усиления карточкой магазина."}
-                        </p>
-                        {previewCosmetic ? (
-                          <div className="mt-4 rounded-[1rem] border border-white/10 bg-white/5 p-3">
-                            <p className="text-[11px] uppercase tracking-[0.18em] text-zinc-500">Цена preview</p>
-                            <div className="mt-2">
-                              <CosmeticPriceBlock
-                                cosmetic={previewCosmetic}
-                                formatPrice={formatPrice}
-                              />
-                            </div>
-                            <p className="mt-2 text-xs leading-5 text-zinc-400">
-                              В preview подмешивается текущий образ пользователя и эффект выделенной карточки.
-                            </p>
-                          </div>
-                        ) : null}
-                      </div>
-                    }
-                  />
-                </div>
-              </div>
-            </div>
+            )}
           </div>
         </div>
-      </div>
-    </section>
-  );
-}
+      </section>
+    );
+  }
