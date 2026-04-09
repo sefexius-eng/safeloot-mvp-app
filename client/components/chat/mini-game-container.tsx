@@ -15,12 +15,15 @@ import {
   PUSHER_GAME_CLEAR_EVENT,
   PUSHER_GAME_DRAW_EVENT,
   PUSHER_GAME_GUESS_EVENT,
+  PUSHER_GAME_REQUEST_CANVAS_EVENT,
+  PUSHER_GAME_SYNC_CANVAS_EVENT,
   PUSHER_GAME_WIN_EVENT,
   type BrowserPusherChannel,
   type BrowserPusherClientEventChannel,
   type ConversationGameStatus,
   type ConversationGameType,
   type RealtimeGameClearPayload,
+  type RealtimeGameCanvasSyncPayload,
   type RealtimeGameDrawPayload,
   type RealtimeGameGuessPayload,
   type RealtimeGameWinPayload,
@@ -201,6 +204,35 @@ export function MiniGameContainer({
     strokesRef.current = [...strokesRef.current, segment];
     persistStrokes(strokesRef.current);
     drawSegment(segment);
+  }
+
+  function drawCanvasSnapshot(imageData: string) {
+    const canvas = canvasRef.current;
+    const context = getCanvasContext();
+
+    if (!canvas || !context) {
+      return;
+    }
+
+    const pendingSegments = [...strokesRef.current];
+    const snapshotImage = new window.Image();
+
+    snapshotImage.onload = () => {
+      resetCanvas();
+      context.drawImage(snapshotImage, 0, 0, canvas.width, canvas.height);
+
+      if (pendingSegments.length === 0) {
+        return;
+      }
+
+      strokesRef.current = pendingSegments;
+
+      for (const segment of pendingSegments) {
+        drawSegment(segment);
+      }
+    };
+
+    snapshotImage.src = imageData;
   }
 
   function clearCanvasState() {
@@ -450,9 +482,27 @@ export function MiniGameContainer({
     let isCancelled = false;
     let pusherChannel: BrowserPusherChannel | null = null;
 
+    const requestCanvasSnapshot = () => {
+      if (isDrawer || status !== "active" || winState) {
+        return;
+      }
+
+      const wasTriggered = triggerClientEvent(PUSHER_GAME_REQUEST_CANVAS_EVENT, {});
+
+      if (!wasTriggered) {
+        setConnectionWarning(
+          "Не удалось запросить актуальный snapshot холста через Pusher. Убедитесь, что client events включены в настройках приложения.",
+        );
+      }
+    };
+
     const handleSubscriptionSucceeded = () => {
       isSubscribedRef.current = true;
       setConnectionWarning(null);
+
+      if (!isDrawer && status === "active") {
+        requestCanvasSnapshot();
+      }
     };
 
     const handleRemoteDraw = (payload: RealtimeGameDrawPayload) => {
@@ -477,6 +527,37 @@ export function MiniGameContainer({
       }
 
       clearCanvasState();
+    };
+
+    const handleRemoteCanvasRequest = () => {
+      if (!isDrawer || status !== "active" || winState) {
+        return;
+      }
+
+      const canvas = canvasRef.current;
+
+      if (!canvas) {
+        return;
+      }
+
+      const snapshot = canvas.toDataURL("image/png");
+      const wasTriggered = triggerClientEvent(PUSHER_GAME_SYNC_CANVAS_EVENT, {
+        image: snapshot,
+      } satisfies RealtimeGameCanvasSyncPayload);
+
+      if (!wasTriggered) {
+        setConnectionWarning(
+          "Не удалось отправить snapshot холста через Pusher. Убедитесь, что client events включены в настройках приложения.",
+        );
+      }
+    };
+
+    const handleRemoteCanvasSync = (payload: RealtimeGameCanvasSyncPayload) => {
+      if (isDrawer || winState || !payload.image) {
+        return;
+      }
+
+      drawCanvasSnapshot(payload.image);
     };
 
     const handleRemoteGuess = (payload: RealtimeGameGuessPayload) => {
@@ -541,6 +622,8 @@ export function MiniGameContainer({
       pusherChannel.bind("pusher:subscription_succeeded", handleSubscriptionSucceeded);
       pusherChannel.bind(PUSHER_GAME_CLEAR_EVENT, handleRemoteClear);
       pusherChannel.bind(PUSHER_GAME_DRAW_EVENT, handleRemoteDraw);
+      pusherChannel.bind(PUSHER_GAME_REQUEST_CANVAS_EVENT, handleRemoteCanvasRequest);
+      pusherChannel.bind(PUSHER_GAME_SYNC_CANVAS_EVENT, handleRemoteCanvasSync);
       pusherChannel.bind(PUSHER_GAME_GUESS_EVENT, handleRemoteGuess);
       pusherChannel.bind(PUSHER_GAME_WIN_EVENT, handleRemoteWin);
     })();
@@ -560,10 +643,12 @@ export function MiniGameContainer({
       pusherChannel.unbind("pusher:subscription_succeeded", handleSubscriptionSucceeded);
       pusherChannel.unbind(PUSHER_GAME_CLEAR_EVENT, handleRemoteClear);
       pusherChannel.unbind(PUSHER_GAME_DRAW_EVENT, handleRemoteDraw);
+      pusherChannel.unbind(PUSHER_GAME_REQUEST_CANVAS_EVENT, handleRemoteCanvasRequest);
+      pusherChannel.unbind(PUSHER_GAME_SYNC_CANVAS_EVENT, handleRemoteCanvasSync);
       pusherChannel.unbind(PUSHER_GAME_GUESS_EVENT, handleRemoteGuess);
       pusherChannel.unbind(PUSHER_GAME_WIN_EVENT, handleRemoteWin);
     };
-  }, [conversationId, isDrawer, sessionId, winState]);
+  }, [conversationId, isDrawer, sessionId, status, winState]);
 
   function handleSubmitGuess(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
