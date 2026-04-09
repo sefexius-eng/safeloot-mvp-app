@@ -49,6 +49,24 @@
       "value": "text-yellow-400 drop-shadow-[0_0_8px_rgba(250,204,21,0.8)]"
     },
     {
+      "name": "Радужный перелив",
+      "type": "COLOR",
+      "price": 300,
+      "value": "bg-gradient-to-r from-red-500 via-yellow-500 to-blue-500 text-transparent bg-clip-text animate-pulse"
+    },
+    {
+      "name": "Магический Аметист",
+      "type": "COLOR",
+      "price": 250,
+      "value": "bg-gradient-to-r from-purple-400 to-pink-600 text-transparent bg-clip-text font-bold"
+    },
+    {
+      "name": "Токсичная пульсация",
+      "type": "COLOR",
+      "price": 150,
+      "value": "text-lime-500 animate-pulse drop-shadow-[0_0_8px_rgba(132,204,22,0.9)]"
+    },
+    {
       "name": "Arcade Nova",
       "type": "FONT",
       "price": 55,
@@ -119,6 +137,30 @@
       "type": "DECORATION",
       "price": 300,
       "value": "ring-4 ring-red-600 border-dashed"
+    },
+    {
+      "name": "Дыхание Дракона [Анимированная]",
+      "type": "DECORATION",
+      "price": 1000,
+      "value": "/cosmetics/dragon-animated.gif"
+    },
+    {
+      "name": "Ядовитая Змея",
+      "type": "DECORATION",
+      "price": 500,
+      "value": "/cosmetics/snake-frame.png"
+    },
+    {
+      "name": "Киберпанк Глитч [Анимированная]",
+      "type": "DECORATION",
+      "price": 800,
+      "value": "/cosmetics/glitch-frame.gif"
+    },
+    {
+      "name": "Ангельские Крылья",
+      "type": "DECORATION",
+      "price": 600,
+      "value": "/cosmetics/angel-wings.png"
     }
   ]
 }
