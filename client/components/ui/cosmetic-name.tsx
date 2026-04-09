@@ -18,11 +18,10 @@ export function CosmeticName({
   className,
 }: CosmeticNameProps) {
   return (
-    <span
-      className={cn(getNicknameAppearanceClassName(appearance), className)}
+    <CensoredText
+      text={text}
+      className={cn(className, getNicknameAppearanceClassName(appearance))}
       style={getNicknameAppearanceStyle(appearance)}
-    >
-      <CensoredText text={text} />
-    </span>
+    />
   );
 }

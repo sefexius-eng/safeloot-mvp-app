@@ -1,12 +1,24 @@
 "use client";
 
+import type { CSSProperties } from "react";
 import { useEffect, useState } from "react";
 
 import { containsProfanity } from "@/lib/censorship";
+import { cn } from "@/lib/utils";
 
 const SAFE_MODE_STORAGE_KEY = "safeMode";
 
-export default function CensoredText({ text }: { text: string | null }) {
+interface CensoredTextProps {
+  text: string | null;
+  className?: string;
+  style?: CSSProperties;
+}
+
+export default function CensoredText({
+  text,
+  className,
+  style,
+}: CensoredTextProps) {
   const [isSafeMode, setIsSafeMode] = useState(false);
 
   useEffect(() => {
@@ -30,19 +42,35 @@ export default function CensoredText({ text }: { text: string | null }) {
     return null;
   }
 
+  const renderPlainText = () => {
+    if (!className && !style) {
+      return <>{text}</>;
+    }
+
+    return (
+      <span className={className} style={style}>
+        {text}
+      </span>
+    );
+  };
+
   if (!isSafeMode) {
-    return <>{text}</>;
+    return renderPlainText();
   }
 
   const hasBadWords = containsProfanity(text);
 
   if (!hasBadWords) {
-    return <>{text}</>;
+    return renderPlainText();
   }
 
   return (
     <span
-      className="cursor-pointer select-none blur-md transition-all hover:blur-none"
+      className={cn(
+        className,
+        "cursor-pointer select-none blur-md transition-all hover:blur-none",
+      )}
+      style={style}
       title="Контент скрыт"
     >
       {text}

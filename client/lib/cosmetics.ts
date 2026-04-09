@@ -80,6 +80,8 @@ export const COSMETIC_TAILWIND_VALUE_SAFELIST = [
   "text-cyan-400 drop-shadow-[0_0_8px_rgba(34,211,238,0.8)]",
   "text-red-600 font-bold drop-shadow-[0_0_5px_rgba(220,38,38,0.9)]",
   "text-yellow-400 drop-shadow-[0_0_8px_rgba(250,204,21,0.8)]",
+  "bg-clip-text text-transparent bg-gradient-to-r from-cyan-400 via-sky-300 to-fuchsia-400 animate-pulse",
+  "bg-clip-text text-transparent bg-gradient-to-r from-amber-300 via-orange-400 to-red-500 animate-pulse",
   "font-mono",
   "font-serif",
   "font-black tracking-widest",
@@ -143,6 +145,10 @@ function normalizeAppearanceClassValue(value: string | null | undefined) {
   return value?.trim() ?? "";
 }
 
+function isCosmeticAssetUrl(value: string) {
+  return /^(https?:\/\/|\/|\.\/|\.\.\/|data:image\/|blob:)/i.test(value);
+}
+
 export function getNicknameAppearanceClassName(
   appearance: Partial<UserAppearanceData> | null | undefined,
 ) {
@@ -174,5 +180,23 @@ export function getNicknameAppearanceStyle(
 export function getAvatarDecorationClassName(
   decoration: string | null | undefined,
 ) {
-  return normalizeAppearanceClassValue(decoration);
+  const normalizedDecoration = normalizeAppearanceClassValue(decoration);
+
+  if (!normalizedDecoration || isCosmeticAssetUrl(normalizedDecoration)) {
+    return "";
+  }
+
+  return normalizedDecoration;
+}
+
+export function getAvatarDecorationImageSrc(
+  decoration: string | null | undefined,
+) {
+  const normalizedDecoration = normalizeAppearanceClassValue(decoration);
+
+  if (!normalizedDecoration || !isCosmeticAssetUrl(normalizedDecoration)) {
+    return null;
+  }
+
+  return normalizedDecoration;
 }

@@ -50,6 +50,7 @@ export function ProfileHero({
       <div className="relative mb-16 md:mb-20">
         <div className="relative h-48 w-full overflow-hidden rounded-xl bg-muted md:h-64">
           {bannerUrl ? (
+            // eslint-disable-next-line @next/next/no-img-element
             <img
               src={bannerUrl}
               alt=""
@@ -71,7 +72,7 @@ export function ProfileHero({
               imageClassName="rounded-full object-cover"
             />
             {avatarStatus ? (
-              <div className="absolute bottom-1 right-1 md:bottom-2 md:right-2">
+              <div className="absolute bottom-1 right-1 z-20 md:bottom-2 md:right-2">
                 {avatarStatus}
               </div>
             ) : null}

@@ -1,6 +1,9 @@
 import Image from "next/image";
 
-import { getAvatarDecorationClassName } from "@/lib/cosmetics";
+import {
+  getAvatarDecorationClassName,
+  getAvatarDecorationImageSrc,
+} from "@/lib/cosmetics";
 import { cn } from "@/lib/utils";
 
 interface UserAvatarProps {
@@ -23,23 +26,34 @@ export function UserAvatar({
   src,
 }: UserAvatarProps) {
   const label = name?.trim() || email?.trim() || "Пользователь";
+  const decorationClassName = getAvatarDecorationClassName(decoration);
+  const decorationImageSrc = getAvatarDecorationImageSrc(decoration);
 
   return (
     <div
       role="img"
       aria-label={alt ?? `Аватар ${label}`}
       className={cn(
-        "relative flex items-center justify-center rounded-full border border-white/10 bg-zinc-800/80 text-zinc-400",
+        "relative flex items-center justify-center overflow-visible rounded-full border border-white/10 bg-zinc-800/80 text-zinc-400",
         className,
       )}
     >
-      {decoration ? (
+      {decorationClassName ? (
         <span
           aria-hidden="true"
           className={cn(
             "pointer-events-none absolute inset-[-4px] rounded-[inherit]",
-            getAvatarDecorationClassName(decoration),
+            decorationClassName,
           )}
+        />
+      ) : null}
+      {decorationImageSrc ? (
+        // eslint-disable-next-line @next/next/no-img-element
+        <img
+          src={decorationImageSrc}
+          alt="Frame"
+          aria-hidden="true"
+          className="pointer-events-none absolute -left-[12%] -top-[12%] z-10 h-[124%] w-[124%] max-w-none object-contain"
         />
       ) : null}
       <span className="relative z-[1] flex h-full w-full items-center justify-center overflow-hidden rounded-[inherit]">
