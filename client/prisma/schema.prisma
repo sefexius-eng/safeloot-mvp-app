@@ -20,6 +20,12 @@ enum SellerRank {
   GOLD
 }
 
+enum CosmeticType {
+  COLOR
+  FONT
+  DECORATION
+}
+
 enum OrderStatus {
   PENDING
   PAID
@@ -54,6 +60,9 @@ model User {
   image            String?
   bannerUrl        String?
   badges           String[]      @default([])
+  activeColor      String?
+  activeFont       String?
+  activeDecoration String?
   emailNotifications Boolean      @default(true)
   pushNotifications Boolean       @default(true)
   password         String?
@@ -79,6 +88,7 @@ model User {
   notifications    Notification[]
   promoUsages      PromoUsage[]
   tavernMessages   TavernMessage[]
+  ownedCosmetics   UserCosmetic[]
   createdAt        DateTime      @default(now())
   updatedAt        DateTime      @updatedAt
 
@@ -343,4 +353,30 @@ model TavernMessage {
   @@index([userId])
   @@index([createdAt])
   @@map("tavern_messages")
+}
+
+model Cosmetic {
+  id     String        @id @default(cuid())
+  name   String
+  type   CosmeticType
+  price  Float
+  value  String
+  users  UserCosmetic[]
+
+  @@map("cosmetics")
+}
+
+model UserCosmetic {
+  id          String    @id @default(cuid())
+  userId      String
+  cosmeticId  String
+  purchasedAt DateTime  @default(now())
+  user        User      @relation(fields: [userId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+  cosmetic    Cosmetic  @relation(fields: [cosmeticId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+
+  @@unique([userId, cosmeticId])
+  @@index([userId])
+  @@index([cosmeticId])
+  @@index([purchasedAt])
+  @@map("user_cosmetics")
 }

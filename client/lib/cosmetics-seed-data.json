@@ -1,0 +1,64 @@
+{
+  "cosmetics": [
+    {
+      "name": "Solar Ember",
+      "type": "COLOR",
+      "price": 25,
+      "value": "#F97316"
+    },
+    {
+      "name": "Emerald Pulse",
+      "type": "COLOR",
+      "price": 30,
+      "value": "#10B981"
+    },
+    {
+      "name": "Frost Signal",
+      "type": "COLOR",
+      "price": 32,
+      "value": "#38BDF8"
+    },
+    {
+      "name": "Gold Crest",
+      "type": "COLOR",
+      "price": 40,
+      "value": "#FACC15"
+    },
+    {
+      "name": "Arcade Nova",
+      "type": "FONT",
+      "price": 55,
+      "value": "font-cosmetic-arcade-nova"
+    },
+    {
+      "name": "Runic Serif",
+      "type": "FONT",
+      "price": 50,
+      "value": "font-cosmetic-runic-serif"
+    },
+    {
+      "name": "Velocity Sans",
+      "type": "FONT",
+      "price": 48,
+      "value": "font-cosmetic-velocity-sans"
+    },
+    {
+      "name": "Ash Ring",
+      "type": "DECORATION",
+      "price": 70,
+      "value": "avatar-frame-ash-ring"
+    },
+    {
+      "name": "Neon Halo",
+      "type": "DECORATION",
+      "price": 90,
+      "value": "avatar-frame-neon-halo"
+    },
+    {
+      "name": "Obsidian Crest",
+      "type": "DECORATION",
+      "price": 110,
+      "value": "avatar-frame-obsidian-crest"
+    }
+  ]
+}

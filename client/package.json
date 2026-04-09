@@ -10,7 +10,8 @@
     "postinstall": "prisma generate",
     "prisma:generate": "prisma generate",
     "prisma:db:push": "prisma db push",
-    "seed:catalog": "node scripts/seed-catalog.cjs"
+    "seed:catalog": "node scripts/seed-catalog.cjs",
+    "seed:cosmetics": "node scripts/seed-cosmetics.cjs"
   },
   "dependencies": {
     "@next-auth/prisma-adapter": "^1.0.7",

@@ -53,6 +53,16 @@ If you do not need the route, prefer the local script instead:
 npm run seed:catalog
 ```
 
+## Cosmetics Seed
+
+To populate the cosmetics shop catalog locally, run:
+
+```bash
+npm run seed:cosmetics
+```
+
+The script is idempotent and updates existing cosmetics by the pair of `name + type` instead of creating duplicates.
+
 This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
 
 ## Learn More
