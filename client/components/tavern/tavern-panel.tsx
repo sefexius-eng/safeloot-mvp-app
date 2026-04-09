@@ -6,6 +6,7 @@ import { useSession } from "next-auth/react";
 
 import { deleteGlobalMessage, sendTavernMessage } from "@/app/actions/tavern";
 import { Button } from "@/components/ui/button";
+import { CosmeticName } from "@/components/ui/cosmetic-name";
 import { UserAvatar } from "@/components/ui/user-avatar";
 import {
   getGlobalTavernChannelName,
@@ -287,6 +288,7 @@ export function TavernPanel({ initialMessages }: TavernPanelProps) {
                           src={message.user?.image}
                           name={message.user?.name ?? message.displayName}
                           alt={`Аватар ${message.displayName}`}
+                          decoration={message.user?.activeDecoration}
                           className="h-10 w-10 border-white/10 bg-zinc-900/80 shadow-[0_12px_28px_rgba(0,0,0,0.18)]"
                           imageClassName="rounded-full object-cover"
                         />
@@ -311,12 +313,18 @@ export function TavernPanel({ initialMessages }: TavernPanelProps) {
                             href={getTavernProfileHref(message)!}
                             className="text-sm font-semibold text-white transition hover:text-orange-100 hover:underline underline-offset-4"
                           >
-                            {message.displayName}
+                            <CosmeticName
+                              text={message.displayName}
+                              appearance={message.user}
+                              className="block"
+                            />
                           </Link>
                         ) : (
-                          <p className="text-sm font-semibold text-white">
-                            {message.displayName}
-                          </p>
+                          <CosmeticName
+                            text={message.displayName}
+                            appearance={message.user}
+                            className="block text-sm font-semibold text-white"
+                          />
                         )}
                         {message.isSystem ? (
                           <span className="rounded-full border border-orange-200/20 bg-orange-950/20 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.18em] text-orange-100">

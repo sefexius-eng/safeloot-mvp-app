@@ -1,6 +1,7 @@
 import { prisma } from "@/lib/prisma";
 import { getSellerReviewSummaryBySellerId } from "@/lib/review-summary";
 
+import { USER_APPEARANCE_SELECT } from "@/lib/cosmetics";
 import { formatMoney, normalizeText } from "@/lib/domain/shared";
 
 export async function getUserById(userId: string) {
@@ -24,6 +25,7 @@ export async function getUserById(userId: string) {
       pushNotifications: true,
       role: true,
       rank: true,
+      ...USER_APPEARANCE_SELECT,
       lastSeen: true,
       platformRevenue: true,
       availableBalance: true,

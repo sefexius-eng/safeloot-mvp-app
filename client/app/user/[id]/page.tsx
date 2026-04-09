@@ -21,6 +21,7 @@ import {
   UserPresenceDot,
   UserPresencePill,
 } from "@/components/ui/user-presence-status";
+import { extractUserAppearance, USER_APPEARANCE_SELECT } from "@/lib/cosmetics";
 import { getCurrentSessionUser } from "@/lib/access-control";
 import { getAuthSession } from "@/lib/auth";
 import { mergeProfileBadgeIds } from "@/lib/profile-badges";
@@ -80,6 +81,7 @@ async function getPublicSellerProfile(id: string) {
       id: true,
       name: true,
       image: true,
+      ...USER_APPEARANCE_SELECT,
       bannerUrl: true,
       badges: true,
       lastSeen: true,
@@ -141,6 +143,7 @@ async function getPublicSellerProfile(id: string) {
               id: true,
               name: true,
               image: true,
+              ...USER_APPEARANCE_SELECT,
             },
           },
         },
@@ -176,6 +179,9 @@ async function getPublicSellerProfile(id: string) {
           id: seller.id,
           name: seller.name,
           image: seller.image,
+          activeColor: seller.activeColor,
+          activeFont: seller.activeFont,
+          activeDecoration: seller.activeDecoration,
           lastSeen: seller.lastSeen.toISOString(),
           role: seller.role,
           rank: seller.rank,
@@ -218,6 +224,7 @@ export default async function PublicUserPage({ params }: PublicUserPageProps) {
         }
         avatarName={displayName}
         avatarSrc={seller.image}
+        appearance={extractUserAppearance(seller)}
         bannerUrl={seller.bannerUrl}
         roleBadge={<ProfileRoleBadge role={seller.role} />}
         badges={seller.badges}

@@ -1,5 +1,6 @@
 import { OrderStatus, Prisma, Role } from "@prisma/client";
 
+import { USER_APPEARANCE_SELECT } from "@/lib/cosmetics";
 import { prisma } from "@/lib/prisma";
 import {
   getSellerReviewSummary,
@@ -92,6 +93,7 @@ export async function listProducts() {
           id: true,
           name: true,
           image: true,
+          ...USER_APPEARANCE_SELECT,
           lastSeen: true,
           role: true,
           rank: true,
@@ -210,6 +212,7 @@ export async function getProductById(
           id: true,
           name: true,
           image: true,
+          ...USER_APPEARANCE_SELECT,
           lastSeen: true,
           role: true,
           rank: true,

@@ -1,12 +1,13 @@
 "use client";
 
-import Image from "next/image";
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { useSession } from "next-auth/react";
 
 import { useCurrency } from "@/components/providers/currency-provider";
 import { SellerRatingBadge } from "@/components/reviews/seller-rating-badge";
+import { CosmeticName } from "@/components/ui/cosmetic-name";
+import { UserAvatar } from "@/components/ui/user-avatar";
 import type { SellerReviewSummary } from "@/lib/review-summary";
 
 const BALANCE_REFRESH_EVENT = "safeloot:balances-refresh";
@@ -18,6 +19,9 @@ interface CurrentUser {
   image: string | null;
   role: string;
   rank: string;
+  activeColor: string | null;
+  activeFont: string | null;
+  activeDecoration: string | null;
   availableBalance: string;
   holdBalance: string;
   reviewSummary: SellerReviewSummary;
@@ -138,7 +142,6 @@ export function ProfileDashboard() {
   }
 
   const displayName = user.name.trim() || user.email.split("@")[0];
-  const avatarLetter = displayName.slice(0, 1).toUpperCase() || "S";
   const displayAvailable = Math.max(0, Number(user.availableBalance));
   const displayHold = Math.max(0, Number(user.holdBalance));
 
@@ -147,28 +150,26 @@ export function ProfileDashboard() {
       <div className="grid gap-5 xl:grid-cols-[minmax(0,1.15fr)_minmax(320px,0.85fr)]">
         <article className="overflow-hidden rounded-[2rem] border border-white/10 bg-[radial-gradient(circle_at_top_left,rgba(251,146,60,0.24),transparent_32%),radial-gradient(circle_at_bottom_right,rgba(14,165,233,0.18),transparent_38%),rgba(9,9,11,0.92)] p-6 shadow-[0_24px_80px_rgba(0,0,0,0.28)] md:p-8">
           <div className="flex flex-col gap-6 md:flex-row md:items-center">
-            <div className="relative flex h-24 w-24 shrink-0 items-center justify-center overflow-hidden rounded-[2rem] border border-white/10 bg-white/10 text-3xl font-semibold text-white shadow-[0_18px_45px_rgba(0,0,0,0.22)]">
-              {user.image ? (
-                <Image
-                  src={user.image}
-                  alt={`Аватар ${displayName}`}
-                  fill
-                  unoptimized
-                  className="object-cover"
-                  sizes="96px"
-                />
-              ) : (
-                avatarLetter
-              )}
-            </div>
+            <UserAvatar
+              src={user.image}
+              name={displayName}
+              email={user.email}
+              decoration={user.activeDecoration}
+              className="h-24 w-24 shrink-0 rounded-[2rem] border border-white/10 bg-white/10 text-3xl font-semibold text-white shadow-[0_18px_45px_rgba(0,0,0,0.22)]"
+              imageClassName="rounded-[inherit] object-cover"
+            />
 
             <div className="min-w-0 flex-1">
               <p className="text-xs font-semibold tracking-[0.24em] uppercase text-orange-200/80">
                 Профиль продавца
               </p>
-              <h2 className="mt-3 truncate text-3xl font-semibold tracking-tight text-white md:text-4xl">
-                {displayName}
-              </h2>
+              <div className="mt-3 truncate text-3xl font-semibold tracking-tight text-white md:text-4xl">
+                <CosmeticName
+                  text={displayName}
+                  appearance={user}
+                  className="block truncate"
+                />
+              </div>
               <p className="mt-2 truncate text-sm text-zinc-300">{user.email}</p>
               <SellerRatingBadge summary={user.reviewSummary} className="mt-4" />
 
@@ -198,6 +199,12 @@ export function ProfileDashboard() {
               className="inline-flex h-11 items-center justify-center rounded-2xl bg-orange-600 px-5 text-sm font-semibold text-white shadow-[0_16px_40px_rgba(249,115,22,0.28)] transition hover:-translate-y-0.5 hover:bg-orange-500"
             >
               Открыть настройки
+            </Link>
+            <Link
+              href="/shop"
+              className="inline-flex h-11 items-center justify-center rounded-2xl border border-sky-400/20 bg-sky-500/10 px-5 text-sm font-semibold text-sky-100 transition hover:bg-sky-500/20"
+            >
+              Магазин косметики
             </Link>
             <Link
               href="/sell"

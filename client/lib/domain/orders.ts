@@ -5,6 +5,7 @@ import {
   TransactionType,
 } from "@prisma/client";
 
+import { USER_APPEARANCE_SELECT } from "@/lib/cosmetics";
 import {
   sendNotificationEmails,
   type NotificationEmailDeliveryInput,
@@ -341,6 +342,7 @@ export async function getOrderById(
           id: true,
           name: true,
           image: true,
+          ...USER_APPEARANCE_SELECT,
           lastSeen: true,
           role: true,
         },
@@ -350,6 +352,7 @@ export async function getOrderById(
           id: true,
           name: true,
           image: true,
+          ...USER_APPEARANCE_SELECT,
           lastSeen: true,
           role: true,
         },
@@ -367,6 +370,7 @@ export async function getOrderById(
               id: true,
               name: true,
               image: true,
+              ...USER_APPEARANCE_SELECT,
             },
           },
         },

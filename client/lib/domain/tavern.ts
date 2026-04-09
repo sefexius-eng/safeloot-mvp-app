@@ -1,5 +1,9 @@
 import type { Role } from "@prisma/client";
 
+import {
+  extractUserAppearance,
+  USER_APPEARANCE_SELECT,
+} from "@/lib/cosmetics";
 import { prisma } from "@/lib/prisma";
 import {
   publishTavernMessageDeletedEvent,
@@ -25,6 +29,9 @@ interface TavernMessageRecord {
     name: string | null;
     email: string;
     image: string | null;
+    activeColor: string | null;
+    activeFont: string | null;
+    activeDecoration: string | null;
     role: Role;
     badges: string[];
   } | null;
@@ -67,6 +74,7 @@ function mapTavernMessage(
           id: message.user.id,
           name: displayName,
           image: message.user.image,
+          ...extractUserAppearance(message.user),
           role: message.user.role,
           badges: message.user.badges,
         }
@@ -86,6 +94,7 @@ function getTavernMessageSelect() {
         name: true,
         email: true,
         image: true,
+        ...USER_APPEARANCE_SELECT,
         role: true,
         badges: true,
       },

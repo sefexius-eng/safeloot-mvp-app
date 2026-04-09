@@ -3,6 +3,7 @@ import { redirect } from "next/navigation";
 
 import { ProfileSettingsForm } from "@/components/profile/profile-settings-form";
 import { getAuthSession } from "@/lib/auth";
+import { USER_APPEARANCE_SELECT } from "@/lib/cosmetics";
 import { mergeProfileBadgeIds } from "@/lib/profile-badges";
 import { prisma } from "@/lib/prisma";
 import { getSellerAutomaticBadgeDataBySellerId } from "@/lib/seller-achievements";
@@ -28,6 +29,7 @@ export default async function ProfileSettingsPage() {
       image: true,
       bannerUrl: true,
       badges: true,
+      ...USER_APPEARANCE_SELECT,
       emailNotifications: true,
       pushNotifications: true,
       telegramId: true,
@@ -90,6 +92,9 @@ export default async function ProfileSettingsPage() {
         initialEmailNotifications={initialEmailNotifications}
         initialImage={initialImage}
         initialName={initialName}
+        initialActiveColor={userProfile.activeColor ?? null}
+        initialActiveDecoration={userProfile.activeDecoration ?? null}
+        initialActiveFont={userProfile.activeFont ?? null}
         initialPushNotifications={initialPushNotifications}
         initialTelegramId={initialTelegramId}
         initialRole={initialRole}

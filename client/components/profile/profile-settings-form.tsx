@@ -30,6 +30,9 @@ interface ProfileSettingsFormProps {
   initialEmailNotifications: boolean;
   initialName: string;
   initialImage: string | null;
+  initialActiveColor: string | null;
+  initialActiveDecoration: string | null;
+  initialActiveFont: string | null;
   initialPushNotifications: boolean;
   initialTelegramId: string | null;
   initialRole: Role;
@@ -183,6 +186,9 @@ export function ProfileSettingsForm({
   initialEmailNotifications,
   initialImage,
   initialName,
+  initialActiveColor,
+  initialActiveDecoration,
+  initialActiveFont,
   initialPushNotifications,
   initialTelegramId,
   initialRole,
@@ -414,6 +420,11 @@ export function ProfileSettingsForm({
             displayName={displayName}
             avatarName={displayName}
             avatarSrc={image}
+            appearance={{
+              activeColor: initialActiveColor,
+              activeFont: initialActiveFont,
+              activeDecoration: initialActiveDecoration,
+            }}
             bannerUrl={normalizedBannerUrl || null}
             roleBadge={<ProfileRoleBadge role={initialRole} />}
             badges={initialBadges}

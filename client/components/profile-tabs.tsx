@@ -49,6 +49,9 @@ export interface ProfileTabsReview {
     email: string;
     name: string | null;
     image: string | null;
+    activeColor: string | null;
+    activeFont: string | null;
+    activeDecoration: string | null;
   };
 }
 

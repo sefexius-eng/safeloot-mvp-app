@@ -1,5 +1,7 @@
 import type { Role } from "@prisma/client";
 
+import type { UserAppearanceData } from "@/lib/cosmetics";
+
 type PusherServerConstructor = typeof import("pusher");
 
 export type BrowserPusherChannel = import("pusher-js").Channel;
@@ -12,7 +14,7 @@ export type RealtimeChannelDescriptor =
   | { kind: "order"; id: string }
   | { kind: "presence" };
 
-export interface RealtimeUserIdentity {
+export interface RealtimeUserIdentity extends UserAppearanceData {
   id: string;
   name: string | null;
   image: string | null;

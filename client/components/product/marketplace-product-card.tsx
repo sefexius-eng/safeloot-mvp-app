@@ -11,6 +11,7 @@ import {
   formatSellerAverageRating,
   formatSellerReviewCount,
 } from "@/components/reviews/seller-star-scale";
+import { CosmeticName } from "@/components/ui/cosmetic-name";
 import { UserPresenceInlineStatus } from "@/components/ui/user-presence-status";
 import { UserAvatar } from "@/components/ui/user-avatar";
 import type { SellerReviewSummary } from "@/lib/review-summary";
@@ -38,6 +39,9 @@ export interface MarketplaceProductCardData {
     id: string;
     name: string | null;
     image: string | null;
+    activeColor: string | null;
+    activeFont: string | null;
+    activeDecoration: string | null;
     lastSeen: string | null;
     role: Role;
     rank: SellerRank;
@@ -123,14 +127,17 @@ export function MarketplaceProductCard({ product }: MarketplaceProductCardProps)
           <UserAvatar
             src={product.seller.image}
             name={sellerDisplayName}
+            decoration={product.seller.activeDecoration}
             className="h-10 w-10 shrink-0 rounded-full border-white/10 bg-zinc-900/80"
             imageClassName="rounded-full object-cover"
           />
           <div className="min-w-0 flex-1">
             <div className="flex items-center gap-2">
-              <p className="truncate text-sm font-medium text-zinc-200 transition group-hover:text-white">
-                <CensoredText text={sellerDisplayName} />
-              </p>
+              <CosmeticName
+                text={sellerDisplayName}
+                appearance={product.seller}
+                className="block truncate text-sm font-medium text-zinc-200 transition group-hover:text-white"
+              />
               {isTeamSeller(product.seller.role) ? (
                 <span className="shrink-0 rounded-full border border-sky-400/20 bg-sky-500/15 px-2 py-0.5 text-[10px] font-bold uppercase tracking-[0.12em] text-sky-100 align-middle">
                   TEAM

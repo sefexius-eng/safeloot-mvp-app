@@ -1,5 +1,6 @@
 import { Prisma } from "@prisma/client";
 
+import { USER_APPEARANCE_SELECT } from "@/lib/cosmetics";
 import {
   sendNotificationEmails,
   type NotificationEmailDeliveryInput,
@@ -48,6 +49,7 @@ async function getConversationContextById(conversationId: string) {
         select: {
           name: true,
           image: true,
+          ...USER_APPEARANCE_SELECT,
           lastSeen: true,
           role: true,
         },
@@ -56,6 +58,7 @@ async function getConversationContextById(conversationId: string) {
         select: {
           name: true,
           image: true,
+          ...USER_APPEARANCE_SELECT,
           lastSeen: true,
           role: true,
         },
@@ -290,6 +293,7 @@ export async function listConversationsByUser(userId: string) {
           id: true,
           name: true,
           image: true,
+          ...USER_APPEARANCE_SELECT,
           role: true,
         },
       },
@@ -298,6 +302,7 @@ export async function listConversationsByUser(userId: string) {
           id: true,
           name: true,
           image: true,
+          ...USER_APPEARANCE_SELECT,
           role: true,
         },
       },
@@ -340,6 +345,9 @@ export async function listConversationsByUser(userId: string) {
         id: otherParty.id,
         name: otherParty.name,
         image: otherParty.image,
+        activeColor: otherParty.activeColor,
+        activeFont: otherParty.activeFont,
+        activeDecoration: otherParty.activeDecoration,
         accountRole: otherParty.role,
       },
       product: conversation.product
@@ -400,6 +408,9 @@ export async function getConversationRoom(conversationId: string, userId: string
             role: "SELLER" as const,
             name: conversation.seller.name,
             image: conversation.seller.image,
+            activeColor: conversation.seller.activeColor,
+            activeFont: conversation.seller.activeFont,
+            activeDecoration: conversation.seller.activeDecoration,
             lastSeen: conversation.seller.lastSeen.toISOString(),
             accountRole: conversation.seller.role,
           }
@@ -408,6 +419,9 @@ export async function getConversationRoom(conversationId: string, userId: string
             role: "BUYER" as const,
             name: conversation.buyer.name,
             image: conversation.buyer.image,
+            activeColor: conversation.buyer.activeColor,
+            activeFont: conversation.buyer.activeFont,
+            activeDecoration: conversation.buyer.activeDecoration,
             lastSeen: conversation.buyer.lastSeen.toISOString(),
             accountRole: conversation.buyer.role,
           },
@@ -467,6 +481,7 @@ export async function getConversationMessages(
               id: true,
               name: true,
               image: true,
+              ...USER_APPEARANCE_SELECT,
             },
           },
         },
@@ -511,6 +526,9 @@ function serializeConversationMessage(message: {
     id: string;
     name: string | null;
     image: string | null;
+    activeColor: string | null;
+    activeFont: string | null;
+    activeDecoration: string | null;
   };
 }): RealtimeConversationMessagePayload {
   return {
@@ -626,6 +644,7 @@ export async function createConversationMessage(input: {
               id: true,
               name: true,
               image: true,
+              ...USER_APPEARANCE_SELECT,
             },
           },
         },
@@ -653,6 +672,7 @@ export async function createConversationMessage(input: {
                   id: true,
                   name: true,
                   image: true,
+                  ...USER_APPEARANCE_SELECT,
                 },
               },
             },
@@ -858,6 +878,7 @@ export async function getChatMessages(
               id: true,
               name: true,
               image: true,
+              ...USER_APPEARANCE_SELECT,
             },
           },
         },

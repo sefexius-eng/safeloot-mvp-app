@@ -52,3 +52,49 @@ a {
   font-weight: 700;
   text-shadow: 0 0 16px rgba(255, 255, 255, 0.18);
 }
+
+.font-cosmetic-arcade-nova {
+  font-family: "Orbitron", "Trebuchet MS", "Segoe UI", sans-serif;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+}
+
+.font-cosmetic-runic-serif {
+  font-family: "Cinzel", Georgia, Cambria, serif;
+  font-weight: 700;
+  letter-spacing: 0.03em;
+}
+
+.font-cosmetic-velocity-sans {
+  font-family: "Rajdhani", "Trebuchet MS", "Segoe UI", sans-serif;
+  font-weight: 700;
+  letter-spacing: 0.03em;
+}
+
+.avatar-frame-ash-ring {
+  border: 1px solid rgba(244, 244, 245, 0.18);
+  box-shadow:
+    0 0 0 1px rgba(244, 244, 245, 0.08),
+    0 0 0 4px rgba(113, 113, 122, 0.18),
+    0 18px 38px rgba(0, 0, 0, 0.24);
+}
+
+.avatar-frame-neon-halo {
+  border: 1px solid rgba(56, 189, 248, 0.5);
+  background:
+    linear-gradient(135deg, rgba(56, 189, 248, 0.2), rgba(249, 115, 22, 0.18));
+  box-shadow:
+    0 0 0 1px rgba(14, 165, 233, 0.28),
+    0 0 18px rgba(56, 189, 248, 0.42),
+    0 0 36px rgba(249, 115, 22, 0.18);
+}
+
+.avatar-frame-obsidian-crest {
+  border: 1px solid rgba(250, 204, 21, 0.34);
+  background:
+    linear-gradient(135deg, rgba(24, 24, 27, 0.22), rgba(250, 204, 21, 0.12));
+  box-shadow:
+    0 0 0 1px rgba(63, 63, 70, 0.24),
+    0 0 0 4px rgba(39, 39, 42, 0.28),
+    0 22px 44px rgba(0, 0, 0, 0.34);
+}

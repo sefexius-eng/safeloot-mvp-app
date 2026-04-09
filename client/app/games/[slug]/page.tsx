@@ -8,6 +8,7 @@ import {
   MarketplaceProductCard,
   type MarketplaceProductCardData,
 } from "@/components/product/marketplace-product-card";
+import { USER_APPEARANCE_SELECT } from "@/lib/cosmetics";
 import {
   convertCurrencyAmountToUsd,
   normalizeCurrencyCode,
@@ -147,6 +148,7 @@ async function getGameCatalog(
           id: true,
           name: true,
           image: true,
+          ...USER_APPEARANCE_SELECT,
           lastSeen: true,
           role: true,
           rank: true,

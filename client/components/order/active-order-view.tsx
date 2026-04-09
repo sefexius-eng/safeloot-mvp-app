@@ -26,6 +26,7 @@ import {
   type SellerReviewCardData,
 } from "@/components/reviews/seller-review-card";
 import { Button } from "@/components/ui/button";
+import { CosmeticName } from "@/components/ui/cosmetic-name";
 import { Input } from "@/components/ui/input";
 import { TeamBadge } from "@/components/ui/team-badge";
 import { Textarea } from "@/components/ui/textarea";
@@ -66,6 +67,9 @@ interface ChatUserIdentity {
   id: string;
   name: string | null;
   image: string | null;
+  activeColor: string | null;
+  activeFont: string | null;
+  activeDecoration: string | null;
 }
 
 interface OrderParticipant extends ChatUserIdentity {
@@ -107,6 +111,9 @@ interface OrderDetail {
       id: string;
       name: string | null;
       image: string | null;
+      activeColor: string | null;
+      activeFont: string | null;
+      activeDecoration: string | null;
     };
   } | null;
   buyer: OrderParticipant;
@@ -1110,6 +1117,9 @@ export function ActiveOrderView({ orderId }: ActiveOrderViewProps) {
                       id: currentOrder.buyer.id,
                       name: currentOrder.buyer.name,
                       image: currentOrder.buyer.image,
+                      activeColor: currentOrder.buyer.activeColor,
+                      activeFont: currentOrder.buyer.activeFont,
+                      activeDecoration: currentOrder.buyer.activeDecoration,
                     },
                   },
                 }
@@ -1239,6 +1249,7 @@ export function ActiveOrderView({ orderId }: ActiveOrderViewProps) {
                 <UserAvatar
                   src={interlocutor.image}
                   name={interlocutorDisplayName}
+                  decoration={interlocutor.activeDecoration}
                   className="h-10 w-10 shrink-0 border-white/10 bg-zinc-800/80"
                   imageClassName="rounded-full object-cover"
                 />
@@ -1259,9 +1270,11 @@ export function ActiveOrderView({ orderId }: ActiveOrderViewProps) {
                     href={`/user/${interlocutor.id}`}
                     className="inline-flex min-w-0 max-w-full items-center gap-2 truncate text-xl font-semibold tracking-tight text-white transition hover:text-orange-300 hover:underline"
                   >
-                    <span className="truncate">
-                      <CensoredText text={interlocutorDisplayName} />
-                    </span>
+                    <CosmeticName
+                      text={interlocutorDisplayName}
+                      appearance={interlocutor}
+                      className="block truncate"
+                    />
                     <TeamBadge role={interlocutor.role} />
                   </Link>
                   <UserPresencePill
@@ -1302,6 +1315,7 @@ export function ActiveOrderView({ orderId }: ActiveOrderViewProps) {
                     <UserAvatar
                       src={participant.image}
                       name={getUserDisplayName(participant, role)}
+                      decoration={participant.activeDecoration}
                       className="h-10 w-10 shrink-0 border-white/10 bg-zinc-800/80"
                       imageClassName="rounded-full object-cover"
                     />
@@ -1310,9 +1324,11 @@ export function ActiveOrderView({ orderId }: ActiveOrderViewProps) {
                         {role}
                       </p>
                       <div className="flex min-w-0 items-center gap-2 text-sm font-semibold text-white">
-                        <p className="truncate">
-                          <CensoredText text={getUserDisplayName(participant, role)} />
-                        </p>
+                        <CosmeticName
+                          text={getUserDisplayName(participant, role)}
+                          appearance={participant}
+                          className="block truncate"
+                        />
                         <TeamBadge role={participant.role} />
                       </div>
                     </div>
@@ -1380,6 +1396,9 @@ export function ActiveOrderView({ orderId }: ActiveOrderViewProps) {
               const authorName = isOwnMessage
                 ? currentUserDisplayName
                 : getUserDisplayName(author, authorFallbackLabel);
+              const authorAppearance = isOwnMessage
+                ? currentParticipant ?? author
+                : author;
 
               return (
                 <div
@@ -1392,6 +1411,7 @@ export function ActiveOrderView({ orderId }: ActiveOrderViewProps) {
                     <UserAvatar
                       src={authorAvatar}
                       name={authorName}
+                      decoration={authorAppearance.activeDecoration}
                       className={[
                         "h-8 w-8 shrink-0 border-white/10",
                         isOwnMessage
@@ -1414,7 +1434,15 @@ export function ActiveOrderView({ orderId }: ActiveOrderViewProps) {
                               : "text-zinc-400",
                         ].join(" ")}
                       >
-                        <CensoredText text={authorLabel} />
+                        {isOwnMessage ? (
+                          <CensoredText text={authorLabel} />
+                        ) : (
+                          <CosmeticName
+                            text={authorLabel}
+                            appearance={authorAppearance}
+                            className="block"
+                          />
+                        )}
                       </span>
 
                       <div
@@ -1477,13 +1505,22 @@ export function ActiveOrderView({ orderId }: ActiveOrderViewProps) {
                     <UserAvatar
                       src={typingParticipant.image}
                       name={typingDisplayName}
+                      decoration={typingParticipant.activeDecoration}
                       className="h-8 w-8 shrink-0 border-sky-500/20 bg-sky-500/10 text-sky-200"
                       imageClassName="rounded-full object-cover"
                     />
                   ) : null}
                   <div className="flex items-center gap-3">
                     <span className="font-semibold text-sky-100">
-                      <CensoredText text={typingDisplayName} />
+                      {typingParticipant ? (
+                        <CosmeticName
+                          text={typingDisplayName}
+                          appearance={typingParticipant}
+                          className="block"
+                        />
+                      ) : (
+                        <CensoredText text={typingDisplayName} />
+                      )}
                     </span>
                     <span>печатает</span>
                   </div>
@@ -1769,7 +1806,26 @@ export function ActiveOrderView({ orderId }: ActiveOrderViewProps) {
                   currentOrder
                     ? {
                         ...currentOrder,
-                        review: updatedReview,
+                        review: {
+                          ...updatedReview,
+                          author: {
+                            id: updatedReview.author.id,
+                            name: updatedReview.author.name,
+                            image: updatedReview.author.image,
+                            activeColor:
+                              updatedReview.author.activeColor ??
+                              currentOrder.review?.author.activeColor ??
+                              null,
+                            activeFont:
+                              updatedReview.author.activeFont ??
+                              currentOrder.review?.author.activeFont ??
+                              null,
+                            activeDecoration:
+                              updatedReview.author.activeDecoration ??
+                              currentOrder.review?.author.activeDecoration ??
+                              null,
+                          },
+                        },
                       }
                     : currentOrder,
                 )

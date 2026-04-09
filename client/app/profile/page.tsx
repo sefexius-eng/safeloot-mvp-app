@@ -2,6 +2,7 @@ import { OrderStatus } from "@prisma/client";
 import Link from "next/link";
 
 import { ProfilePageClient } from "@/app/profile/profile-page-client";
+import { extractUserAppearance, USER_APPEARANCE_SELECT } from "@/lib/cosmetics";
 import { ProfileHero } from "@/components/profile/profile-hero";
 import { ProfileRoleBadge } from "@/components/profile/profile-role-badge";
 import {
@@ -128,6 +129,7 @@ export default async function ProfilePage() {
             id: true,
             name: true,
             image: true,
+            ...USER_APPEARANCE_SELECT,
             role: true,
             bannerUrl: true,
             badges: true,
@@ -177,6 +179,7 @@ export default async function ProfilePage() {
                     email: true,
                     name: true,
                     image: true,
+                    ...USER_APPEARANCE_SELECT,
                   },
                 },
               },
@@ -258,6 +261,7 @@ export default async function ProfilePage() {
         displayName={sellerDisplayName}
         avatarName={sellerDisplayName}
         avatarSrc={sellerProfile?.image ?? session?.user?.image ?? null}
+        appearance={extractUserAppearance(sellerProfile)}
         bannerUrl={sellerProfile?.bannerUrl ?? null}
         roleBadge={
           shouldShowProfileRoleBadge ? (
@@ -290,6 +294,12 @@ export default async function ProfilePage() {
                 Посмотреть мою витрину
               </Link>
             ) : null}
+            <Link
+              href="/shop"
+              className="inline-flex h-11 items-center justify-center rounded-2xl border border-sky-400/20 bg-sky-500/10 px-5 text-sm font-semibold text-sky-100 transition hover:-translate-y-0.5 hover:bg-sky-500/20"
+            >
+              Магазин косметики
+            </Link>
             <Link
               href="/profile/settings"
               className="inline-flex h-11 items-center justify-center rounded-2xl bg-orange-600 px-5 text-sm font-semibold text-white shadow-[0_16px_40px_rgba(249,115,22,0.28)] transition hover:-translate-y-0.5 hover:bg-orange-500"

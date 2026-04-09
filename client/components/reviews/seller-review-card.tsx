@@ -9,6 +9,7 @@ import CensoredText from "@/components/censored-text";
 import { RatingStars } from "@/components/reviews/rating-stars";
 import { SellerReviewReplyForm } from "@/components/reviews/seller-review-reply-form";
 import { Button } from "@/components/ui/button";
+import { CosmeticName } from "@/components/ui/cosmetic-name";
 import {
   Dialog,
   DialogContent,
@@ -34,6 +35,9 @@ export interface SellerReviewCardData {
     name: string | null;
     image: string | null;
     email?: string | null;
+    activeColor?: string | null;
+    activeFont?: string | null;
+    activeDecoration?: string | null;
   };
 }
 
@@ -216,13 +220,16 @@ export function SellerReviewCard({
             src={review.author.image}
             name={authorName}
             email={review.author.email ?? undefined}
+            decoration={review.author.activeDecoration}
             className="h-12 w-12 shrink-0 border-white/10 bg-zinc-900/80"
             imageClassName="rounded-full object-cover"
           />
           <div className="min-w-0">
-            <p className="truncate text-sm font-semibold text-white">
-              <CensoredText text={authorName} />
-            </p>
+            <CosmeticName
+              text={authorName}
+              appearance={review.author}
+              className="block truncate text-sm font-semibold text-white"
+            />
             <p className="truncate text-xs uppercase tracking-[0.16em] text-zinc-500">
               Покупатель
             </p>

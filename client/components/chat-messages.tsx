@@ -6,6 +6,7 @@ import { useEffect, useRef, useState } from "react";
 import { markConversationMessagesAsRead } from "@/app/actions/chat";
 import CensoredText from "@/components/censored-text";
 import { Button } from "@/components/ui/button";
+import { CosmeticName } from "@/components/ui/cosmetic-name";
 import { Input } from "@/components/ui/input";
 import {
   getConversationChannelName,
@@ -30,6 +31,9 @@ export interface ChatMessageSender {
   id: string;
   name?: string | null;
   image?: string | null;
+  activeColor?: string | null;
+  activeFont?: string | null;
+  activeDecoration?: string | null;
 }
 
 export interface ChatMessage {
@@ -577,6 +581,9 @@ export function ChatMessages({
         id: currentUserId,
         name: "Вы",
         image: null,
+        activeColor: null,
+        activeFont: null,
+        activeDecoration: null,
       },
     };
 
@@ -688,7 +695,15 @@ export function ChatMessages({
                     ].join(" ")}
                   >
                     <p className="text-xs uppercase tracking-[0.18em] text-zinc-500">
-                      <CensoredText text={authorLabel} />
+                      {isOwnMessage ? (
+                        <CensoredText text={authorLabel} />
+                      ) : (
+                        <CosmeticName
+                          text={authorLabel}
+                          appearance={message.sender}
+                          className="block"
+                        />
+                      )}
                     </p>
                     {message.text ? (
                       <p className="mt-2 whitespace-pre-wrap text-sm leading-7">

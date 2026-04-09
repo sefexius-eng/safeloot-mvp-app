@@ -3,6 +3,7 @@ import { notFound, redirect } from "next/navigation";
 
 import CensoredText from "@/components/censored-text";
 import { ChatMessages } from "@/components/chat-messages";
+import { CosmeticName } from "@/components/ui/cosmetic-name";
 import { UserAvatar } from "@/components/ui/user-avatar";
 import { BuyProductDialog } from "@/components/product/buy-product-dialog";
 import { TeamBadge } from "@/components/ui/team-badge";
@@ -116,15 +117,18 @@ export default async function ChatRoomPage({ params }: ChatPageProps) {
             <UserAvatar
               src={conversation.otherParty.image}
               name={otherPartyName}
+              decoration={conversation.otherParty.activeDecoration}
               className="h-12 w-12 shrink-0 border-gray-700 bg-zinc-800/80"
               imageClassName="rounded-full object-cover"
             />
             <div className="min-w-0">
               <div className="flex min-w-0 flex-wrap items-center gap-2 text-lg font-semibold text-white">
                 <div className="flex min-w-0 items-center gap-2">
-                  <p className="truncate">
-                    <CensoredText text={otherPartyName} />
-                  </p>
+                  <CosmeticName
+                    text={otherPartyName}
+                    appearance={conversation.otherParty}
+                    className="block truncate"
+                  />
                   <TeamBadge role={conversation.otherParty.accountRole} />
                 </div>
                 <UserPresencePill

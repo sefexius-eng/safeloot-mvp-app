@@ -6,6 +6,7 @@ import { getOrCreateConversation } from "@/app/actions/chat";
 import CensoredText from "@/components/censored-text";
 import { SellerRatingBadge } from "@/components/reviews/seller-rating-badge";
 import { BuyProductDialog } from "@/components/product/buy-product-dialog";
+import { CosmeticName } from "@/components/ui/cosmetic-name";
 import { UserAvatar } from "@/components/ui/user-avatar";
 import { FormattedPrice } from "@/components/ui/formatted-price";
 import { getCurrentSessionUser } from "@/lib/access-control";
@@ -52,6 +53,9 @@ interface ProductDetail {
     id: string;
     name: string | null;
     image: string | null;
+    activeColor: string | null;
+    activeFont: string | null;
+    activeDecoration: string | null;
     rank: SellerRank;
     reviewSummary: SellerReviewSummary;
   };
@@ -355,12 +359,15 @@ export default async function ProductPage({ params }: ProductPageProps) {
                     <UserAvatar
                       src={product.seller.image}
                       name={sellerName}
+                      decoration={product.seller.activeDecoration}
                       className="h-12 w-12 shrink-0"
                     />
                     <div className="min-w-0 flex-1">
-                      <p className="truncate text-xl font-semibold text-white transition group-hover:text-orange-200 group-hover:underline">
-                        <CensoredText text={sellerName} />
-                      </p>
+                      <CosmeticName
+                        text={sellerName}
+                        appearance={product.seller}
+                        className="block truncate text-xl font-semibold text-white transition group-hover:text-orange-200 group-hover:underline"
+                      />
                       <SellerRatingBadge
                         summary={product.seller.reviewSummary}
                         className="mt-3"

@@ -4,6 +4,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 
 import CensoredText from "@/components/censored-text";
+import { CosmeticName } from "@/components/ui/cosmetic-name";
 import { UserAvatar } from "@/components/ui/user-avatar";
 
 export interface ChatSidebarConversation {
@@ -13,6 +14,9 @@ export interface ChatSidebarConversation {
     id: string;
     name: string | null;
     image: string | null;
+    activeColor: string | null;
+    activeFont: string | null;
+    activeDecoration: string | null;
   };
   product: {
     id: string;
@@ -79,15 +83,18 @@ export function ChatSidebar({ conversations }: ChatSidebarProps) {
                 <UserAvatar
                   src={chat.otherParty.image}
                   name={displayName}
+                  decoration={chat.otherParty.activeDecoration}
                   className="h-12 w-12 shrink-0 border-gray-700 bg-zinc-800/80"
                   imageClassName="rounded-full object-cover"
                 />
 
                 <div className="min-w-0 flex-1">
                   <div className="flex items-center justify-between gap-3">
-                    <p className="truncate text-sm font-semibold text-white">
-                      <CensoredText text={displayName} />
-                    </p>
+                    <CosmeticName
+                      text={displayName}
+                      appearance={chat.otherParty}
+                      className="block truncate text-sm font-semibold text-white"
+                    />
                     <span className="shrink-0 text-[11px] uppercase tracking-[0.16em] text-gray-500">
                       {formatConversationTime(chat.lastMessage?.createdAt ?? chat.updatedAt)}
                     </span>

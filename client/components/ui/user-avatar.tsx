@@ -5,6 +5,7 @@ interface UserAvatarProps {
   name?: string | null;
   email?: string | null;
   alt?: string;
+  decoration?: string | null;
   className?: string;
   imageClassName?: string;
 }
@@ -12,6 +13,7 @@ interface UserAvatarProps {
 export function UserAvatar({
   alt,
   className,
+  decoration,
   email,
   imageClassName,
   name,
@@ -24,31 +26,42 @@ export function UserAvatar({
       role="img"
       aria-label={alt ?? `Аватар ${label}`}
       className={cn(
-        "flex items-center justify-center overflow-hidden rounded-full border border-white/10 bg-zinc-800/80 text-zinc-400",
+        "relative flex items-center justify-center rounded-full border border-white/10 bg-zinc-800/80 text-zinc-400",
         className,
       )}
     >
-      {src ? (
-        <img
-          src={src}
-          alt=""
-          className={cn("h-full w-full object-cover", imageClassName)}
-        />
-      ) : (
-        <svg
+      {decoration ? (
+        <span
           aria-hidden="true"
-          viewBox="0 0 24 24"
-          fill="none"
-          className="h-[58%] w-[58%]"
-          stroke="currentColor"
-          strokeWidth="1.8"
-          strokeLinecap="round"
-          strokeLinejoin="round"
-        >
-          <path d="M18 20a6 6 0 0 0-12 0" />
-          <circle cx="12" cy="8" r="4" />
-        </svg>
-      )}
+          className={cn(
+            "pointer-events-none absolute inset-[-4px] rounded-[inherit]",
+            decoration,
+          )}
+        />
+      ) : null}
+      <span className="relative z-[1] flex h-full w-full items-center justify-center overflow-hidden rounded-[inherit]">
+        {src ? (
+          <img
+            src={src}
+            alt=""
+            className={cn("h-full w-full object-cover", imageClassName)}
+          />
+        ) : (
+          <svg
+            aria-hidden="true"
+            viewBox="0 0 24 24"
+            fill="none"
+            className="h-[58%] w-[58%]"
+            stroke="currentColor"
+            strokeWidth="1.8"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          >
+            <path d="M18 20a6 6 0 0 0-12 0" />
+            <circle cx="12" cy="8" r="4" />
+          </svg>
+        )}
+      </span>
     </div>
   );
 }

@@ -25,6 +25,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { CosmeticName } from "@/components/ui/cosmetic-name";
 import { Select } from "@/components/ui/select";
 import { UserAvatar } from "@/components/ui/user-avatar";
 import catalogSeedData from "@/lib/catalog-seed-data.json";
@@ -77,6 +78,9 @@ interface CurrentUser {
   pushNotifications: boolean;
   role: Role;
   rank: string;
+  activeColor: string | null;
+  activeFont: string | null;
+  activeDecoration: string | null;
   lastSeen: string;
   availableBalance: string;
   holdBalance: string;
@@ -346,9 +350,11 @@ export function SiteHeader() {
         <DropdownMenuContent align="end" forceMount className={contentClassName}>
           <DropdownMenuLabel>Аккаунт</DropdownMenuLabel>
           <div className="px-3 pb-2">
-            <p className="truncate text-sm font-semibold text-white">
-              {displayName}
-            </p>
+            <CosmeticName
+              text={displayName}
+              appearance={user}
+              className="block truncate text-sm font-semibold text-white"
+            />
             <p className="truncate text-xs text-zinc-500">
               {user?.email ?? session?.user?.email ?? ""}
             </p>
@@ -359,6 +365,9 @@ export function SiteHeader() {
           </DropdownMenuItem>
           <DropdownMenuItem asChild>
             <Link href="/profile/settings">Настройки профиля</Link>
+          </DropdownMenuItem>
+          <DropdownMenuItem asChild>
+            <Link href="/shop">Магазин косметики</Link>
           </DropdownMenuItem>
           <DropdownMenuItem onSelect={() => setIsUserSearchOpen(true)}>
             Найти пользователя
@@ -414,6 +423,7 @@ export function SiteHeader() {
                       src={user?.image ?? session?.user?.image ?? null}
                       name={displayName}
                       email={user?.email ?? session?.user?.email ?? null}
+                      decoration={user?.activeDecoration}
                       className="h-9 w-9 shrink-0 rounded-md border-0 bg-zinc-800/80"
                       imageClassName="rounded-md object-cover"
                     />
@@ -629,12 +639,15 @@ export function SiteHeader() {
                       src={user?.image ?? session?.user?.image ?? null}
                       name={displayName}
                       email={user?.email ?? session?.user?.email ?? null}
+                      decoration={user?.activeDecoration}
                       className="h-10 w-10 shrink-0 rounded-[0.8rem] border-0 bg-zinc-800/80"
                     />
                     <div className="hidden min-w-0 flex-col lg:flex">
-                      <span className="truncate text-sm font-semibold text-white">
-                        {displayName}
-                      </span>
+                      <CosmeticName
+                        text={displayName}
+                        appearance={user}
+                        className="block truncate text-sm font-semibold text-white"
+                      />
                       <span className="truncate text-xs text-zinc-500">
                         Профиль
                       </span>

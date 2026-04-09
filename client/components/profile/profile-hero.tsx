@@ -2,6 +2,11 @@ import type { ReactNode } from "react";
 
 import { ProfileBadgeList } from "@/components/profile/profile-badge-list";
 import { UserAvatar } from "@/components/ui/user-avatar";
+import {
+  getNicknameAppearanceClassName,
+  getNicknameAppearanceStyle,
+  type UserAppearanceData,
+} from "@/lib/cosmetics";
 import { cn } from "@/lib/utils";
 
 interface ProfileHeroProps {
@@ -10,6 +15,7 @@ interface ProfileHeroProps {
   avatarName: string;
   avatarSrc?: string | null;
   bannerUrl?: string | null;
+  appearance?: UserAppearanceData | null;
   roleBadge?: ReactNode;
   badges?: string[] | null;
   details?: ReactNode;
@@ -25,6 +31,7 @@ export function ProfileHero({
   avatarName,
   avatarSrc,
   bannerUrl,
+  appearance,
   roleBadge,
   badges,
   details,
@@ -59,6 +66,7 @@ export function ProfileHero({
             <UserAvatar
               src={avatarSrc}
               name={avatarName}
+              decoration={appearance?.activeDecoration}
               className="h-24 w-24 border-4 border-background bg-zinc-900/90 text-zinc-100 shadow-[0_22px_50px_rgba(0,0,0,0.34)] md:h-32 md:w-32"
               imageClassName="rounded-full object-cover"
             />
@@ -79,7 +87,12 @@ export function ProfileHero({
 
           <div className="mt-3 flex flex-wrap items-center gap-3">
             <h1 className="min-w-0 break-words text-3xl font-semibold tracking-tight text-white [overflow-wrap:anywhere] md:text-5xl md:leading-[1.02]">
-              {displayName}
+              <span
+                className={getNicknameAppearanceClassName(appearance)}
+                style={getNicknameAppearanceStyle(appearance)}
+              >
+                {displayName}
+              </span>
             </h1>
             {roleBadge}
           </div>
