@@ -1,4 +1,5 @@
 import { MessageType, Prisma } from "@prisma/client";
+import { Chess } from "chess.js";
 
 import { USER_APPEARANCE_SELECT } from "@/lib/cosmetics";
 import {
@@ -55,6 +56,13 @@ function isNonEmptyString(value: unknown): value is string {
   return typeof value === "string" && value.trim().length > 0;
 }
 
+function isStringArray(value: unknown): value is string[] {
+  return (
+    Array.isArray(value) &&
+    value.every((entry) => typeof entry === "string" && entry.trim().length > 0)
+  );
+}
+
 const MAX_GAME_CANVAS_SNAPSHOT_LENGTH = 1_500_000;
 
 function isConversationGameCanvasSnapshot(value: unknown): value is string {
@@ -84,6 +92,7 @@ function parseConversationGameMetadata(
   const fen = metadata.fen;
   const whitePlayerId = metadata.whitePlayerId;
   const blackPlayerId = metadata.blackPlayerId;
+  const moveHistory = metadata.moveHistory;
 
   if (
     !isConversationGameType(game) ||
@@ -112,11 +121,18 @@ function parseConversationGameMetadata(
     const normalizedFen = fen;
     const normalizedWhitePlayerId = whitePlayerId;
     const normalizedBlackPlayerId = blackPlayerId;
+    const normalizedMoveHistory =
+      moveHistory === undefined || moveHistory === null
+        ? []
+        : isStringArray(moveHistory)
+          ? moveHistory
+          : null;
 
     if (
       !isNonEmptyString(normalizedFen) ||
       !isNonEmptyString(normalizedWhitePlayerId) ||
-      !isNonEmptyString(normalizedBlackPlayerId)
+      !isNonEmptyString(normalizedBlackPlayerId) ||
+      normalizedMoveHistory === null
     ) {
       return null;
     }
@@ -126,6 +142,7 @@ function parseConversationGameMetadata(
       fen: normalizedFen,
       whitePlayerId: normalizedWhitePlayerId,
       blackPlayerId: normalizedBlackPlayerId,
+      moveHistory: normalizedMoveHistory,
     };
   }
 
@@ -159,6 +176,7 @@ function toConversationGameMetadataData(
           fen: gameMetadata.fen,
           whitePlayerId: gameMetadata.whitePlayerId,
           blackPlayerId: gameMetadata.blackPlayerId,
+          moveHistory: gameMetadata.moveHistory ?? [],
         }
       : {}),
   };
@@ -1395,6 +1413,146 @@ export async function updateConversationGameCanvasState(input: {
       const message = await transactionClient.message.update({
         where: {
           id: activeGameInvite.id,
+        },
+        data: {
+          gameMetadata: toConversationGameMetadataData(nextGameMetadata),
+        },
+        select: {
+          id: true,
+          gameMetadata: true,
+        },
+      });
+
+      await transactionClient.conversation.update({
+        where: {
+          id: conversation.id,
+        },
+        data: {
+          updatedAt: new Date(),
+        },
+      });
+
+      return message;
+    },
+    {
+      isolationLevel: Prisma.TransactionIsolationLevel.Serializable,
+    },
+  );
+
+  return {
+    conversationId: conversation.id,
+    messageId: updatedMessage.id,
+    gameMetadata: parseConversationGameMetadata(updatedMessage.gameMetadata),
+  };
+}
+
+export async function updateConversationChessGameState(input: {
+  conversationId: string;
+  messageId: string;
+  userId: string;
+  fen: string;
+  moveHistory: string[];
+}) {
+  const conversationId = normalizeText(input.conversationId);
+  const messageId = normalizeText(input.messageId);
+  const userId = normalizeText(input.userId);
+  const fenInput = normalizeText(input.fen);
+  const moveHistory = input.moveHistory;
+
+  if (!conversationId) {
+    throw new Error("conversationId is required.");
+  }
+
+  if (!messageId) {
+    throw new Error("messageId is required.");
+  }
+
+  if (!userId) {
+    throw new Error("userId is required.");
+  }
+
+  if (!fenInput) {
+    throw new Error("fen is required.");
+  }
+
+  if (
+    !Array.isArray(moveHistory) ||
+    !moveHistory.every(
+      (entry) => typeof entry === "string" && entry.trim().length > 0,
+    )
+  ) {
+    throw new Error("moveHistory must be an array of SAN moves.");
+  }
+
+  let validatedFen: string;
+
+  try {
+    validatedFen = new Chess(fenInput).fen();
+  } catch {
+    throw new Error("Некорректное состояние шахматной доски.");
+  }
+
+  const conversation = await prisma.conversation.findUnique({
+    where: {
+      id: conversationId,
+    },
+    select: {
+      id: true,
+      buyerId: true,
+      sellerId: true,
+    },
+  });
+
+  if (!conversation) {
+    throw new Error(`Conversation with id ${conversationId} was not found.`);
+  }
+
+  ensureConversationParticipant(userId, conversation);
+
+  const existingMessage = await prisma.message.findUnique({
+    where: {
+      id: messageId,
+    },
+    select: {
+      id: true,
+      conversationId: true,
+      type: true,
+      gameMetadata: true,
+    },
+  });
+
+  if (!existingMessage || existingMessage.conversationId !== conversation.id) {
+    throw new Error(`Game invite message with id ${messageId} was not found.`);
+  }
+
+  if (existingMessage.type !== MessageType.GAME_INVITE) {
+    throw new Error("Only game invite messages can update chess state.");
+  }
+
+  const currentGameMetadata = parseConversationGameMetadata(existingMessage.gameMetadata);
+
+  if (!currentGameMetadata || currentGameMetadata.game !== "chess") {
+    throw new Error("Chess game metadata is missing or invalid.");
+  }
+
+  if (
+    currentGameMetadata.whitePlayerId !== userId &&
+    currentGameMetadata.blackPlayerId !== userId
+  ) {
+    throw new Error("Only chess participants can update board state.");
+  }
+
+  const nextGameMetadata: ConversationGameMetadata = {
+    ...currentGameMetadata,
+    fen: validatedFen,
+    moveHistory,
+  };
+
+  const updatedMessage = await prisma.$transaction(
+    async (transactionClient) => {
+      const message = await transactionClient.message.update({
+        where: {
+          id: existingMessage.id,
         },
         data: {
           gameMetadata: toConversationGameMetadataData(nextGameMetadata),

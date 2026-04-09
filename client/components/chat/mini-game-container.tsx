@@ -3,6 +3,7 @@
 import { X } from "lucide-react";
 import { useEffect, useMemo, useRef, useState, useTransition } from "react";
 
+import { ChessMiniGame } from "@/components/chat/chess-mini-game";
 import { saveGameCanvasState, updateGameInviteStatus } from "@/app/actions/chat";
 import { Button } from "@/components/ui/button";
 import {
@@ -18,6 +19,7 @@ import {
   PUSHER_GAME_WIN_EVENT,
   type BrowserPusherChannel,
   type BrowserPusherClientEventChannel,
+  type ConversationGameMetadata,
   type ConversationGameStatus,
   type ConversationGameType,
   type RealtimeGameClearPayload,
@@ -60,13 +62,21 @@ interface MiniGameContainerProps {
   sessionId: string;
   initiatorId: string;
   canvasSnapshot?: string | null;
+  fen?: string | null;
+  whitePlayerId?: string | null;
+  blackPlayerId?: string | null;
+  moveHistory?: string[] | null;
   initiatorName: string;
   guesserName: string;
   currentUserId: string;
+  onGameMetadataUpdate?: (
+    messageId: string,
+    nextGameMetadata: ConversationGameMetadata,
+  ) => void;
   onClose: () => void;
 }
 
-export function MiniGameContainer({
+function CrocodileMiniGame({
   conversationId,
   messageId,
   game,
@@ -842,4 +852,12 @@ export function MiniGameContainer({
       </div>
     </div>
   );
+}
+
+export function MiniGameContainer(props: MiniGameContainerProps) {
+  if (props.game === "chess") {
+    return <ChessMiniGame {...props} />;
+  }
+
+  return <CrocodileMiniGame {...props} />;
 }

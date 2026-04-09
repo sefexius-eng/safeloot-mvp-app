@@ -125,7 +125,7 @@ function getGameTitle(game: ConversationGameType) {
 }
 
 function supportsInlineMiniGameRuntime(game: ConversationGameType) {
-  return game === "crocodile";
+  return game === "crocodile" || game === "chess";
 }
 
 function getGameInviteStatusLabel(status: ConversationGameStatus) {
@@ -233,6 +233,21 @@ function mergeMessages(currentMessages: ChatMessage[], nextMessages: ChatMessage
   return Array.from(mergedMessages.values()).sort(
     (left, right) =>
       Date.parse(left.createdAt) - Date.parse(right.createdAt),
+  );
+}
+
+function mergeUpdatedGameMetadata(
+  currentMessages: ChatMessage[],
+  messageId: string,
+  nextGameMetadata: ConversationGameMetadata,
+) {
+  return currentMessages.map((message) =>
+    message.id === messageId
+      ? {
+          ...message,
+          gameMetadata: nextGameMetadata,
+        }
+      : message,
   );
 }
 
@@ -827,6 +842,15 @@ export function ChatMessages({
     });
   }
 
+  function handleUpdateGameMetadata(
+    messageId: string,
+    nextGameMetadata: ConversationGameMetadata,
+  ) {
+    setMessages((currentMessages) =>
+      mergeUpdatedGameMetadata(currentMessages, messageId, nextGameMetadata),
+    );
+  }
+
   const isMutating = isSending || isProcessingAttachment || isSendingInvite;
   const openGameMessage = openGameMessageId
     ? messages.find((message) => {
@@ -1057,9 +1081,14 @@ export function ChatMessages({
           sessionId={openGameMessage.gameMetadata.sessionId ?? openGameMessage.id}
           initiatorId={openGameMessage.gameMetadata.initiatorId}
           canvasSnapshot={openGameMessage.gameMetadata.canvasSnapshot ?? null}
+          fen={openGameMessage.gameMetadata.fen ?? null}
+          whitePlayerId={openGameMessage.gameMetadata.whitePlayerId ?? null}
+          blackPlayerId={openGameMessage.gameMetadata.blackPlayerId ?? null}
+          moveHistory={openGameMessage.gameMetadata.moveHistory ?? []}
           initiatorName={openGameInitiatorName}
           guesserName={openGameGuesserName}
           currentUserId={currentUserId}
+          onGameMetadataUpdate={handleUpdateGameMetadata}
           onClose={() => setOpenGameMessageId(null)}
         />
       ) : null}

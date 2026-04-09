@@ -18,6 +18,7 @@ import {
   softDeleteConversationByUser,
   toggleArchiveConversationByUser,
   updateConversationGameCanvasState as updateConversationGameCanvasStateRecord,
+  updateConversationChessGameState as updateConversationChessGameStateRecord,
   updateConversationGameInviteStatus as updateConversationGameInviteStatusRecord,
 } from "@/lib/domain/chat-service";
 import type { ConversationGameStatus, ConversationGameType } from "@/lib/pusher";
@@ -305,6 +306,27 @@ export async function saveGameCanvasState(
     conversationId,
     userId,
     canvasSnapshot: base64Image,
+  });
+
+  revalidateChatPaths(result.conversationId);
+
+  return result;
+}
+
+export async function saveChessGameState(
+  conversationId: string,
+  messageId: string,
+  fen: string,
+  moveHistory: string[],
+) {
+  const userId = await requireActiveChatUserId();
+
+  const result = await updateConversationChessGameStateRecord({
+    conversationId,
+    messageId,
+    userId,
+    fen,
+    moveHistory,
   });
 
   revalidateChatPaths(result.conversationId);
