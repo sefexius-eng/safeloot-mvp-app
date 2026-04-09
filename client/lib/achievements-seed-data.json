@@ -4,28 +4,28 @@
       "code": "REGISTRATION",
       "title": "Первый шаг",
       "description": "Добро пожаловать на SafeLoot!",
-      "iconUrl": "/achievements/start.png",
+      "iconUrl": "/achievements/start.svg",
       "rarity": "COMMON"
     },
     {
       "code": "FIRST_TRADE",
       "title": "Честный малый",
       "description": "Успешно завершена первая сделка",
-      "iconUrl": "/achievements/handshake.png",
+      "iconUrl": "/achievements/handshake.svg",
       "rarity": "RARE"
     },
     {
       "code": "CHESS_MASTER",
       "title": "Гроссмейстер",
       "description": "Сыграна первая партия в шахматы в чате",
-      "iconUrl": "/achievements/chess.png",
+      "iconUrl": "/achievements/chess.svg",
       "rarity": "EPIC"
     },
     {
       "code": "SHOPAHOLIC",
       "title": "Модник",
       "description": "Куплена первая косметика в магазине",
-      "iconUrl": "/achievements/shop.png",
+      "iconUrl": "/achievements/shop.svg",
       "rarity": "RARE"
     },
     {

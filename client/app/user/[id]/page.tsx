@@ -3,9 +3,9 @@ import { notFound } from "next/navigation";
 
 import CensoredText from "@/components/censored-text";
 import {
-  ProfileAchievementGrid,
   type ProfileAchievementItem,
 } from "@/components/profile/profile-achievement-grid";
+import { PublicProfileAchievements } from "@/components/profile/public-profile-achievements";
 import { ProfileHero } from "@/components/profile/profile-hero";
 import { PublicProfileMessageButton } from "@/components/profile/public-profile-message-button";
 import { ProfileRoleBadge } from "@/components/profile/profile-role-badge";
@@ -93,16 +93,7 @@ async function getPublicSellerProfile(id: string) {
         select: {
           id: true,
           earnedAt: true,
-          achievement: {
-            select: {
-              id: true,
-              code: true,
-              title: true,
-              description: true,
-              iconUrl: true,
-              rarity: true,
-            },
-          },
+          achievement: true,
         },
         orderBy: {
           earnedAt: "desc",
@@ -330,14 +321,7 @@ export default async function PublicUserPage({ params }: PublicUserPageProps) {
         }
       />
 
-      <ProfileAchievementGrid
-        eyebrow="Achievement Board"
-        title="Достижения продавца"
-        description="Коллекция достижений, заработанных за активность, отзывы и успешные продажи на SafeLoot."
-        achievements={seller.achievements}
-        emptyTitle="Пока достижений нет"
-        emptyDescription="Когда продавец совершит первые заметные шаги на площадке, здесь появятся его достижения."
-      />
+      <PublicProfileAchievements achievements={seller.achievements} />
 
       <section className="space-y-6">
         <div className="flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
