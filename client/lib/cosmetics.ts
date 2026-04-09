@@ -12,6 +12,7 @@ export interface CosmeticCatalogItem {
   name: string;
   type: CosmeticType;
   price: number;
+  oldPrice: number | null;
   value: string;
   isOwned: boolean;
   isEquipped: boolean;

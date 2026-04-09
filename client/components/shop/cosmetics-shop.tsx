@@ -3,13 +3,14 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
-import type { CosmeticType } from "@prisma/client";
+import type { CosmeticType, Role } from "@prisma/client";
 
 import {
   buyCosmetic as buyCosmeticAction,
   clearActiveCosmetics as clearActiveCosmeticsAction,
   equipCosmetic as equipCosmeticAction,
   unequipCosmetic as unequipCosmeticAction,
+  updateCosmeticPrice as updateCosmeticPriceAction,
 } from "@/app/actions/cosmetics";
 import { useCurrency } from "@/components/providers/currency-provider";
 import { CosmeticName } from "@/components/ui/cosmetic-name";
@@ -29,6 +30,7 @@ import {
   type CosmeticsShopState,
   type CosmeticsViewerState,
 } from "@/lib/cosmetics";
+import { isAdminRole } from "@/lib/roles";
 import { cn } from "@/lib/utils";
 import { ProfileHero } from "@/components/profile/profile-hero";
 
@@ -59,6 +61,12 @@ const SHOP_SECONDARY_BUTTON_CLASS_NAME =
 
 const SHOP_SECONDARY_WIDE_BUTTON_CLASS_NAME =
   "border border-white/20 bg-white/5 px-4 text-white hover:-translate-y-0.5 hover:bg-white/10";
+
+const SHOP_INLINE_EDITOR_INPUT_CLASS_NAME =
+  "h-9 w-full rounded-xl border border-white/10 bg-white/5 px-3 text-sm text-white outline-none transition placeholder:text-zinc-500 focus:border-white/20 focus:bg-white/10";
+
+const SHOP_INLINE_EDITOR_ACTION_CLASS_NAME =
+  "inline-flex h-9 items-center justify-center rounded-xl border px-3 text-xs font-semibold transition disabled:cursor-not-allowed disabled:opacity-60";
 
 function getTypeAccent(type: CosmeticType) {
   switch (type) {
@@ -291,6 +299,68 @@ function getShopHeadline(type: CosmeticType) {
   }
 }
 
+function hasCosmeticDiscount(cosmetic: Pick<CosmeticCatalogItem, "price" | "oldPrice">) {
+  return cosmetic.oldPrice !== null && cosmetic.oldPrice > cosmetic.price;
+}
+
+function getCosmeticDiscountPercent(
+  cosmetic: Pick<CosmeticCatalogItem, "price" | "oldPrice">,
+) {
+  if (!hasCosmeticDiscount(cosmetic) || !cosmetic.oldPrice) {
+    return null;
+  }
+
+  return Math.max(
+    1,
+    Math.round(((cosmetic.oldPrice - cosmetic.price) / cosmetic.oldPrice) * 100),
+  );
+}
+
+function CosmeticPriceBlock({
+  cosmetic,
+  formatPrice,
+  align = "left",
+  compact = false,
+}: {
+  cosmetic: Pick<CosmeticCatalogItem, "price" | "oldPrice">;
+  formatPrice: (amount: string | number) => string;
+  align?: "left" | "right";
+  compact?: boolean;
+}) {
+  const discountPercent = getCosmeticDiscountPercent(cosmetic);
+  const isDiscounted = hasCosmeticDiscount(cosmetic);
+
+  return (
+    <div
+      className={cn(
+        "flex flex-col gap-1",
+        align === "right" ? "items-end text-right" : "items-start text-left",
+      )}
+    >
+      {isDiscounted ? (
+        <div className="flex flex-wrap items-center gap-2">
+          <span className="text-sm text-gray-500 line-through">
+            {formatPrice(cosmetic.oldPrice ?? 0)}
+          </span>
+          {discountPercent ? (
+            <span className="inline-flex rounded-full border border-red-500/20 bg-red-500/10 px-2 py-0.5 text-[11px] font-semibold uppercase tracking-[0.14em] text-red-200">
+              -{discountPercent}%
+            </span>
+          ) : null}
+        </div>
+      ) : null}
+      <span
+        className={cn(
+          "font-bold text-emerald-400",
+          compact ? "text-sm" : "text-lg",
+        )}
+      >
+        {formatPrice(cosmetic.price)}
+      </span>
+    </div>
+  );
+}
+
 function CosmeticPreview({
   cosmetic,
   viewer,
@@ -351,7 +421,13 @@ function CosmeticPreview({
   );
 }
 
-export function CosmeticsShop({ initialState }: { initialState: CosmeticsShopState }) {
+export function CosmeticsShop({
+  initialState,
+  currentUserRole,
+}: {
+  initialState: CosmeticsShopState;
+  currentUserRole: Role | null;
+}) {
   const { formatBalance, formatPrice } = useCurrency();
   const router = useRouter();
   const [activeType, setActiveType] = useState<CosmeticType>("COLOR");
@@ -363,6 +439,10 @@ export function CosmeticsShop({ initialState }: { initialState: CosmeticsShopSta
   const [feedback, setFeedback] = useState<ShopMessageState>(null);
   const [pendingCosmeticId, setPendingCosmeticId] = useState<string | null>(null);
   const [pendingUnequipType, setPendingUnequipType] = useState<CosmeticType | null>(null);
+  const [editingCosmeticId, setEditingCosmeticId] = useState<string | null>(null);
+  const [draftPrice, setDraftPrice] = useState("");
+  const [draftOldPrice, setDraftOldPrice] = useState("");
+  const [pendingPriceCosmeticId, setPendingPriceCosmeticId] = useState<string | null>(null);
   const [isResettingAll, setIsResettingAll] = useState(false);
   const [isPending, startTransition] = useTransition();
 
@@ -419,6 +499,7 @@ export function CosmeticsShop({ initialState }: { initialState: CosmeticsShopSta
   const previewDisplayName = viewer?.name ?? "SafeLoot Player";
   const previewEmail = viewer?.email ?? "player@safeloot.net";
   const previewCountBase = typeCosmetics.length;
+  const canManagePrices = isAdminRole(currentUserRole);
 
   function applyViewerState(nextViewer: CosmeticsViewerState, message: ShopMessageState) {
     setViewer(nextViewer);
@@ -426,6 +507,12 @@ export function CosmeticsShop({ initialState }: { initialState: CosmeticsShopSta
     setFeedback(message);
     window.dispatchEvent(new Event(BALANCE_REFRESH_EVENT));
     router.refresh();
+  }
+
+  function startPriceEditing(cosmetic: CosmeticCatalogItem) {
+    setEditingCosmeticId(cosmetic.id);
+    setDraftPrice(String(cosmetic.price));
+    setDraftOldPrice(cosmetic.oldPrice === null ? "" : String(cosmetic.oldPrice));
   }
 
   function handleBuy(cosmeticId: string) {
@@ -552,6 +639,84 @@ export function CosmeticsShop({ initialState }: { initialState: CosmeticsShopSta
         })
         .finally(() => {
           setIsResettingAll(false);
+        });
+    });
+  }
+
+  function handleSavePrice(cosmeticId: string) {
+    const normalizedPriceInput = draftPrice.trim();
+    const normalizedOldPriceInput = draftOldPrice.trim();
+
+    if (!normalizedPriceInput) {
+      setFeedback({
+        tone: "error",
+        text: "Укажите текущую цену перед сохранением.",
+      });
+      return;
+    }
+
+    const parsedPrice = Number(normalizedPriceInput);
+
+    if (!Number.isFinite(parsedPrice) || parsedPrice < 0) {
+      setFeedback({
+        tone: "error",
+        text: "Текущая цена должна быть неотрицательным числом.",
+      });
+      return;
+    }
+
+    const parsedOldPrice = normalizedOldPriceInput
+      ? Number(normalizedOldPriceInput)
+      : null;
+
+    if (
+      parsedOldPrice !== null &&
+      (!Number.isFinite(parsedOldPrice) || parsedOldPrice < 0)
+    ) {
+      setFeedback({
+        tone: "error",
+        text: "Старая цена должна быть неотрицательным числом.",
+      });
+      return;
+    }
+
+    setPendingPriceCosmeticId(cosmeticId);
+    setFeedback(null);
+
+    startTransition(() => {
+      void updateCosmeticPriceAction(cosmeticId, parsedPrice, parsedOldPrice)
+        .then((updatedCosmetic) => {
+          setCosmetics((currentCosmetics) =>
+            currentCosmetics.map((cosmetic) =>
+              cosmetic.id === updatedCosmetic.id
+                ? {
+                    ...cosmetic,
+                    price: updatedCosmetic.price,
+                    oldPrice: updatedCosmetic.oldPrice,
+                  }
+                : cosmetic,
+            ),
+          );
+          setEditingCosmeticId(null);
+          setDraftPrice("");
+          setDraftOldPrice("");
+          setFeedback({
+            tone: "success",
+            text: `Цена для ${updatedCosmetic.name} обновлена.`,
+          });
+          router.refresh();
+        })
+        .catch((error) => {
+          setFeedback({
+            tone: "error",
+            text:
+              error instanceof Error
+                ? error.message
+                : "Не удалось обновить цену косметики.",
+          });
+        })
+        .finally(() => {
+          setPendingPriceCosmeticId(null);
         });
     });
   }
@@ -828,9 +993,12 @@ export function CosmeticsShop({ initialState }: { initialState: CosmeticsShopSta
                     </p>
                     <div className="mt-4 flex items-center justify-between gap-3 text-sm">
                       <span className="text-zinc-400">{COSMETIC_TYPE_LABELS[cosmetic.type]}</span>
-                      <span className="font-semibold text-white">
-                        {formatPrice(cosmetic.price)}
-                      </span>
+                      <CosmeticPriceBlock
+                        cosmetic={cosmetic}
+                        formatPrice={formatPrice}
+                        align="right"
+                        compact
+                      />
                     </div>
                   </button>
                 );
@@ -911,9 +1079,12 @@ export function CosmeticsShop({ initialState }: { initialState: CosmeticsShopSta
                   {previewCosmetic ? (
                     <div className="mt-4 rounded-[1rem] border border-white/10 bg-white/5 p-3">
                       <p className="text-[11px] uppercase tracking-[0.18em] text-zinc-500">Цена preview</p>
-                      <p className="mt-2 text-lg font-semibold text-white">
-                        {formatPrice(previewCosmetic.price)}
-                      </p>
+                      <div className="mt-2">
+                        <CosmeticPriceBlock
+                          cosmetic={previewCosmetic}
+                          formatPrice={formatPrice}
+                        />
+                      </div>
                       <p className="mt-2 text-xs leading-5 text-zinc-400">
                         В preview подмешивается текущий образ пользователя и эффект выделенной карточки.
                       </p>
@@ -980,9 +1151,22 @@ export function CosmeticsShop({ initialState }: { initialState: CosmeticsShopSta
                     </div>
                     <div className="rounded-[1.1rem] border border-white/10 bg-black/20 px-3 py-2 text-right">
                       <p className="text-[11px] uppercase tracking-[0.2em] text-zinc-500">Цена</p>
-                      <p className="mt-1 text-lg font-semibold text-white">
-                        {formatPrice(cosmetic.price)}
-                      </p>
+                      <div className="mt-2">
+                        <CosmeticPriceBlock
+                          cosmetic={cosmetic}
+                          formatPrice={formatPrice}
+                          align="right"
+                        />
+                      </div>
+                      {canManagePrices && editingCosmeticId !== cosmetic.id ? (
+                        <button
+                          type="button"
+                          onClick={() => startPriceEditing(cosmetic)}
+                          className="mt-3 inline-flex items-center justify-end text-xs font-semibold text-sky-200 transition hover:text-sky-100"
+                        >
+                          ✏️ Изменить цену
+                        </button>
+                      ) : null}
                     </div>
                   </div>
 
@@ -991,6 +1175,70 @@ export function CosmeticsShop({ initialState }: { initialState: CosmeticsShopSta
                   </div>
 
                   <div className="mt-auto flex flex-col gap-3 pt-5">
+                    {canManagePrices && editingCosmeticId === cosmetic.id ? (
+                      <div className="rounded-[1.15rem] border border-white/10 bg-white/5 p-3">
+                        <div className="grid gap-3 sm:grid-cols-2">
+                          <label className="grid gap-1">
+                            <span className="text-[11px] font-semibold uppercase tracking-[0.18em] text-zinc-500">
+                              Текущая цена
+                            </span>
+                            <input
+                              type="number"
+                              min="0"
+                              step="0.01"
+                              value={draftPrice}
+                              onChange={(event) => setDraftPrice(event.target.value)}
+                              className={SHOP_INLINE_EDITOR_INPUT_CLASS_NAME}
+                              inputMode="decimal"
+                            />
+                          </label>
+                          <label className="grid gap-1">
+                            <span className="text-[11px] font-semibold uppercase tracking-[0.18em] text-zinc-500">
+                              Старая цена
+                            </span>
+                            <input
+                              type="number"
+                              min="0"
+                              step="0.01"
+                              value={draftOldPrice}
+                              onChange={(event) => setDraftOldPrice(event.target.value)}
+                              className={SHOP_INLINE_EDITOR_INPUT_CLASS_NAME}
+                              inputMode="decimal"
+                              placeholder="Не задана"
+                            />
+                          </label>
+                        </div>
+                        <div className="mt-3 flex gap-2">
+                          <button
+                            type="button"
+                            onClick={() => handleSavePrice(cosmetic.id)}
+                            disabled={isPending || pendingPriceCosmeticId === cosmetic.id}
+                            className={cn(
+                              SHOP_INLINE_EDITOR_ACTION_CLASS_NAME,
+                              "border-emerald-500/20 bg-emerald-500/10 text-emerald-100 hover:bg-emerald-500/15",
+                            )}
+                          >
+                            {pendingPriceCosmeticId === cosmetic.id ? "Сохраняем..." : "✅ Сохранить"}
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setEditingCosmeticId(null);
+                              setDraftPrice("");
+                              setDraftOldPrice("");
+                            }}
+                            disabled={isPending || pendingPriceCosmeticId === cosmetic.id}
+                            className={cn(
+                              SHOP_INLINE_EDITOR_ACTION_CLASS_NAME,
+                              "border-white/10 bg-white/5 text-zinc-200 hover:bg-white/10",
+                            )}
+                          >
+                            Отмена
+                          </button>
+                        </div>
+                      </div>
+                    ) : null}
+
                     <div className="flex flex-wrap gap-2 text-[11px] font-semibold uppercase tracking-[0.18em]">
                       {cosmetic.isOwned ? (
                         <span className="rounded-full border border-emerald-500/20 bg-emerald-500/10 px-2.5 py-1 text-emerald-100">

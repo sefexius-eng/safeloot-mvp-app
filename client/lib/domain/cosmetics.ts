@@ -24,6 +24,7 @@ type CosmeticRecord = {
   name: string;
   type: "COLOR" | "FONT" | "DECORATION";
   price: number;
+  oldPrice: number | null;
   value: string;
 };
 
@@ -95,6 +96,8 @@ function mapCosmeticRecord(
     name: cosmetic.name,
     type: cosmetic.type,
     price: Number(cosmetic.price.toFixed(2)),
+    oldPrice:
+      cosmetic.oldPrice === null ? null : Number(cosmetic.oldPrice.toFixed(2)),
     value: cosmetic.value,
     isOwned: ownedCosmeticIds.has(cosmetic.id),
     isEquipped:
@@ -127,6 +130,7 @@ async function getCosmeticById(
       name: true,
       type: true,
       price: true,
+      oldPrice: true,
       value: true,
     },
   });
@@ -155,6 +159,7 @@ export async function getCosmeticsShopState(
         name: true,
         type: true,
         price: true,
+        oldPrice: true,
         value: true,
       },
     }),

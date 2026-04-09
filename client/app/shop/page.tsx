@@ -1,4 +1,5 @@
 import Link from "next/link";
+import type { Role } from "@prisma/client";
 
 import { CosmeticsShop } from "@/components/shop/cosmetics-shop";
 import { FormattedBalance } from "@/components/ui/formatted-balance";
@@ -7,6 +8,10 @@ import { getAuthSession } from "@/lib/auth";
 import { getCosmeticsShopState } from "@/lib/domain/cosmetics";
 
 export const dynamic = "force-dynamic";
+
+function getShopUserRole(role: Role | null | undefined) {
+  return role ?? null;
+}
 
 export default async function ShopPage() {
   const currentUser = await getCurrentSessionUser(await getAuthSession());
@@ -52,7 +57,10 @@ export default async function ShopPage() {
         </div>
       </section>
 
-      <CosmeticsShop initialState={shopState} />
+      <CosmeticsShop
+        initialState={shopState}
+        currentUserRole={getShopUserRole(currentUser?.role)}
+      />
     </main>
   );
 }
