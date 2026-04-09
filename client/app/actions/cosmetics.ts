@@ -11,6 +11,7 @@ import {
   equipCosmetic as equipCosmeticRecord,
   unequipCosmetic as unequipCosmeticRecord,
 } from "@/lib/domain/cosmetics";
+import { prisma } from "@/lib/prisma";
 import type { CosmeticsViewerState } from "@/lib/cosmetics";
 
 function getUnequipMessage(cosmeticType: CosmeticType) {
@@ -47,6 +48,31 @@ async function requireActiveCosmeticsUser() {
   }
 
   return currentUser;
+}
+
+async function requireAdminCosmeticsUser() {
+  const session = await getAuthSession();
+  const currentUser = await getCurrentSessionUser(session);
+
+  if (!currentUser) {
+    throw new Error("Unauthorized");
+  }
+
+  if (currentUser.role !== "ADMIN" && currentUser.role !== "SUPER_ADMIN") {
+    throw new Error("Unauthorized");
+  }
+
+  return currentUser;
+}
+
+function normalizeCosmeticPriceValue(value: number, fieldName: string) {
+  const normalizedValue = Number(value);
+
+  if (!Number.isFinite(normalizedValue) || normalizedValue < 0) {
+    throw new Error(`${fieldName} must be a non-negative number.`);
+  }
+
+  return normalizedValue;
 }
 
 function revalidateCosmeticViews(userId: string) {
@@ -170,4 +196,46 @@ export async function clearActiveCosmetics(): Promise<CosmeticMutationResult> {
           : "Не удалось сбросить активную косметику.",
     };
   }
+}
+
+export async function updateCosmeticPrice(
+  id: string,
+  newPrice: number,
+  oldPrice?: number | null,
+) {
+  await requireAdminCosmeticsUser();
+
+  const normalizedId = id.trim();
+
+  if (!normalizedId) {
+    throw new Error("Cosmetic id is required.");
+  }
+
+  const normalizedPrice = normalizeCosmeticPriceValue(newPrice, "newPrice");
+  const normalizedOldPrice =
+    oldPrice === null || oldPrice === undefined
+      ? null
+      : normalizeCosmeticPriceValue(oldPrice, "oldPrice");
+
+  const updatedCosmetic = await prisma.cosmetic.update({
+    where: {
+      id: normalizedId,
+    },
+    data: {
+      price: normalizedPrice,
+      oldPrice: normalizedOldPrice,
+    },
+    select: {
+      id: true,
+      name: true,
+      type: true,
+      price: true,
+      oldPrice: true,
+      value: true,
+    },
+  });
+
+  revalidatePath("/shop");
+
+  return updatedCosmetic;
 }
