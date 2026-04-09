@@ -4,10 +4,22 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 
 const INFO_LINKS = [
-  "Пользовательское соглашение",
-  "Политика конфиденциальности",
-  "Правила Escrow-сделок",
-  "Поддержка",
+  {
+    label: "Пользовательское соглашение",
+    href: "/terms",
+  },
+  {
+    label: "Политика конфиденциальности",
+    href: "/privacy",
+  },
+  {
+    label: "Правила Escrow-сделок",
+    href: "/help",
+  },
+  {
+    label: "Поддержка",
+    href: "/help",
+  },
 ];
 
 const COMMUNITY_LINKS = ["Telegram", "Discord"];
@@ -53,13 +65,13 @@ export function SiteFooter() {
               Информация
             </p>
             <nav className="mt-4 flex flex-col gap-3 text-sm text-zinc-400">
-              {INFO_LINKS.map((label) => (
+              {INFO_LINKS.map((link) => (
                 <Link
-                  key={label}
-                  href="/help"
+                  key={link.label}
+                  href={link.href}
                   className="transition hover:text-white"
                 >
-                  {label}
+                  {link.label}
                 </Link>
               ))}
             </nav>
