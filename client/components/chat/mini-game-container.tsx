@@ -110,6 +110,10 @@ export function MiniGameContainer({
     () => `mini-game-word:${game}:${sessionId}:${initiatorId}`,
     [game, initiatorId, sessionId],
   );
+  const canvasSnapshotStorageKey = useMemo(
+    () => `crocodile_canvas_${conversationId}`,
+    [conversationId],
+  );
   const strokesStorageKey = useMemo(
     () => `mini-game-strokes:${game}:${sessionId}`,
     [game, sessionId],
@@ -237,6 +241,39 @@ export function MiniGameContainer({
     snapshotImage.src = imageData;
   }
 
+  function persistCanvasSnapshotToStorage() {
+    const canvas = canvasRef.current;
+
+    if (!canvas || !isDrawer) {
+      return;
+    }
+
+    try {
+      sessionStorage.setItem(canvasSnapshotStorageKey, canvas.toDataURL());
+    } catch {
+      return;
+    }
+  }
+
+  function restoreCanvasSnapshotFromStorage() {
+    if (!isDrawer) {
+      return false;
+    }
+
+    try {
+      const savedSnapshot = sessionStorage.getItem(canvasSnapshotStorageKey)?.trim();
+
+      if (!savedSnapshot) {
+        return false;
+      }
+
+      drawCanvasSnapshot(savedSnapshot);
+      return true;
+    } catch {
+      return false;
+    }
+  }
+
   function clearCanvasState() {
     resetCanvas();
     strokesRef.current = [];
@@ -247,6 +284,7 @@ export function MiniGameContainer({
 
     try {
       sessionStorage.removeItem(strokesStorageKey);
+      sessionStorage.removeItem(canvasSnapshotStorageKey);
     } catch {
       return;
     }
@@ -464,6 +502,11 @@ export function MiniGameContainer({
     };
   }
 
+  function handlePointerUp(event: React.PointerEvent<HTMLCanvasElement>) {
+    stopDrawing(event);
+    persistCanvasSnapshotToStorage();
+  }
+
   useEffect(() => {
     const canvas = canvasRef.current;
 
@@ -475,13 +518,15 @@ export function MiniGameContainer({
     canvas.height = CANVAS_HEIGHT;
 
     if (isDrawer) {
-      hydrateCanvasFromStorage();
+      if (!restoreCanvasSnapshotFromStorage()) {
+        hydrateCanvasFromStorage();
+      }
     } else {
       clearCanvasState();
     }
 
     resolveSecretWord();
-  }, [isDrawer, strokesStorageKey, wordStorageKey]);
+  }, [canvasSnapshotStorageKey, isDrawer, strokesStorageKey, wordStorageKey]);
 
   useEffect(() => {
     let isCancelled = false;
@@ -804,7 +849,7 @@ export function MiniGameContainer({
                   ref={canvasRef}
                   onPointerDown={handlePointerDown}
                   onPointerMove={handlePointerMove}
-                  onPointerUp={stopDrawing}
+                  onPointerUp={handlePointerUp}
                   onPointerOut={stopDrawing}
                   onPointerCancel={stopDrawing}
                   className="aspect-video h-auto w-full touch-none rounded-[0.9rem] bg-white"
