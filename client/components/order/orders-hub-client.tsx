@@ -81,36 +81,36 @@ export function OrdersHubClient({ purchases, sales, accountEmail }: OrdersHubCli
 
   return (
     <div className="flex flex-col gap-8">
-      <section className="relative overflow-hidden rounded-[2.25rem] border border-slate-200 bg-white p-7 shadow-[0_24px_80px_rgba(15,23,42,0.08)] md:p-10">
-        <p className="text-sm font-semibold tracking-[0.24em] uppercase text-emerald-700">
+      <section className="relative overflow-hidden rounded-[2.25rem] border border-white/10 bg-[radial-gradient(circle_at_top_left,rgba(0,200,83,0.18),transparent_28%),radial-gradient(circle_at_bottom_right,rgba(0,94,48,0.14),transparent_36%),#13171F] p-7 shadow-[0_24px_80px_rgba(0,0,0,0.28)] md:p-10">
+        <p className="text-sm font-semibold tracking-[0.24em] uppercase text-[#8bffb3]">
           Orders Hub
         </p>
-        <h1 className="mt-3 text-3xl font-semibold tracking-tight text-slate-900 md:text-5xl md:leading-[1.05]">
+        <h1 className="mt-3 text-3xl font-semibold tracking-tight text-white md:text-5xl md:leading-[1.05]">
           Мои заказы
         </h1>
-        <p className="mt-4 max-w-3xl text-sm leading-7 text-slate-600 md:text-base">
+        <p className="mt-4 max-w-3xl text-sm leading-7 text-gray-300 md:text-base">
           Отдельный центр управления покупками и продажами: ищите нужный заказ, фильтруйте по статусу и переходите прямо в чат сделки.
         </p>
 
         <div className="mt-6 flex flex-wrap gap-3 text-sm">
           {accountEmail ? (
-            <span className="rounded-full border border-slate-200 bg-slate-50 px-4 py-2 text-slate-600">
-              Аккаунт: <span className="ml-2 font-semibold text-slate-900">{accountEmail}</span>
+            <span className="rounded-full border border-white/10 bg-white/5 px-4 py-2 text-gray-300">
+              Аккаунт: <span className="ml-2 font-semibold text-white">{accountEmail}</span>
             </span>
           ) : null}
-          <span className="rounded-full border border-slate-200 bg-slate-50 px-4 py-2 text-slate-600">
-            Покупок: <span className="ml-2 font-semibold text-slate-900">{purchases.length}</span>
+          <span className="rounded-full border border-white/10 bg-white/5 px-4 py-2 text-gray-300">
+            Покупок: <span className="ml-2 font-semibold text-white">{purchases.length}</span>
           </span>
-          <span className="rounded-full border border-slate-200 bg-slate-50 px-4 py-2 text-slate-600">
-            Продаж: <span className="ml-2 font-semibold text-slate-900">{sales.length}</span>
+          <span className="rounded-full border border-white/10 bg-white/5 px-4 py-2 text-gray-300">
+            Продаж: <span className="ml-2 font-semibold text-white">{sales.length}</span>
           </span>
         </div>
       </section>
 
-      <section className="rounded-[2rem] border border-slate-200 bg-white p-6 shadow-[0_24px_80px_rgba(15,23,42,0.08)] backdrop-blur md:p-8">
+      <section className="rounded-[2rem] border border-white/10 bg-[#13171F] p-6 shadow-[0_24px_80px_rgba(0,0,0,0.28)] backdrop-blur md:p-8">
         <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_auto] lg:items-end">
           <div>
-            <label htmlFor="orders-search" className="text-sm font-semibold text-slate-900">
+            <label htmlFor="orders-search" className="text-sm font-semibold text-white">
               Поиск по названию товара или ID заказа
             </label>
             <Input
@@ -119,17 +119,17 @@ export function OrdersHubClient({ purchases, sales, accountEmail }: OrdersHubCli
               value={query}
               onChange={(event) => setQuery(event.target.value)}
               placeholder="Например: Steam Wallet или cmn123..."
-              className="mt-3 border-slate-300 bg-white text-slate-900 placeholder:text-slate-400"
+              className="mt-3 border-white/10 bg-[#0D1117] text-white placeholder:text-gray-500"
             />
           </div>
 
-          <div className="rounded-[1.5rem] border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-600 lg:min-w-[220px]">
-            Найдено: <span className="font-semibold text-slate-900">{filteredOrders.length}</span>
-            <span className="ml-2 text-slate-500">из {activeOrders.length}</span>
+          <div className="rounded-[1.5rem] border border-white/10 bg-[#0D1117] px-4 py-3 text-sm text-gray-300 lg:min-w-[220px]">
+            Найдено: <span className="font-semibold text-white">{filteredOrders.length}</span>
+            <span className="ml-2 text-gray-500">из {activeOrders.length}</span>
           </div>
         </div>
 
-        <div className="mt-6 inline-flex flex-wrap rounded-[1.25rem] border border-slate-200 bg-slate-50 p-1">
+        <div className="mt-6 inline-flex flex-wrap rounded-[1.25rem] border border-white/10 bg-[#0D1117] p-1">
           {ORDER_HUB_TABS.map((tab) => {
             const tabCount = tab.value === "purchases" ? purchases.length : sales.length;
 
@@ -141,8 +141,8 @@ export function OrdersHubClient({ purchases, sales, accountEmail }: OrdersHubCli
                 className={cn(
                   "rounded-[1rem] px-4 py-2.5 text-sm font-semibold transition",
                   activeTab === tab.value
-                    ? "border border-emerald-300 bg-emerald-500 text-emerald-950 shadow-[0_10px_30px_rgba(16,185,129,0.2)]"
-                    : "text-slate-600 hover:bg-white hover:text-slate-900",
+                    ? "bg-[#00C853] text-[#0D1117] font-semibold shadow-[0_10px_30px_rgba(0,200,83,0.2)]"
+                    : "border border-white/10 bg-transparent text-gray-400 hover:bg-white/[0.05] hover:text-gray-300",
                 )}
                 aria-pressed={activeTab === tab.value}
               >
@@ -167,8 +167,8 @@ export function OrdersHubClient({ purchases, sales, accountEmail }: OrdersHubCli
                 className={cn(
                   "inline-flex items-center rounded-full border px-4 py-2 text-sm font-medium transition",
                   statusFilter === filter.value
-                    ? "border-emerald-300 bg-emerald-50 text-emerald-800"
-                    : "border-slate-200 bg-white text-slate-600 hover:border-slate-300 hover:bg-slate-50 hover:text-slate-900",
+                    ? "border-[#00C853] bg-[#00C853] text-[#0D1117] font-semibold"
+                    : "border-white/10 bg-transparent text-gray-400 hover:bg-white/[0.05] hover:text-gray-300",
                 )}
                 aria-pressed={statusFilter === filter.value}
               >
@@ -181,13 +181,13 @@ export function OrdersHubClient({ purchases, sales, accountEmail }: OrdersHubCli
 
         <div className="mt-6 space-y-4">
           {filteredOrders.length === 0 ? (
-            <div className="rounded-[1.75rem] border border-dashed border-slate-300 bg-slate-50 px-6 py-10 text-sm leading-7 text-slate-600">
-              <p className="text-base font-semibold text-slate-900">{emptyState.title}</p>
+            <div className="rounded-[1.75rem] border border-dashed border-white/10 bg-[#0D1117] px-6 py-10 text-sm leading-7 text-gray-300">
+              <p className="text-base font-semibold text-white">{emptyState.title}</p>
               <p className="mt-2 max-w-2xl">{emptyState.description}</p>
               {emptyState.actionHref && emptyState.actionLabel ? (
                 <Link
                   href={emptyState.actionHref}
-                  className="mt-5 inline-flex h-11 items-center justify-center rounded-2xl border border-emerald-300 bg-emerald-100 px-5 text-sm font-semibold text-emerald-900 shadow-[0_16px_40px_rgba(16,185,129,0.14)] transition hover:-translate-y-0.5 hover:bg-emerald-200"
+                  className="mt-5 inline-flex h-11 items-center justify-center rounded-2xl bg-[#00C853] px-5 text-sm font-semibold text-[#0D1117] shadow-[0_16px_40px_rgba(0,200,83,0.24)] transition hover:-translate-y-0.5 hover:bg-[#00B04A]"
                 >
                   {emptyState.actionLabel}
                 </Link>
@@ -197,7 +197,7 @@ export function OrdersHubClient({ purchases, sales, accountEmail }: OrdersHubCli
             filteredOrders.map((order) => (
               <article
                 key={order.id}
-                className="rounded-[1.75rem] border border-slate-200 bg-white p-5 shadow-[0_20px_56px_rgba(15,23,42,0.08)] transition hover:border-emerald-300"
+                className="rounded-[1.75rem] border border-white/10 bg-[#0D1117] p-5 shadow-[0_20px_56px_rgba(0,0,0,0.28)] transition hover:border-[#00C853]/30"
               >
                 <div className="flex flex-wrap items-center gap-3">
                   <span
@@ -208,34 +208,34 @@ export function OrdersHubClient({ purchases, sales, accountEmail }: OrdersHubCli
                   >
                     {getOrdersHubStatusLabel(order.status)}
                   </span>
-                  <span className="text-sm text-slate-600">Заказ #{order.id}</span>
-                  <span className="text-sm text-slate-600">
+                  <span className="text-sm text-gray-400">Заказ #{order.id}</span>
+                  <span className="text-sm text-gray-400">
                     Создан {formatOrderDate(order.createdAt)}
                   </span>
                 </div>
 
                 <div className="mt-4 flex flex-col gap-5 lg:flex-row lg:items-start lg:justify-between">
                   <div className="min-w-0 flex-1">
-                    <p className="text-lg font-semibold text-slate-900">{order.productTitle}</p>
-                    <div className="mt-2 flex flex-wrap items-center gap-x-5 gap-y-2 text-sm text-slate-600">
+                    <p className="text-lg font-semibold text-white">{order.productTitle}</p>
+                    <div className="mt-2 flex flex-wrap items-center gap-x-5 gap-y-2 text-sm text-gray-300">
                       <span>
                         {counterpartyLabel}:{" "}
-                        <span className="font-medium text-slate-900">{order.counterparty.name}</span>
+                        <span className="font-medium text-white">{order.counterparty.name}</span>
                       </span>
                       <span>Обновлен {formatOrderDate(order.updatedAt)}</span>
                     </div>
                   </div>
 
                   <div className="flex flex-col items-start gap-3 lg:items-end">
-                    <div className="text-sm text-slate-600">
+                    <div className="text-sm text-gray-300">
                       Сумма заказа:{" "}
-                      <span className="font-semibold text-slate-900">
+                      <span className="font-semibold text-white">
                         {formatStoredOrderAmount(order.price, order.currency)}
                       </span>
                     </div>
                     <Link
                       href={`/orders/${order.id}`}
-                      className="inline-flex h-11 items-center justify-center rounded-2xl border border-emerald-300 bg-emerald-100 px-5 text-sm font-semibold text-emerald-900 shadow-[0_16px_40px_rgba(16,185,129,0.14)] transition hover:-translate-y-0.5 hover:bg-emerald-200"
+                      className="inline-flex h-11 items-center justify-center rounded-2xl bg-[#00C853] px-5 text-sm font-semibold text-[#0D1117] shadow-[0_16px_40px_rgba(0,200,83,0.24)] transition hover:-translate-y-0.5 hover:bg-[#00B04A]"
                     >
                       Перейти к заказу
                     </Link>
