@@ -185,6 +185,12 @@
       "type": "DECORATION",
       "price": 670,
       "value": "/cosmetics/six-seven-frame.png"
+    },
+    {
+      "name": "Самурай Oni",
+      "type": "DECORATION",
+      "price": 880,
+      "value": "/cosmetics/oni-samurai-frame.png"
     }
   ]
 }
