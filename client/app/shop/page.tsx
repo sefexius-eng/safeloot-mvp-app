@@ -1,6 +1,7 @@
 import Link from "next/link";
 
 import { CosmeticsShop } from "@/components/shop/cosmetics-shop";
+import { FormattedBalance } from "@/components/ui/formatted-balance";
 import { getCurrentSessionUser } from "@/lib/access-control";
 import { getAuthSession } from "@/lib/auth";
 import { getCosmeticsShopState } from "@/lib/domain/cosmetics";
@@ -30,7 +31,7 @@ export default async function ShopPage() {
           <div className="flex flex-wrap gap-3">
             {shopState.viewer ? (
               <div className="inline-flex h-11 items-center rounded-2xl border border-emerald-500/20 bg-emerald-500/10 px-4 text-sm font-semibold text-emerald-100">
-                Баланс магазина: {Number(shopState.viewer.availableBalance).toLocaleString("ru-RU")} USDT
+                Баланс магазина: <FormattedBalance amount={shopState.viewer.availableBalance} className="ml-2" />
               </div>
             ) : (
               <Link

@@ -11,6 +11,7 @@ import {
   equipCosmetic as equipCosmeticAction,
   unequipCosmetic as unequipCosmeticAction,
 } from "@/app/actions/cosmetics";
+import { useCurrency } from "@/components/providers/currency-provider";
 import { CosmeticName } from "@/components/ui/cosmetic-name";
 import { Button } from "@/components/ui/button";
 import { UserAvatar } from "@/components/ui/user-avatar";
@@ -47,14 +48,17 @@ type RarityRecommendation = {
   cosmetic: CosmeticCatalogItem;
 };
 
-function formatShopPrice(value: number) {
-  const hasFractions = Math.abs(value % 1) > Number.EPSILON;
+const SHOP_ACTION_BUTTON_BASE_CLASS_NAME =
+  "inline-flex items-center justify-center rounded-2xl text-sm font-semibold transition disabled:translate-y-0 disabled:cursor-not-allowed disabled:opacity-60";
 
-  return new Intl.NumberFormat("ru-RU", {
-    minimumFractionDigits: hasFractions ? 2 : 0,
-    maximumFractionDigits: hasFractions ? 2 : 0,
-  }).format(value);
-}
+const SHOP_BUY_BUTTON_CLASS_NAME =
+  "h-11 min-w-[144px] bg-orange-500 px-5 text-white shadow-[0_16px_40px_rgba(249,115,22,0.28)] hover:-translate-y-0.5 hover:bg-orange-600";
+
+const SHOP_SECONDARY_BUTTON_CLASS_NAME =
+  "h-11 min-w-[144px] border border-white/20 bg-white/5 px-5 text-white hover:-translate-y-0.5 hover:bg-white/10";
+
+const SHOP_SECONDARY_WIDE_BUTTON_CLASS_NAME =
+  "h-10 w-full border border-white/20 bg-white/5 px-4 text-white hover:-translate-y-0.5 hover:bg-white/10";
 
 function getTypeAccent(type: CosmeticType) {
   switch (type) {
@@ -348,6 +352,7 @@ function CosmeticPreview({
 }
 
 export function CosmeticsShop({ initialState }: { initialState: CosmeticsShopState }) {
+  const { formatBalance, formatPrice } = useCurrency();
   const router = useRouter();
   const [activeType, setActiveType] = useState<CosmeticType>("COLOR");
   const [sortMode, setSortMode] = useState<ShopSortMode>("recommended");
@@ -585,7 +590,7 @@ export function CosmeticsShop({ initialState }: { initialState: CosmeticsShopSta
                   Баланс
                 </p>
                 <p className="mt-2 text-2xl font-semibold text-white">
-                  {formatShopPrice(Number(viewer.availableBalance))} USDT
+                  {formatBalance(viewer.availableBalance)}
                 </p>
               </div>
 
@@ -616,7 +621,6 @@ export function CosmeticsShop({ initialState }: { initialState: CosmeticsShopSta
                 <div className="mt-3 grid gap-3">
                   {COSMETIC_TYPE_ORDER.map((type) => {
                     const slotItem = slotItems[type];
-                    const accent = getTypeAccent(type);
                     const isClearing = isPending && pendingUnequipType === type;
 
                     return (
@@ -645,17 +649,18 @@ export function CosmeticsShop({ initialState }: { initialState: CosmeticsShopSta
                         </p>
 
                         {slotItem ? (
-                          <Button
+                          <button
                             type="button"
                             onClick={() => handleUnequip(type)}
                             disabled={isPending || isClearing}
                             className={cn(
-                              "mt-3 h-10 w-full rounded-2xl border border-white/10 bg-transparent px-4 text-sm font-semibold text-white hover:bg-white/10",
-                              accent.pill,
+                              SHOP_ACTION_BUTTON_BASE_CLASS_NAME,
+                              SHOP_SECONDARY_WIDE_BUTTON_CLASS_NAME,
+                              "mt-3",
                             )}
                           >
                             {isClearing ? "Снимаем..." : "Снять"}
-                          </Button>
+                          </button>
                         ) : null}
                       </div>
                     );
@@ -824,7 +829,7 @@ export function CosmeticsShop({ initialState }: { initialState: CosmeticsShopSta
                     <div className="mt-4 flex items-center justify-between gap-3 text-sm">
                       <span className="text-zinc-400">{COSMETIC_TYPE_LABELS[cosmetic.type]}</span>
                       <span className="font-semibold text-white">
-                        {formatShopPrice(cosmetic.price)} USDT
+                        {formatPrice(cosmetic.price)}
                       </span>
                     </div>
                   </button>
@@ -907,7 +912,7 @@ export function CosmeticsShop({ initialState }: { initialState: CosmeticsShopSta
                     <div className="mt-4 rounded-[1rem] border border-white/10 bg-white/5 p-3">
                       <p className="text-[11px] uppercase tracking-[0.18em] text-zinc-500">Цена preview</p>
                       <p className="mt-2 text-lg font-semibold text-white">
-                        {formatShopPrice(previewCosmetic.price)} USDT
+                        {formatPrice(previewCosmetic.price)}
                       </p>
                       <p className="mt-2 text-xs leading-5 text-zinc-400">
                         В preview подмешивается текущий образ пользователя и эффект выделенной карточки.
@@ -976,7 +981,7 @@ export function CosmeticsShop({ initialState }: { initialState: CosmeticsShopSta
                     <div className="rounded-[1.1rem] border border-white/10 bg-black/20 px-3 py-2 text-right">
                       <p className="text-[11px] uppercase tracking-[0.2em] text-zinc-500">Цена</p>
                       <p className="mt-1 text-lg font-semibold text-white">
-                        {formatShopPrice(cosmetic.price)} USDT
+                        {formatPrice(cosmetic.price)}
                       </p>
                     </div>
                   </div>
@@ -1011,31 +1016,37 @@ export function CosmeticsShop({ initialState }: { initialState: CosmeticsShopSta
 
                     {viewer ? (
                       cosmetic.isOwned ? (
-                        <Button
+                        <button
                           type="button"
                           onClick={() => handleEquip(cosmetic.id)}
                           disabled={cosmetic.isEquipped || isPending || isMutating}
-                          className={cn("min-w-[144px] rounded-2xl px-5", accent.button)}
+                          className={cn(
+                            SHOP_ACTION_BUTTON_BASE_CLASS_NAME,
+                            SHOP_SECONDARY_BUTTON_CLASS_NAME,
+                          )}
                         >
                           {cosmetic.isEquipped
                             ? "Уже надето"
                             : isMutating
                               ? "Экипируем..."
                               : "Экипировать"}
-                        </Button>
+                        </button>
                       ) : (
-                        <Button
+                        <button
                           type="button"
                           onClick={() => handleBuy(cosmetic.id)}
                           disabled={isPending || isMutating || !isAffordable}
-                          className={cn("min-w-[144px] rounded-2xl px-5", accent.button)}
+                          className={cn(
+                            SHOP_ACTION_BUTTON_BASE_CLASS_NAME,
+                            SHOP_BUY_BUTTON_CLASS_NAME,
+                          )}
                         >
                           {isMutating
                             ? "Покупаем..."
                             : isAffordable
                               ? "Купить"
                               : "Недостаточно"}
-                        </Button>
+                        </button>
                       )
                     ) : (
                       <Link
