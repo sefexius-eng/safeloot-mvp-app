@@ -2,6 +2,7 @@ import type { Role } from "@prisma/client";
 
 import { prisma } from "@/lib/prisma";
 import {
+  publishTavernMessageDeletedEvent,
   publishTavernMessageEvent,
   type RealtimeTavernMessagePayload,
 } from "@/lib/pusher";
@@ -150,4 +151,24 @@ export async function publishSystemTavernPurchaseAnnouncement(input: {
     text: `🎉 Пользователь ${buyerName} только что приобрел товар из категории ${gameName}!`,
     isSystem: true,
   });
+}
+
+export async function deleteTavernMessage(messageId?: string | null) {
+  const normalizedMessageId = normalizeText(messageId ?? undefined);
+
+  if (!normalizedMessageId) {
+    throw new Error("messageId is required.");
+  }
+
+  await prisma.tavernMessage.delete({
+    where: {
+      id: normalizedMessageId,
+    },
+  });
+
+  await publishTavernMessageDeletedEvent(normalizedMessageId);
+
+  return {
+    id: normalizedMessageId,
+  };
 }

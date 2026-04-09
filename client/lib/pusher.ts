@@ -88,7 +88,8 @@ export const PUSHER_NOTIFICATION_EVENT = "new-notification";
 export const PUSHER_TYPING_EVENT = "typing-state";
 export const PUSHER_ORDER_UPDATED_EVENT = "order-updated";
 export const PUSHER_GLOBAL_PRESENCE_CHANNEL = "presence-site-users";
-export const PUSHER_GLOBAL_TAVERN_CHANNEL = "global-tavern";
+export const PUSHER_GLOBAL_TAVERN_CHANNEL = "tavern-chat";
+export const PUSHER_TAVERN_MESSAGE_DELETED_EVENT = "message-deleted";
 
 const PUSHER_AUTH_ENDPOINT = "/api/pusher/auth";
 const USER_CHANNEL_PREFIX = "private-user-";
@@ -360,5 +361,13 @@ export async function publishTavernMessageEvent(
     getGlobalTavernChannelName(),
     PUSHER_MESSAGE_EVENT,
     messageData,
+  );
+}
+
+export async function publishTavernMessageDeletedEvent(messageId: string) {
+  await triggerPusherEvent(
+    getGlobalTavernChannelName(),
+    PUSHER_TAVERN_MESSAGE_DELETED_EVENT,
+    { id: messageId },
   );
 }

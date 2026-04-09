@@ -4,16 +4,18 @@ import Link from "next/link";
 import { useEffect, useRef, useState, useTransition } from "react";
 import { useSession } from "next-auth/react";
 
-import { sendTavernMessage } from "@/app/actions/tavern";
+import { deleteGlobalMessage, sendTavernMessage } from "@/app/actions/tavern";
 import { Button } from "@/components/ui/button";
 import { UserAvatar } from "@/components/ui/user-avatar";
 import {
   getGlobalTavernChannelName,
   getPusherClient,
   PUSHER_MESSAGE_EVENT,
+  PUSHER_TAVERN_MESSAGE_DELETED_EVENT,
   type BrowserPusherChannel,
   type RealtimeTavernMessagePayload,
 } from "@/lib/pusher";
+import { isAdminRole } from "@/lib/roles";
 import { cn } from "@/lib/utils";
 
 interface TavernPanelProps {
@@ -49,6 +51,13 @@ function upsertTavernMessage(
     .slice(-MAX_TAVERN_MESSAGES);
 }
 
+function removeTavernMessage(
+  currentMessages: RealtimeTavernMessagePayload[],
+  messageId: string,
+) {
+  return currentMessages.filter((message) => message.id !== messageId);
+}
+
 function getMessageInitial(message: RealtimeTavernMessagePayload) {
   if (message.isSystem) {
     return "SL";
@@ -67,7 +76,7 @@ function getTavernProfileHref(message: RealtimeTavernMessagePayload) {
 
 export function TavernPanel({ initialMessages }: TavernPanelProps) {
   const feedRef = useRef<HTMLDivElement | null>(null);
-  const { status } = useSession();
+  const { data: session, status } = useSession();
   const [draft, setDraft] = useState("");
   const [errorMessage, setErrorMessage] = useState("");
   const [messages, setMessages] = useState<RealtimeTavernMessagePayload[]>(
@@ -102,6 +111,11 @@ export function TavernPanel({ initialMessages }: TavernPanelProps) {
       setErrorMessage("");
     };
 
+    const handleMessageDeleted = (data: { id: string }) => {
+      setMessages((currentMessages) => removeTavernMessage(currentMessages, data.id));
+      setErrorMessage("");
+    };
+
     void (async () => {
       pusherClient = await getPusherClient();
 
@@ -111,6 +125,7 @@ export function TavernPanel({ initialMessages }: TavernPanelProps) {
 
       pusherChannel = pusherClient.subscribe(getGlobalTavernChannelName());
       pusherChannel.bind(PUSHER_MESSAGE_EVENT, handleRealtimeMessage);
+      pusherChannel.bind(PUSHER_TAVERN_MESSAGE_DELETED_EVENT, handleMessageDeleted);
     })();
 
     return () => {
@@ -121,6 +136,10 @@ export function TavernPanel({ initialMessages }: TavernPanelProps) {
       }
 
       pusherChannel.unbind(PUSHER_MESSAGE_EVENT, handleRealtimeMessage);
+      pusherChannel.unbind(
+        PUSHER_TAVERN_MESSAGE_DELETED_EVENT,
+        handleMessageDeleted,
+      );
       pusherClient.unsubscribe(getGlobalTavernChannelName());
     };
   }, []);
@@ -158,6 +177,29 @@ export function TavernPanel({ initialMessages }: TavernPanelProps) {
   }
 
   const canSendMessage = status === "authenticated";
+  const canDeleteMessages = isAdminRole(session?.user?.role) && session?.user?.role !== "MODERATOR";
+
+  function handleDeleteMessage(messageId: string) {
+    startTransition(() => {
+      void deleteGlobalMessage(messageId)
+        .then((result) => {
+          if (!result.ok || !result.deletedMessageId) {
+            setErrorMessage(
+              result.message ?? "Не удалось удалить сообщение из таверны.",
+            );
+            return;
+          }
+
+          setMessages((currentMessages) =>
+            removeTavernMessage(currentMessages, result.deletedMessageId!),
+          );
+          setErrorMessage("");
+        })
+        .catch(() => {
+          setErrorMessage("Не удалось удалить сообщение из таверны.");
+        });
+    });
+  }
 
   return (
     <section className="overflow-hidden rounded-[2.2rem] border border-orange-500/15 bg-[radial-gradient(circle_at_top_left,rgba(249,115,22,0.16),transparent_30%),radial-gradient(circle_at_bottom_right,rgba(14,165,233,0.14),transparent_34%),linear-gradient(135deg,rgba(24,24,27,0.96),rgba(15,23,42,0.94))] shadow-[0_24px_80px_rgba(0,0,0,0.24)]">
@@ -228,7 +270,7 @@ export function TavernPanel({ initialMessages }: TavernPanelProps) {
                 <article
                   key={message.id}
                   className={cn(
-                    "rounded-[1.45rem] border px-4 py-3 shadow-[0_12px_36px_rgba(0,0,0,0.16)]",
+                    "group rounded-[1.45rem] border px-4 py-3 shadow-[0_12px_36px_rgba(0,0,0,0.16)]",
                     message.isSystem
                       ? "border-orange-500/25 bg-[linear-gradient(135deg,rgba(249,115,22,0.22),rgba(120,53,15,0.32))] text-orange-50"
                       : "border-white/10 bg-white/6 text-zinc-100",
@@ -284,6 +326,18 @@ export function TavernPanel({ initialMessages }: TavernPanelProps) {
                         <span className="text-xs text-zinc-300/70">
                           {formatTavernMessageTime(message.createdAt)}
                         </span>
+                        {canDeleteMessages ? (
+                          <button
+                            type="button"
+                            onClick={() => handleDeleteMessage(message.id)}
+                            disabled={isPending}
+                            className="ml-auto inline-flex h-7 w-7 items-center justify-center rounded-full border border-white/10 bg-black/20 text-sm text-zinc-300 opacity-40 transition hover:border-red-400/30 hover:bg-red-500/15 hover:text-red-100 hover:opacity-100 disabled:cursor-not-allowed disabled:opacity-30 group-hover:opacity-100"
+                            aria-label="Удалить сообщение"
+                            title="Удалить сообщение"
+                          >
+                            🗑️
+                          </button>
+                        ) : null}
                       </div>
                       <p
                         className={cn(
