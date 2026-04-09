@@ -196,6 +196,31 @@ async function getOrCreateConversationRecord(input: {
   );
 }
 
+function buildDirectConversationWhere(
+  userId: string,
+  targetUserId: string,
+): Prisma.ConversationWhereInput {
+  return {
+    productId: null,
+    OR: [
+      {
+        buyerId: userId,
+        sellerId: targetUserId,
+      },
+      {
+        buyerId: targetUserId,
+        sellerId: userId,
+      },
+    ],
+  };
+}
+
+function getDirectConversationLockKey(userId: string, targetUserId: string) {
+  const [firstParticipantId, secondParticipantId] = [userId, targetUserId].sort();
+
+  return `direct-conversation:${firstParticipantId}:${secondParticipantId}`;
+}
+
 export async function getOrCreateDirectConversation(input: {
   userId: string;
   targetUserId: string;
@@ -215,6 +240,26 @@ export async function getOrCreateDirectConversation(input: {
     throw new Error("Нельзя начать диалог с самим собой.");
   }
 
+  const directConversationWhere = buildDirectConversationWhere(
+    userId,
+    targetUserId,
+  );
+  const existingConversation = await prisma.conversation.findFirst({
+    where: directConversationWhere,
+    select: {
+      id: true,
+    },
+    orderBy: {
+      createdAt: "desc",
+    },
+  });
+
+  if (existingConversation) {
+    return {
+      conversationId: existingConversation.id,
+    };
+  }
+
   const conversation = await prisma.$transaction(
     async (transactionClient) => {
       const targetUser = await transactionClient.user.findUnique({
@@ -230,20 +275,12 @@ export async function getOrCreateDirectConversation(input: {
         throw new Error("Пользователь не найден.");
       }
 
-      const existingConversation = await transactionClient.conversation.findFirst({
-        where: {
-          productId: null,
-          OR: [
-            {
-              buyerId: userId,
-              sellerId: targetUserId,
-            },
-            {
-              buyerId: targetUserId,
-              sellerId: userId,
-            },
-          ],
-        },
+      await transactionClient.$queryRaw(
+        Prisma.sql`SELECT pg_advisory_xact_lock(hashtext(${getDirectConversationLockKey(userId, targetUserId)}))`,
+      );
+
+      const existingConversationInTransaction = await transactionClient.conversation.findFirst({
+        where: directConversationWhere,
         select: {
           id: true,
         },
@@ -252,8 +289,8 @@ export async function getOrCreateDirectConversation(input: {
         },
       });
 
-      if (existingConversation) {
-        return existingConversation;
+      if (existingConversationInTransaction) {
+        return existingConversationInTransaction;
       }
 
       return transactionClient.conversation.create({
