@@ -7,7 +7,7 @@ import {
 } from "@prisma/client";
 
 import { prisma } from "@/lib/prisma";
-import { canManageForeignProducts } from "@/lib/roles";
+import { canManageForeignProducts, isAdminRole } from "@/lib/roles";
 
 export const MONEY_SCALE = 2;
 const COMMISSION_RATE = 0.05;
