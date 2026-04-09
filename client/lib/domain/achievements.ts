@@ -1,17 +1,22 @@
-import { AchievementRarity, OrderStatus, Prisma } from "@prisma/client";
+import { OrderStatus, Prisma, Rarity } from "@prisma/client";
 
 import { normalizeText } from "@/lib/domain/shared";
+import {
+  createUserNotification,
+  sendNotificationRealtimeEvents,
+  type NotificationRealtimeDeliveryInput,
+} from "@/lib/domain/notifications-service";
 import { prisma } from "@/lib/prisma";
 
 export interface AchievementGrantResult {
   alreadyEarned: boolean;
   achievement: {
     id: string;
-    key: string;
+    code: string;
     title: string;
     description: string;
     iconUrl: string;
-    rarity: AchievementRarity;
+    rarity: Rarity;
   };
   userAchievement: {
     id: string;
@@ -21,7 +26,7 @@ export interface AchievementGrantResult {
   };
 }
 
-export const ACHIEVEMENT_KEYS = Object.freeze({
+export const ACHIEVEMENT_CODES = Object.freeze({
   FIRST_PURCHASE: "FIRST_PURCHASE",
   FIRST_REVIEW: "FIRST_REVIEW",
   FIRST_SALE: "FIRST_SALE",
@@ -40,26 +45,26 @@ const PURCHASE_ELIGIBLE_STATUSES: OrderStatus[] = [
 const SELLER_SALE_ACHIEVEMENT_THRESHOLDS = [
   {
     count: 1,
-    key: ACHIEVEMENT_KEYS.FIRST_SALE,
+    code: ACHIEVEMENT_CODES.FIRST_SALE,
   },
   {
     count: 10,
-    key: ACHIEVEMENT_KEYS.TEN_SALES,
+    code: ACHIEVEMENT_CODES.TEN_SALES,
   },
   {
     count: 50,
-    key: ACHIEVEMENT_KEYS.FIFTY_SALES,
+    code: ACHIEVEMENT_CODES.FIFTY_SALES,
   },
 ] as const;
 
-type AchievementRecord = NonNullable<Awaited<ReturnType<typeof getAchievementByKey>>>;
+type AchievementRecord = NonNullable<Awaited<ReturnType<typeof getAchievementByCode>>>;
 
 interface AchievementAutomationTask {
   label: string;
   run: () => Promise<unknown>;
 }
 
-function normalizeAchievementKey(value?: string) {
+function normalizeAchievementCode(value?: string) {
   return normalizeText(value).toUpperCase();
 }
 
@@ -78,14 +83,14 @@ async function assertUserExists(userId: string) {
   }
 }
 
-async function getAchievementByKey(key: string) {
+async function getAchievementByCode(code: string) {
   return prisma.achievement.findUnique({
     where: {
-      key,
+      code,
     },
     select: {
       id: true,
-      key: true,
+      code: true,
       title: true,
       description: true,
       iconUrl: true,
@@ -114,6 +119,9 @@ async function getExistingUserAchievement(userId: string, achievementId: string)
 async function grantAchievementRecordToUser(
   userId: string,
   achievement: AchievementRecord,
+  options?: {
+    notifyUser?: boolean;
+  },
 ): Promise<AchievementGrantResult> {
   const existingUserAchievement = await getExistingUserAchievement(userId, achievement.id);
 
@@ -142,7 +150,7 @@ async function grantAchievementRecordToUser(
       },
     });
 
-    return {
+    const result: AchievementGrantResult = {
       alreadyEarned: false,
       achievement,
       userAchievement: {
@@ -150,6 +158,15 @@ async function grantAchievementRecordToUser(
         earnedAt: createdUserAchievement.earnedAt.toISOString(),
       },
     };
+
+    if (options?.notifyUser) {
+      await notifyUserAboutAchievementGrant({
+        userId,
+        achievement: result.achievement,
+      });
+    }
+
+    return result;
   } catch (error) {
     if (
       error instanceof Prisma.PrismaClientKnownRequestError &&
@@ -178,21 +195,22 @@ async function grantAchievementRecordToUser(
 
 export async function grantAchievementToUserIfExists(input: {
   userId: string;
-  achievementKey: string;
+  achievementCode: string;
+  notifyUser?: boolean;
 }) {
   const userId = normalizeText(input.userId);
-  const achievementKey = normalizeAchievementKey(input.achievementKey);
+  const achievementCode = normalizeAchievementCode(input.achievementCode);
 
   if (!userId) {
     throw new Error("userId is required.");
   }
 
-  if (!achievementKey) {
-    throw new Error("achievementKey is required.");
+  if (!achievementCode) {
+    throw new Error("achievementCode is required.");
   }
 
   const [achievement] = await Promise.all([
-    getAchievementByKey(achievementKey),
+    getAchievementByCode(achievementCode),
     assertUserExists(userId),
   ]);
 
@@ -200,7 +218,40 @@ export async function grantAchievementToUserIfExists(input: {
     return null;
   }
 
-  return grantAchievementRecordToUser(userId, achievement);
+  return grantAchievementRecordToUser(userId, achievement, {
+    notifyUser: input.notifyUser,
+  });
+}
+
+async function notifyUserAboutAchievementGrant(input: {
+  userId: string;
+  achievement: AchievementGrantResult["achievement"];
+}) {
+  const realtimeDeliveryQueue: NotificationRealtimeDeliveryInput[] = [];
+
+  try {
+    await prisma.$transaction(async (transactionClient) => {
+      await createUserNotification(
+        transactionClient,
+        {
+          userId: input.userId,
+          title: "Новое достижение",
+          message: `Вы получили достижение «${input.achievement.title}».`,
+          link: "/profile",
+        },
+        undefined,
+        realtimeDeliveryQueue,
+      );
+    });
+
+    await sendNotificationRealtimeEvents(realtimeDeliveryQueue);
+  } catch (error) {
+    console.error("[ACHIEVEMENT_NOTIFICATION_ERROR]", {
+      userId: input.userId,
+      achievementCode: input.achievement.code,
+      error,
+    });
+  }
 }
 
 async function countEligibleBuyerPurchases(userId: string) {
@@ -246,7 +297,7 @@ export async function maybeGrantBuyerPurchaseAchievements(userId: string) {
 
   const result = await grantAchievementToUserIfExists({
     userId: normalizedUserId,
-    achievementKey: ACHIEVEMENT_KEYS.FIRST_PURCHASE,
+    achievementCode: ACHIEVEMENT_CODES.FIRST_PURCHASE,
   });
 
   return result ? [result] : [];
@@ -267,7 +318,7 @@ export async function maybeGrantReviewAuthorAchievements(userId: string) {
 
   const result = await grantAchievementToUserIfExists({
     userId: normalizedUserId,
-    achievementKey: ACHIEVEMENT_KEYS.FIRST_REVIEW,
+    achievementCode: ACHIEVEMENT_CODES.FIRST_REVIEW,
   });
 
   return result ? [result] : [];
@@ -289,10 +340,10 @@ export async function maybeGrantSellerSaleAchievements(userId: string) {
   const achievementResults = await Promise.all(
     SELLER_SALE_ACHIEVEMENT_THRESHOLDS.filter(
       ({ count }) => completedSalesCount >= count,
-    ).map(({ key }) =>
+    ).map(({ code }) =>
       grantAchievementToUserIfExists({
         userId: normalizedUserId,
-        achievementKey: key,
+        achievementCode: code,
       }),
     ),
   );
@@ -329,21 +380,22 @@ export async function runAchievementAutomation(
 
 export async function grantAchievementToUser(input: {
   userId: string;
-  achievementKey: string;
+  achievementCode: string;
+  notifyUser?: boolean;
 }): Promise<AchievementGrantResult> {
   const userId = normalizeText(input.userId);
-  const achievementKey = normalizeAchievementKey(input.achievementKey);
+  const achievementCode = normalizeAchievementCode(input.achievementCode);
 
   if (!userId) {
     throw new Error("userId is required.");
   }
 
-  if (!achievementKey) {
-    throw new Error("achievementKey is required.");
+  if (!achievementCode) {
+    throw new Error("achievementCode is required.");
   }
 
   const [achievement] = await Promise.all([
-    getAchievementByKey(achievementKey),
+    getAchievementByCode(achievementCode),
     assertUserExists(userId),
   ]);
 
@@ -351,5 +403,7 @@ export async function grantAchievementToUser(input: {
     throw new Error("Достижение не найдено.");
   }
 
-  return grantAchievementRecordToUser(userId, achievement);
+  return grantAchievementRecordToUser(userId, achievement, {
+    notifyUser: input.notifyUser,
+  });
 }

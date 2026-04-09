@@ -145,7 +145,7 @@ export default async function ProfilePage() {
                 achievement: {
                   select: {
                     id: true,
-                    key: true,
+                    code: true,
                     title: true,
                     description: true,
                     iconUrl: true,
@@ -276,7 +276,7 @@ export default async function ProfilePage() {
         (entry) =>
           ({
             id: entry.id,
-            key: entry.achievement.key,
+            code: entry.achievement.code,
             title: entry.achievement.title,
             description: entry.achievement.description,
             iconUrl: entry.achievement.iconUrl,

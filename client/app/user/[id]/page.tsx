@@ -96,7 +96,7 @@ async function getPublicSellerProfile(id: string) {
           achievement: {
             select: {
               id: true,
-              key: true,
+              code: true,
               title: true,
               description: true,
               iconUrl: true,
@@ -224,7 +224,7 @@ async function getPublicSellerProfile(id: string) {
       (entry) =>
         ({
           id: entry.id,
-          key: entry.achievement.key,
+          code: entry.achievement.code,
           title: entry.achievement.title,
           description: entry.achievement.description,
           iconUrl: entry.achievement.iconUrl,

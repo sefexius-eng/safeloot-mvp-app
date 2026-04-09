@@ -6,7 +6,7 @@ const prisma = new PrismaClient();
 async function upsertAchievement(achievement) {
   return prisma.achievement.upsert({
     where: {
-      key: achievement.key,
+      code: achievement.code,
     },
     update: {
       title: achievement.title,
@@ -15,7 +15,7 @@ async function upsertAchievement(achievement) {
       rarity: achievement.rarity,
     },
     create: {
-      key: achievement.key,
+      code: achievement.code,
       title: achievement.title,
       description: achievement.description,
       iconUrl: achievement.iconUrl,

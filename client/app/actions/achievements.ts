@@ -40,14 +40,16 @@ function revalidateAchievementPaths(userId: string) {
 
 export async function grantAchievement(
   userId: string,
-  achievementKey: string,
+  achievementCode: string,
+  notifyUser = true,
 ): Promise<GrantAchievementActionResult> {
   try {
     await requireAdminAchievementUser();
 
     const result = await grantAchievementToUser({
       userId,
-      achievementKey,
+      achievementCode,
+      notifyUser,
     });
 
     revalidateAchievementPaths(result.userAchievement.userId);

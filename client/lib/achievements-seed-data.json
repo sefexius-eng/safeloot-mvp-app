@@ -1,35 +1,35 @@
 {
   "achievements": [
     {
-      "key": "FIRST_PURCHASE",
+      "code": "FIRST_PURCHASE",
       "title": "Первый шаг",
       "description": "Совершите первую покупку на SafeLoot.",
       "iconUrl": "/achievements/first-purchase.svg",
       "rarity": "COMMON"
     },
     {
-      "key": "FIRST_REVIEW",
+      "code": "FIRST_REVIEW",
       "title": "Голос покупателя",
       "description": "Оставьте первый отзыв после завершённой сделки.",
       "iconUrl": "/achievements/first-review.svg",
       "rarity": "COMMON"
     },
     {
-      "key": "FIRST_SALE",
+      "code": "FIRST_SALE",
       "title": "Первая продажа",
       "description": "Успешно завершите первую продажу как продавец.",
       "iconUrl": "/achievements/first-sale.svg",
       "rarity": "RARE"
     },
     {
-      "key": "TEN_SALES",
+      "code": "TEN_SALES",
       "title": "Стабильный продавец",
       "description": "Завершите 10 успешных продаж на маркетплейсе.",
       "iconUrl": "/achievements/ten-sales.svg",
       "rarity": "EPIC"
     },
     {
-      "key": "FIFTY_SALES",
+      "code": "FIFTY_SALES",
       "title": "Легенда витрины",
       "description": "Завершите 50 успешных продаж и закрепитесь среди лучших продавцов.",
       "iconUrl": "/achievements/fifty-sales.svg",

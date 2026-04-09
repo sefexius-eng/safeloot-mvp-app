@@ -26,11 +26,13 @@ enum CosmeticType {
   DECORATION
 }
 
-enum AchievementRarity {
+enum Rarity {
   COMMON
   RARE
   EPIC
   LEGENDARY
+
+  @@map("AchievementRarity")
 }
 
 enum OrderStatus {
@@ -363,11 +365,11 @@ model Notification {
 
 model Achievement {
   id               String             @id @default(cuid())
-  key              String             @unique
+  code             String             @unique @map("key")
   title            String
   description      String
   iconUrl          String
-  rarity           AchievementRarity
+  rarity           Rarity
   userAchievements UserAchievement[]
 
   @@map("achievements")

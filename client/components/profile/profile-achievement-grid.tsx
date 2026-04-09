@@ -4,7 +4,7 @@ import { cn } from "@/lib/utils";
 
 export interface ProfileAchievementItem {
   id: string;
-  key: string;
+  code: string;
   title: string;
   description: string;
   iconUrl: string;
