@@ -69,6 +69,17 @@ function getAutoDeliverySystemMessage(autoDeliveryContent: string) {
   return `Система SafeLoot: ${autoDeliveryContent}`;
 }
 
+function logSettledSideEffectResults(
+  scope: string,
+  results: PromiseSettledResult<unknown>[],
+) {
+  results.forEach((result, index) => {
+    if (result.status === "rejected") {
+      console.error(`[${scope}_${index}_ERROR]`, result.reason);
+    }
+  });
+}
+
 async function publishPaidOrderRealtimeAndSystem(input: {
   orderId: string;
   buyerId: string;
@@ -84,7 +95,7 @@ async function publishPaidOrderRealtimeAndSystem(input: {
     systemMessages.push(getAutoDeliverySystemMessage(input.autoDeliveryContent));
   }
 
-  await Promise.all([
+  const sideEffectResults = await Promise.allSettled([
     sendSellerOrderTelegramNotification({
       telegramId: input.sellerTelegramId,
       productTitle: input.productTitle,
@@ -103,6 +114,8 @@ async function publishPaidOrderRealtimeAndSystem(input: {
       ensureDedicatedConversation: true,
     }),
   ]);
+
+  logSettledSideEffectResults("ORDER_PAID_SIDE_EFFECT", sideEffectResults);
 }
 
 export async function createOrder(input: {
@@ -309,7 +322,7 @@ export async function createOrder(input: {
     },
   );
 
-  await Promise.all([
+  const postCommitResults = await Promise.allSettled([
     sendNotificationEmails(emailDeliveryQueue),
     sendNotificationRealtimeEvents(realtimeNotificationQueue),
     publishPaidOrderRealtimeAndSystem({
@@ -323,6 +336,8 @@ export async function createOrder(input: {
     }),
   ]);
 
+  logSettledSideEffectResults("CREATE_ORDER_POST_COMMIT", postCommitResults);
+
   try {
     await publishSystemTavernPurchaseAnnouncement({
       buyerName: result.buyerDisplayName,
@@ -332,12 +347,16 @@ export async function createOrder(input: {
     console.error("[TAVERN_PURCHASE_ANNOUNCEMENT_ERROR]", error);
   }
 
-  await runAchievementAutomation("create-order", [
-    {
-      label: "buyer-purchase-achievements",
-      run: () => maybeGrantBuyerPurchaseAchievements(buyerId),
-    },
-  ]);
+  try {
+    await runAchievementAutomation("create-order", [
+      {
+        label: "buyer-purchase-achievements",
+        run: () => maybeGrantBuyerPurchaseAchievements(buyerId),
+      },
+    ]);
+  } catch (error) {
+    console.error("[CREATE_ORDER_ACHIEVEMENTS_ERROR]", error);
+  }
 
   return {
     orderId: result.orderId,

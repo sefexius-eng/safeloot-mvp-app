@@ -624,7 +624,7 @@ async function getOrCreateDedicatedConversationByOrder(order: {
         return existingConversation;
       }
 
-      await transactionClient.$queryRaw(
+      await transactionClient.$executeRaw(
         Prisma.sql`SELECT pg_advisory_xact_lock(hashtext(${getOrderConversationLockKey(order.id)}))`,
       );
 
@@ -758,7 +758,7 @@ export async function getOrCreateDirectConversation(input: {
         throw new Error("Пользователь не найден.");
       }
 
-      await transactionClient.$queryRaw(
+      await transactionClient.$executeRaw(
         Prisma.sql`SELECT pg_advisory_xact_lock(hashtext(${getDirectConversationLockKey(userId, targetUserId)}))`,
       );
 
