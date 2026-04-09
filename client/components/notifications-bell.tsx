@@ -1,7 +1,7 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useSession } from "next-auth/react";
 
 import {
@@ -12,13 +12,18 @@ import {
 import {
   DropdownMenu,
   DropdownMenuContent,
-  DropdownMenuItem,
   DropdownMenuLabel,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import {
+  getPusherClient,
+  getUserNotificationChannelName,
+  PUSHER_NOTIFICATION_EVENT,
+  type BrowserPusherChannel,
+  type RealtimeNotificationPayload,
+} from "@/lib/pusher";
 
-const NOTIFICATIONS_POLL_INTERVAL_MS = 20000;
 const ANNOUNCED_NOTIFICATIONS_STORAGE_KEY = "safeloot:announced-notifications";
 
 interface NotificationsBellProps {
@@ -68,6 +73,29 @@ function persistAnnouncedNotificationIds(userId: string, notificationIds: Set<st
   );
 }
 
+function upsertNotifications(
+  currentNotifications: NotificationListItem[],
+  nextNotifications: NotificationListItem[],
+) {
+  const notificationsById = new Map<string, NotificationListItem>();
+
+  for (const notification of currentNotifications) {
+    notificationsById.set(notification.id, notification);
+  }
+
+  for (const notification of nextNotifications) {
+    const existingNotification = notificationsById.get(notification.id);
+    notificationsById.set(notification.id, {
+      ...existingNotification,
+      ...notification,
+    });
+  }
+
+  return Array.from(notificationsById.values()).sort(
+    (left, right) => Date.parse(right.createdAt) - Date.parse(left.createdAt),
+  );
+}
+
 export function NotificationsBell({
   mode = "trigger",
   pushNotificationsEnabled = false,
@@ -81,6 +109,36 @@ export function NotificationsBell({
   const hasHydratedInitialNotificationsRef = useRef(false);
   const announcedNotificationIdsRef = useRef<Set<string>>(new Set());
   const notificationUserId = session?.user?.id?.trim() ?? "";
+
+  const maybeShowBrowserNotification = useCallback(
+    (notification: NotificationListItem) => {
+      if (
+        !pushNotificationsEnabled ||
+        typeof window === "undefined" ||
+        !("Notification" in window) ||
+        window.Notification.permission !== "granted" ||
+        (document.visibilityState === "visible" && document.hasFocus())
+      ) {
+        return;
+      }
+
+      const browserNotification = new window.Notification(notification.title, {
+        body: notification.message,
+        tag: notification.id,
+      });
+
+      browserNotification.onclick = () => {
+        window.focus();
+
+        if (notification.link) {
+          router.push(notification.link);
+        }
+
+        browserNotification.close();
+      };
+    },
+    [pushNotificationsEnabled, router],
+  );
 
   useEffect(() => {
     announcedNotificationIdsRef.current = notificationUserId
@@ -119,45 +177,6 @@ export function NotificationsBell({
             }
 
             hasHydratedInitialNotificationsRef.current = true;
-          } else {
-            const newNotifications = nextNotifications.filter(
-              (notification) => !announcedNotificationIds.has(notification.id),
-            );
-
-            for (const notification of newNotifications) {
-              announcedNotificationIds.add(notification.id);
-            }
-
-            if (notificationUserId) {
-              persistAnnouncedNotificationIds(notificationUserId, announcedNotificationIds);
-            }
-
-            if (
-              pushNotificationsEnabled &&
-              newNotifications.length > 0 &&
-              typeof window !== "undefined" &&
-              "Notification" in window &&
-              window.Notification.permission === "granted" &&
-              (document.visibilityState !== "visible" || !document.hasFocus())
-            ) {
-              for (const notification of [...newNotifications].reverse()) {
-                const browserNotification = new window.Notification(notification.title, {
-                  body: notification.message,
-                  tag: notification.id,
-                });
-
-                browserNotification.onclick = () => {
-                  window.focus();
-
-                  if (notification.link) {
-                    router.push(notification.link);
-                  }
-
-                  browserNotification.close();
-                };
-              }
-            }
-
           }
 
           setNotifications(nextNotifications);
@@ -179,15 +198,69 @@ export function NotificationsBell({
     }
 
     void loadNotifications();
-    const intervalId = window.setInterval(() => {
-      void loadNotifications();
-    }, NOTIFICATIONS_POLL_INTERVAL_MS);
 
     return () => {
       isMounted = false;
-      window.clearInterval(intervalId);
     };
-  }, [notificationUserId, pushNotificationsEnabled, router, status]);
+  }, [notificationUserId, status]);
+
+  useEffect(() => {
+    if (status !== "authenticated" || !notificationUserId) {
+      return;
+    }
+
+    let isCancelled = false;
+    let pusherChannel: BrowserPusherChannel | null = null;
+  let pusherClient: Awaited<ReturnType<typeof getPusherClient>> = null;
+
+    const handleRealtimeNotification = (
+      notification: RealtimeNotificationPayload,
+    ) => {
+      setNotifications((currentNotifications) =>
+        upsertNotifications(currentNotifications, [notification]),
+      );
+      setErrorMessage("");
+
+      const announcedNotificationIds = announcedNotificationIdsRef.current;
+      const hasAlreadyBeenAnnounced = announcedNotificationIds.has(notification.id);
+
+      announcedNotificationIds.add(notification.id);
+
+      if (notificationUserId) {
+        persistAnnouncedNotificationIds(notificationUserId, announcedNotificationIds);
+      }
+
+      if (!hasHydratedInitialNotificationsRef.current || hasAlreadyBeenAnnounced) {
+        return;
+      }
+
+      maybeShowBrowserNotification(notification);
+    };
+
+    void (async () => {
+      pusherClient = await getPusherClient();
+
+      if (!pusherClient || isCancelled) {
+        return;
+      }
+
+      pusherChannel = pusherClient.subscribe(
+        getUserNotificationChannelName(notificationUserId),
+      );
+      pusherChannel.bind(PUSHER_NOTIFICATION_EVENT, handleRealtimeNotification);
+    })();
+
+    return () => {
+      isCancelled = true;
+
+      if (!pusherChannel) {
+        return;
+      }
+
+      pusherChannel.unbind(PUSHER_NOTIFICATION_EVENT, handleRealtimeNotification);
+      pusherClient?.unsubscribe(getUserNotificationChannelName(notificationUserId));
+    };
+  }, [maybeShowBrowserNotification, notificationUserId, status]);
 
   async function handleNotificationClick(notification: NotificationListItem) {
     try {

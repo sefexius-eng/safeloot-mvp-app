@@ -2,6 +2,10 @@ import type { Prisma } from "@prisma/client";
 
 import type { NotificationEmailDeliveryInput } from "@/lib/notification-delivery";
 import { formatStoredOrderAmount } from "@/lib/currency-config";
+import {
+  publishUserNotificationEvent,
+  type RealtimeNotificationPayload,
+} from "@/lib/pusher";
 import { getSiteUrl } from "@/lib/site-url";
 import { escapeTelegramHtml, sendTelegramNotification } from "@/lib/telegram";
 
@@ -215,6 +219,25 @@ export function triggerDealChatTelegramNotification(input: {
   }
 }
 
+export interface NotificationRealtimeDeliveryInput {
+  userId: string;
+  notification: RealtimeNotificationPayload;
+}
+
+export async function sendNotificationRealtimeEvents(
+  realtimeDeliveryQueue: NotificationRealtimeDeliveryInput[],
+) {
+  if (realtimeDeliveryQueue.length === 0) {
+    return;
+  }
+
+  await Promise.all(
+    realtimeDeliveryQueue.map(({ userId, notification }) =>
+      publishUserNotificationEvent(userId, notification),
+    ),
+  );
+}
+
 export async function createUserNotification(
   transactionClient: Prisma.TransactionClient,
   input: {
@@ -224,6 +247,7 @@ export async function createUserNotification(
     link?: string;
   },
   emailDeliveryQueue?: NotificationEmailDeliveryInput[],
+  realtimeDeliveryQueue?: NotificationRealtimeDeliveryInput[],
 ) {
   const userId = normalizeText(input.userId);
   const title = normalizeText(input.title);
@@ -260,16 +284,39 @@ export async function createUserNotification(
     }
   }
 
-  await transactionClient.notification.create({
+  const createdNotification = await transactionClient.notification.create({
     data: {
       userId,
       title,
       message,
       link,
     },
+    select: {
+      id: true,
+      userId: true,
+      title: true,
+      message: true,
+      link: true,
+      isRead: true,
+      createdAt: true,
+    },
   });
 
   if (recipientEmailDelivery && emailDeliveryQueue) {
     emailDeliveryQueue.push(recipientEmailDelivery);
+  }
+
+  if (realtimeDeliveryQueue) {
+    realtimeDeliveryQueue.push({
+      userId,
+      notification: {
+        id: createdNotification.id,
+        title: createdNotification.title,
+        message: createdNotification.message,
+        link: createdNotification.link,
+        isRead: createdNotification.isRead,
+        createdAt: createdNotification.createdAt.toISOString(),
+      },
+    });
   }
 }

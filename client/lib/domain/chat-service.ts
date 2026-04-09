@@ -4,6 +4,15 @@ import {
   sendNotificationEmails,
   type NotificationEmailDeliveryInput,
 } from "@/lib/notification-delivery";
+import {
+  publishConversationMessageEvent,
+  publishConversationTypingStateEvent,
+  publishOrderMessageEvent,
+  publishOrderTypingStateEvent,
+  type RealtimeConversationMessagePayload,
+  type RealtimeOrderMessagePayload,
+  type RealtimeTypingUser,
+} from "@/lib/pusher";
 import { prisma } from "@/lib/prisma";
 
 import {
@@ -20,6 +29,8 @@ import {
 } from "@/lib/domain/shared";
 import {
   createUserNotification,
+  sendNotificationRealtimeEvents,
+  type NotificationRealtimeDeliveryInput,
   triggerDealChatTelegramNotification,
 } from "@/lib/domain/notifications-service";
 
@@ -481,6 +492,44 @@ export async function getConversationMessages(
   };
 }
 
+function serializeConversationMessage(message: {
+  id: string;
+  text: string;
+  imageUrl: string | null;
+  isSystem: boolean;
+  isRead: boolean;
+  senderId: string;
+  createdAt: Date;
+  updatedAt: Date;
+  sender: {
+    id: string;
+    name: string | null;
+    image: string | null;
+  };
+}): RealtimeConversationMessagePayload {
+  return {
+    ...message,
+    createdAt: message.createdAt.toISOString(),
+    updatedAt: message.updatedAt.toISOString(),
+  };
+}
+
+function mapConversationMessageToOrderMessage(
+  message: RealtimeConversationMessagePayload,
+): RealtimeOrderMessagePayload {
+  return {
+    id: message.id,
+    content: message.text,
+    imageUrl: message.imageUrl,
+    isSystem: message.isSystem,
+    isRead: message.isRead,
+    senderId: message.senderId,
+    createdAt: message.createdAt,
+    updatedAt: message.updatedAt,
+    sender: message.sender,
+  };
+}
+
 export async function createConversationMessage(input: {
   conversationId: string;
   senderId: string;
@@ -521,6 +570,16 @@ export async function createConversationMessage(input: {
       id: true,
       buyerId: true,
       sellerId: true,
+      buyer: {
+        select: {
+          name: true,
+        },
+      },
+      seller: {
+        select: {
+          name: true,
+        },
+      },
     },
   });
 
@@ -535,6 +594,7 @@ export async function createConversationMessage(input: {
     senderId === conversation.buyerId ? conversation.sellerId : conversation.buyerId;
 
   const emailDeliveryQueue: NotificationEmailDeliveryInput[] = [];
+  const realtimeNotificationQueue: NotificationRealtimeDeliveryInput[] = [];
 
   const result = await prisma.$transaction(
     async (transactionClient) => {
@@ -611,6 +671,7 @@ export async function createConversationMessage(input: {
           link: `/chats/${conversation.id}`,
         },
         emailDeliveryQueue,
+        realtimeNotificationQueue,
       );
 
       return {
@@ -623,22 +684,27 @@ export async function createConversationMessage(input: {
     },
   );
 
-  await sendNotificationEmails(emailDeliveryQueue);
+  const serializedMessage = serializeConversationMessage(result.message);
+  const serializedSystemMessage = result.systemMessage
+    ? serializeConversationMessage(result.systemMessage)
+    : null;
+  const typingUsers = getTypingUsers(conversation) as RealtimeTypingUser[];
+
+  await Promise.all([
+    sendNotificationEmails(emailDeliveryQueue),
+    sendNotificationRealtimeEvents(realtimeNotificationQueue),
+    publishConversationMessageEvent(conversation.id, serializedMessage),
+    publishConversationTypingStateEvent(conversation.id, typingUsers),
+    ...(serializedSystemMessage
+      ? [publishConversationMessageEvent(conversation.id, serializedSystemMessage)]
+      : []),
+  ]);
 
   return {
     conversationId: conversation.id,
-    message: {
-      ...result.message,
-      createdAt: result.message.createdAt.toISOString(),
-      updatedAt: result.message.updatedAt.toISOString(),
-    },
-    systemMessage: result.systemMessage
-      ? {
-          ...result.systemMessage,
-          createdAt: result.systemMessage.createdAt.toISOString(),
-          updatedAt: result.systemMessage.updatedAt.toISOString(),
-        }
-      : null,
+    message: serializedMessage,
+    systemMessage: serializedSystemMessage,
+    typingUsers,
   };
 }
 
@@ -739,9 +805,12 @@ export async function setConversationTyping(input: {
   ensureConversationParticipant(senderId, conversation);
   setTypingState(conversationId, senderId, Boolean(input.isTyping));
 
+  const typingUsers = getTypingUsers(conversation) as RealtimeTypingUser[];
+  void publishConversationTypingStateEvent(conversation.id, typingUsers);
+
   return {
     conversationId: conversation.id,
-    typingUsers: getTypingUsers(conversation),
+    typingUsers,
   };
 }
 
@@ -838,6 +907,21 @@ export async function createChatMessage(input: {
     sender.name?.trim() ||
     (input.senderId === order.buyerId ? "Покупатель" : "Продавец");
 
+  const orderMessage = result.message
+    ? mapConversationMessageToOrderMessage(result.message)
+    : null;
+  const orderSystemMessage = result.systemMessage
+    ? mapConversationMessageToOrderMessage(result.systemMessage)
+    : null;
+
+  await Promise.all([
+    publishOrderTypingStateEvent(order.id, result.typingUsers),
+    ...(orderMessage ? [publishOrderMessageEvent(order.id, orderMessage)] : []),
+    ...(orderSystemMessage
+      ? [publishOrderMessageEvent(order.id, orderSystemMessage)]
+      : []),
+  ]);
+
   triggerDealChatTelegramNotification({
     telegramId: recipient.telegramId,
     orderId: order.id,
@@ -849,32 +933,8 @@ export async function createChatMessage(input: {
   return {
     orderId: order.id,
     chatRoomId: result.conversationId,
-    message: result.message
-      ? {
-          id: result.message.id,
-          content: result.message.text,
-          imageUrl: result.message.imageUrl,
-          isSystem: result.message.isSystem,
-          isRead: result.message.isRead,
-          senderId: result.message.senderId,
-          createdAt: result.message.createdAt,
-          updatedAt: result.message.updatedAt,
-          sender: result.message.sender,
-        }
-      : null,
-    systemMessage: result.systemMessage
-      ? {
-          id: result.systemMessage.id,
-          content: result.systemMessage.text,
-          imageUrl: result.systemMessage.imageUrl,
-          isSystem: result.systemMessage.isSystem,
-          isRead: result.systemMessage.isRead,
-          senderId: result.systemMessage.senderId,
-          createdAt: result.systemMessage.createdAt,
-          updatedAt: result.systemMessage.updatedAt,
-          sender: result.systemMessage.sender,
-        }
-      : null,
+    message: orderMessage,
+    systemMessage: orderSystemMessage,
   };
 }
 
@@ -931,6 +991,8 @@ export async function setChatTyping(input: {
     senderId: input.senderId,
     isTyping: input.isTyping,
   });
+
+  void publishOrderTypingStateEvent(order.id, result.typingUsers);
 
   return {
     orderId: order.id,

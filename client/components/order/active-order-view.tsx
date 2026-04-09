@@ -4,6 +4,7 @@ import type { Role } from "@prisma/client";
 import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState, useTransition } from "react";
 import Link from "next/link";
+import Image from "next/image";
 import { useSession } from "next-auth/react";
 
 import { markMessagesAsRead, sendMessage } from "@/app/actions/chat";
@@ -33,11 +34,19 @@ import {
   formatStoredOrderAmount,
   normalizeCurrencyCode,
 } from "@/lib/currency-config";
+import {
+  getOrderChannelName,
+  getPusherClient,
+  PUSHER_MESSAGE_EVENT,
+  PUSHER_ORDER_UPDATED_EVENT,
+  PUSHER_TYPING_EVENT,
+  type BrowserPusherChannel,
+  type RealtimeOrderMessagePayload,
+  type RealtimeOrderUpdatedPayload,
+  type RealtimeTypingStatePayload,
+} from "@/lib/pusher";
 import { isAdminRole } from "@/lib/roles";
 
-const CHAT_POLL_INTERVAL_MS = 3000;
-const ORDER_REFRESH_INTERVAL_MS = 30000;
-const TYPING_POLL_INTERVAL_MS = 1500;
 const TYPING_IDLE_TIMEOUT_MS = 1800;
 const INTERLOCUTOR_ONLINE_WINDOW_MS = 5 * 60 * 1000;
 const BALANCE_REFRESH_EVENT = "safeloot:balances-refresh";
@@ -290,6 +299,29 @@ async function compressChatImage(file: File) {
   return readFileAsDataUrl(webpBlob);
 }
 
+function mergeOrderMessages(
+  currentMessages: ChatMessage[],
+  nextMessages: ChatMessage[],
+) {
+  const messagesById = new Map<string, ChatMessage>();
+
+  for (const message of currentMessages) {
+    messagesById.set(message.id, message);
+  }
+
+  for (const message of nextMessages) {
+    const existingMessage = messagesById.get(message.id);
+    messagesById.set(message.id, {
+      ...existingMessage,
+      ...message,
+    });
+  }
+
+  return Array.from(messagesById.values()).sort(
+    (left, right) => Date.parse(left.createdAt) - Date.parse(right.createdAt),
+  );
+}
+
 export function ActiveOrderView({ orderId }: ActiveOrderViewProps) {
   const { data: session, status: sessionStatus } = useSession();
   const router = useRouter();
@@ -388,13 +420,9 @@ export function ActiveOrderView({ orderId }: ActiveOrderViewProps) {
     }
 
     void loadOrder();
-    const intervalId = window.setInterval(() => {
-      void loadOrder();
-    }, ORDER_REFRESH_INTERVAL_MS);
 
     return () => {
       isMounted = false;
-      window.clearInterval(intervalId);
     };
   }, [orderId, sessionStatus]);
 
@@ -431,7 +459,9 @@ export function ActiveOrderView({ orderId }: ActiveOrderViewProps) {
         if (isMounted) {
           const chatPayload = payload as ChatResponse;
           setChatRoomId(chatPayload.chatRoomId);
-          setMessages(chatPayload.messages);
+          setMessages((currentMessages) =>
+            mergeOrderMessages(currentMessages, chatPayload.messages),
+          );
           setChatError("");
         }
       } catch (error) {
@@ -450,13 +480,9 @@ export function ActiveOrderView({ orderId }: ActiveOrderViewProps) {
     }
 
     void loadChat();
-    const intervalId = window.setInterval(() => {
-      void loadChat();
-    }, CHAT_POLL_INTERVAL_MS);
 
     return () => {
       isMounted = false;
-      window.clearInterval(intervalId);
     };
   }, [orderId, sessionStatus]);
 
@@ -501,13 +527,73 @@ export function ActiveOrderView({ orderId }: ActiveOrderViewProps) {
     }
 
     void loadTypingState();
-    const intervalId = window.setInterval(() => {
-      void loadTypingState();
-    }, TYPING_POLL_INTERVAL_MS);
 
     return () => {
       isMounted = false;
-      window.clearInterval(intervalId);
+    };
+  }, [orderId, sessionStatus]);
+
+  useEffect(() => {
+    if (sessionStatus !== "authenticated") {
+      return;
+    }
+
+    let isCancelled = false;
+    let pusherChannel: BrowserPusherChannel | null = null;
+    let pusherClient: Awaited<ReturnType<typeof getPusherClient>> = null;
+
+    const handleRealtimeMessage = (message: RealtimeOrderMessagePayload) => {
+      setMessages((currentMessages) => mergeOrderMessages(currentMessages, [message]));
+      setChatError("");
+    };
+
+    const handleRealtimeTypingState = (
+      payload: RealtimeTypingStatePayload,
+    ) => {
+      setTypingUsers(payload.typingUsers);
+    };
+
+    const handleOrderUpdated = (payload: RealtimeOrderUpdatedPayload) => {
+      if (payload.orderId !== orderId) {
+        return;
+      }
+
+      setOrder((currentOrder) =>
+        currentOrder
+          ? {
+              ...currentOrder,
+              status: payload.status as OrderStatus,
+              platformFee: payload.platformFee ?? currentOrder.platformFee,
+            }
+          : currentOrder,
+      );
+      setLoadError("");
+    };
+
+    void (async () => {
+      pusherClient = await getPusherClient();
+
+      if (!pusherClient || isCancelled) {
+        return;
+      }
+
+      pusherChannel = pusherClient.subscribe(getOrderChannelName(orderId));
+      pusherChannel.bind(PUSHER_MESSAGE_EVENT, handleRealtimeMessage);
+      pusherChannel.bind(PUSHER_TYPING_EVENT, handleRealtimeTypingState);
+      pusherChannel.bind(PUSHER_ORDER_UPDATED_EVENT, handleOrderUpdated);
+    })();
+
+    return () => {
+      isCancelled = true;
+
+      if (!pusherChannel || !pusherClient) {
+        return;
+      }
+
+      pusherChannel.unbind(PUSHER_MESSAGE_EVENT, handleRealtimeMessage);
+      pusherChannel.unbind(PUSHER_TYPING_EVENT, handleRealtimeTypingState);
+      pusherChannel.unbind(PUSHER_ORDER_UPDATED_EVENT, handleOrderUpdated);
+      pusherClient.unsubscribe(getOrderChannelName(orderId));
     };
   }, [orderId, sessionStatus]);
 
@@ -656,7 +742,7 @@ export function ActiveOrderView({ orderId }: ActiveOrderViewProps) {
         window.clearTimeout(typingTimeoutRef.current);
       }
     };
-  }, [draftMessage, orderId]);
+  }, [currentUserId, draftMessage, orderId]);
 
   useEffect(() => {
     return () => {
@@ -776,9 +862,12 @@ export function ActiveOrderView({ orderId }: ActiveOrderViewProps) {
 
       if (nextMessage) {
         setMessages((currentMessages) =>
-          nextSystemMessage
-            ? [...currentMessages, nextMessage, nextSystemMessage]
-            : [...currentMessages, nextMessage],
+          mergeOrderMessages(
+            currentMessages,
+            nextSystemMessage
+              ? [nextMessage, nextSystemMessage]
+              : [nextMessage],
+          ),
         );
       }
     } catch (error) {
@@ -1363,9 +1452,12 @@ export function ActiveOrderView({ orderId }: ActiveOrderViewProps) {
                             rel="noreferrer"
                             className={message.content ? "mt-3 block overflow-hidden rounded-[1rem] border border-white/10 bg-black/15" : "block overflow-hidden rounded-[1rem] border border-white/10 bg-black/15"}
                           >
-                            <img
+                            <Image
                               src={message.imageUrl}
                               alt="Скриншот из чата"
+                              width={800}
+                              height={600}
+                              unoptimized
                               className="max-h-[360px] w-auto max-w-full object-cover"
                             />
                           </a>
@@ -1426,9 +1518,12 @@ export function ActiveOrderView({ orderId }: ActiveOrderViewProps) {
 
         {draftImageBase64 ? (
           <div className="mt-4 flex items-start gap-3 rounded-[1.25rem] border border-white/10 bg-white/5 p-3">
-            <img
+            <Image
               src={draftImageBase64}
               alt="Предпросмотр скриншота"
+              width={112}
+              height={80}
+              unoptimized
               className="h-20 w-28 rounded-2xl object-cover"
             />
             <div className="min-w-0 flex-1">

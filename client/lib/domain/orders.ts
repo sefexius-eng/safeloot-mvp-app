@@ -9,6 +9,7 @@ import {
   sendNotificationEmails,
   type NotificationEmailDeliveryInput,
 } from "@/lib/notification-delivery";
+import { publishOrderUpdatedEvent } from "@/lib/pusher";
 import { prisma } from "@/lib/prisma";
 import { normalizeCurrencyCode } from "@/lib/currency-config";
 
@@ -28,11 +29,15 @@ import {
 } from "@/lib/domain/shared";
 import {
   createUserNotification,
+  sendNotificationRealtimeEvents,
+  type NotificationRealtimeDeliveryInput,
   sendBuyerRefundTelegramNotification,
   sendOrderDisputeOpenedTelegramNotification,
   sendSellerOrderCompletedTelegramNotification,
   sendSellerOrderTelegramNotification,
 } from "@/lib/domain/notifications-service";
+
+const ZERO_PLATFORM_FEE = formatMoney(ZERO_MONEY);
 
 export async function createOrder(input: {
   productId?: string;
@@ -52,6 +57,7 @@ export async function createOrder(input: {
   }
 
   const emailDeliveryQueue: NotificationEmailDeliveryInput[] = [];
+  const realtimeNotificationQueue: NotificationRealtimeDeliveryInput[] = [];
 
   const result = await prisma.$transaction(
     async (transactionClient) => {
@@ -208,6 +214,7 @@ export async function createOrder(input: {
           link: `/orders/${orderId}`,
         },
         emailDeliveryQueue,
+        realtimeNotificationQueue,
       );
 
       return {
@@ -224,13 +231,21 @@ export async function createOrder(input: {
     },
   );
 
-  await sendNotificationEmails(emailDeliveryQueue);
-  await sendSellerOrderTelegramNotification({
-    telegramId: result.sellerTelegramId,
-    productTitle: result.productTitle,
-    price: result.orderPrice,
-    currency: result.orderCurrency,
-  });
+  await Promise.all([
+    sendNotificationEmails(emailDeliveryQueue),
+    sendNotificationRealtimeEvents(realtimeNotificationQueue),
+    sendSellerOrderTelegramNotification({
+      telegramId: result.sellerTelegramId,
+      productTitle: result.productTitle,
+      price: result.orderPrice,
+      currency: result.orderCurrency,
+    }),
+    publishOrderUpdatedEvent({
+      orderId: result.orderId,
+      status: result.status,
+      platformFee: ZERO_PLATFORM_FEE,
+    }),
+  ]);
 
   return {
     orderId: result.orderId,
@@ -393,6 +408,7 @@ export async function confirmOrder(input: { orderId?: string; buyerId: string })
   }
 
   const emailDeliveryQueue: NotificationEmailDeliveryInput[] = [];
+  const realtimeNotificationQueue: NotificationRealtimeDeliveryInput[] = [];
 
   const result = await prisma.$transaction(
     async (transactionClient) => {
@@ -471,6 +487,7 @@ export async function confirmOrder(input: { orderId?: string; buyerId: string })
           link: `/orders/${checkoutOrder.id}`,
         },
         emailDeliveryQueue,
+        realtimeNotificationQueue,
       );
 
       return {
@@ -487,13 +504,21 @@ export async function confirmOrder(input: { orderId?: string; buyerId: string })
     },
   );
 
-  await sendNotificationEmails(emailDeliveryQueue);
-  await sendSellerOrderTelegramNotification({
-    telegramId: result.sellerTelegramId,
-    productTitle: result.productTitle,
-    price: result.orderPrice,
-    currency: result.orderCurrency,
-  });
+  await Promise.all([
+    sendNotificationEmails(emailDeliveryQueue),
+    sendNotificationRealtimeEvents(realtimeNotificationQueue),
+    sendSellerOrderTelegramNotification({
+      telegramId: result.sellerTelegramId,
+      productTitle: result.productTitle,
+      price: result.orderPrice,
+      currency: result.orderCurrency,
+    }),
+    publishOrderUpdatedEvent({
+      orderId: result.orderId,
+      status: result.status,
+      platformFee: ZERO_PLATFORM_FEE,
+    }),
+  ]);
 
   return {
     orderId: result.orderId,
@@ -661,12 +686,20 @@ export async function completeOrder(input: { orderId: string; buyerId: string })
     },
   );
 
-  await sendSellerOrderCompletedTelegramNotification({
-    telegramId: result.sellerTelegramId,
-    productTitle: result.productTitle,
-    sellerNetAmount: result.sellerNetAmount,
-    currency: result.orderCurrency,
-  });
+  await Promise.all([
+    sendSellerOrderCompletedTelegramNotification({
+      telegramId: result.sellerTelegramId,
+      productTitle: result.productTitle,
+      sellerNetAmount: result.sellerNetAmount,
+      currency: result.orderCurrency,
+    }),
+    publishOrderUpdatedEvent({
+      orderId: result.orderId,
+      status: result.status,
+      platformFee: result.platformFee,
+      sellerNetAmount: result.sellerNetAmount,
+    }),
+  ]);
 
   return {
     orderId: result.orderId,
@@ -690,6 +723,7 @@ export async function refundOrder(input: { orderId: string; sellerId: string }) 
   }
 
   const emailDeliveryQueue: NotificationEmailDeliveryInput[] = [];
+  const realtimeNotificationQueue: NotificationRealtimeDeliveryInput[] = [];
 
   const result = await prisma.$transaction(
     async (transactionClient) => {
@@ -802,6 +836,7 @@ export async function refundOrder(input: { orderId: string; sellerId: string }) 
           link: `/orders/${order.id}`,
         },
         emailDeliveryQueue,
+        realtimeNotificationQueue,
       );
 
       return {
@@ -818,14 +853,22 @@ export async function refundOrder(input: { orderId: string; sellerId: string }) 
     },
   );
 
-  await sendNotificationEmails(emailDeliveryQueue);
-
-  await sendBuyerRefundTelegramNotification({
-    telegramId: result.buyerTelegramId,
-    productTitle: result.productTitle,
-    refundAmount: result.refundAmount,
-    currency: result.orderCurrency,
-  });
+  await Promise.all([
+    sendNotificationEmails(emailDeliveryQueue),
+    sendNotificationRealtimeEvents(realtimeNotificationQueue),
+    sendBuyerRefundTelegramNotification({
+      telegramId: result.buyerTelegramId,
+      productTitle: result.productTitle,
+      refundAmount: result.refundAmount,
+      currency: result.orderCurrency,
+    }),
+    publishOrderUpdatedEvent({
+      orderId: result.orderId,
+      status: result.status,
+      platformFee: ZERO_PLATFORM_FEE,
+      refundAmount: result.refundAmount,
+    }),
+  ]);
 
   return {
     orderId: result.orderId,
@@ -925,11 +968,18 @@ export async function openOrderDispute(input: {
     },
   );
 
-  await sendOrderDisputeOpenedTelegramNotification({
-    telegramId: result.recipientTelegramId,
-    productTitle: result.productTitle,
-    openedBy: result.openedBy as "buyer" | "seller",
-  });
+  await Promise.all([
+    sendOrderDisputeOpenedTelegramNotification({
+      telegramId: result.recipientTelegramId,
+      productTitle: result.productTitle,
+      openedBy: result.openedBy as "buyer" | "seller",
+    }),
+    publishOrderUpdatedEvent({
+      orderId: result.orderId,
+      status: result.status,
+      platformFee: ZERO_PLATFORM_FEE,
+    }),
+  ]);
 
   return {
     orderId: result.orderId,
@@ -944,7 +994,7 @@ export async function resolveOrderDisputeToBuyer(input: { orderId: string }) {
     throw new Error("orderId is required.");
   }
 
-  return prisma.$transaction(
+  const result = await prisma.$transaction(
     async (transactionClient) => {
       const order = await transactionClient.order.findUnique({
         where: { id: orderId },
@@ -1033,6 +1083,15 @@ export async function resolveOrderDisputeToBuyer(input: { orderId: string }) {
       isolationLevel: Prisma.TransactionIsolationLevel.Serializable,
     },
   );
+
+  await publishOrderUpdatedEvent({
+    orderId: result.orderId,
+    status: result.status,
+    platformFee: ZERO_PLATFORM_FEE,
+    refundAmount: result.refundAmount,
+  });
+
+  return result;
 }
 
 export async function resolveOrderDisputeToSeller(input: { orderId: string }) {
@@ -1042,7 +1101,7 @@ export async function resolveOrderDisputeToSeller(input: { orderId: string }) {
     throw new Error("orderId is required.");
   }
 
-  return prisma.$transaction(
+  const result = await prisma.$transaction(
     async (transactionClient) => {
       const order = await transactionClient.order.findUnique({
         where: { id: orderId },
@@ -1159,4 +1218,13 @@ export async function resolveOrderDisputeToSeller(input: { orderId: string }) {
       isolationLevel: Prisma.TransactionIsolationLevel.Serializable,
     },
   );
+
+  await publishOrderUpdatedEvent({
+    orderId: result.orderId,
+    status: result.status,
+    platformFee: result.platformFee,
+    sellerNetAmount: result.sellerNetAmount,
+  });
+
+  return result;
 }

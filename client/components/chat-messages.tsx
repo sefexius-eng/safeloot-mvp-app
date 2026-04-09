@@ -1,14 +1,22 @@
 "use client";
 
+import Image from "next/image";
 import { useEffect, useRef, useState } from "react";
 
 import { markConversationMessagesAsRead } from "@/app/actions/chat";
 import CensoredText from "@/components/censored-text";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import {
+  getConversationChannelName,
+  getPusherClient,
+  PUSHER_MESSAGE_EVENT,
+  PUSHER_TYPING_EVENT,
+  type BrowserPusherChannel,
+  type RealtimeConversationMessagePayload,
+  type RealtimeTypingStatePayload,
+} from "@/lib/pusher";
 
-const CHAT_POLL_INTERVAL_MS = 2500;
-const TYPING_POLL_INTERVAL_MS = 1500;
 const TYPING_IDLE_TIMEOUT_MS = 1800;
 const MAX_CHAT_IMAGE_WIDTH = 800;
 const CHAT_IMAGE_QUALITY = 0.7;
@@ -274,13 +282,10 @@ export function ChatMessages({
       }
     }
 
-    const intervalId = window.setInterval(() => {
-      void loadNewMessages();
-    }, CHAT_POLL_INTERVAL_MS);
+    void loadNewMessages();
 
     return () => {
       isMounted = false;
-      window.clearInterval(intervalId);
     };
   }, [conversationId]);
 
@@ -305,13 +310,55 @@ export function ChatMessages({
     }
 
     void loadTypingState();
-    const intervalId = window.setInterval(() => {
-      void loadTypingState();
-    }, TYPING_POLL_INTERVAL_MS);
 
     return () => {
       isMounted = false;
-      window.clearInterval(intervalId);
+    };
+  }, [conversationId]);
+
+  useEffect(() => {
+    let isCancelled = false;
+    let pusherChannel: BrowserPusherChannel | null = null;
+    let pusherClient: Awaited<ReturnType<typeof getPusherClient>> = null;
+
+    const handleRealtimeMessage = (
+      message: RealtimeConversationMessagePayload,
+    ) => {
+      latestMessageCreatedAtRef.current = message.createdAt;
+      setMessages((currentMessages) => mergeMessages(currentMessages, [message]));
+      setErrorMessage("");
+    };
+
+    const handleRealtimeTypingState = (
+      payload: RealtimeTypingStatePayload,
+    ) => {
+      setTypingUsers(payload.typingUsers);
+    };
+
+    void (async () => {
+      pusherClient = await getPusherClient();
+
+      if (!pusherClient || isCancelled) {
+        return;
+      }
+
+      pusherChannel = pusherClient.subscribe(
+        getConversationChannelName(conversationId),
+      );
+      pusherChannel.bind(PUSHER_MESSAGE_EVENT, handleRealtimeMessage);
+      pusherChannel.bind(PUSHER_TYPING_EVENT, handleRealtimeTypingState);
+    })();
+
+    return () => {
+      isCancelled = true;
+
+      if (!pusherChannel || !pusherClient) {
+        return;
+      }
+
+      pusherChannel.unbind(PUSHER_MESSAGE_EVENT, handleRealtimeMessage);
+      pusherChannel.unbind(PUSHER_TYPING_EVENT, handleRealtimeTypingState);
+      pusherClient.unsubscribe(getConversationChannelName(conversationId));
     };
   }, [conversationId]);
 
@@ -649,9 +696,12 @@ export function ChatMessages({
                       </p>
                     ) : null}
                     {message.imageUrl ? (
-                      <img
+                      <Image
                         src={message.imageUrl}
                         alt="Вложение к сообщению"
+                        width={800}
+                        height={600}
+                        unoptimized
                         className="mt-3 max-h-[320px] w-full rounded-[1rem] border border-white/10 object-cover"
                       />
                     ) : null}
@@ -682,9 +732,12 @@ export function ChatMessages({
                 <p className="text-xs font-semibold uppercase tracking-[0.22em] text-zinc-500">
                   Подготовленное вложение
                 </p>
-                <img
+                <Image
                   src={draftImageBase64}
                   alt="Подготовленный скриншот"
+                  width={800}
+                  height={600}
+                  unoptimized
                   className="mt-3 max-h-56 rounded-[1rem] border border-white/10 object-cover"
                 />
               </div>
