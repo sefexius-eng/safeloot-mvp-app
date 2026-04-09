@@ -139,6 +139,13 @@ export default async function RootLayout({
         </AuthSessionProvider>
         <ExternalAnalytics />
         <Analytics />
+        <audio
+          id="notification-sound"
+          src="/sounds/notification.mp3"
+          preload="auto"
+          aria-hidden="true"
+          className="hidden"
+        />
       </body>
     </html>
   );
