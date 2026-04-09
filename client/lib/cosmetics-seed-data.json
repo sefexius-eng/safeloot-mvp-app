@@ -179,6 +179,12 @@
       "type": "DECORATION",
       "price": 700,
       "value": "/cosmetics/kitsune-mask.png"
+    },
+    {
+      "name": "Six Seven",
+      "type": "DECORATION",
+      "price": 670,
+      "value": "/cosmetics/six-seven-frame.png"
     }
   ]
 }
