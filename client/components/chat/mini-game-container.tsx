@@ -32,10 +32,11 @@ const STROKE_COLOR = "#111827";
 const STROKE_WIDTH = 5;
 
 interface DrawSegment {
-  fromX: number;
-  fromY: number;
-  toX: number;
-  toY: number;
+  startX: number;
+  startY: number;
+  endX: number;
+  endY: number;
+  color: string;
 }
 
 interface GuessEntry {
@@ -160,9 +161,10 @@ export function MiniGameContainer({
       return;
     }
 
+    context.strokeStyle = segment.color;
     context.beginPath();
-    context.moveTo(segment.fromX, segment.fromY);
-    context.lineTo(segment.toX, segment.toY);
+    context.moveTo(segment.startX, segment.startY);
+    context.lineTo(segment.endX, segment.endY);
     context.stroke();
   }
 
@@ -175,9 +177,9 @@ export function MiniGameContainer({
   }
 
   function appendSegment(segment: DrawSegment) {
-    drawSegment(segment);
     strokesRef.current = [...strokesRef.current, segment];
     persistStrokes(strokesRef.current);
+    drawSegment(segment);
   }
 
   function clearCanvasState() {
@@ -308,11 +310,16 @@ export function MiniGameContainer({
       return null;
     }
 
-    const rect = canvas.getBoundingClientRect();
+    const nativeEvent = event.nativeEvent as PointerEvent & {
+      offsetX: number;
+      offsetY: number;
+    };
+    const scaleX = canvas.width / Math.max(canvas.clientWidth, 1);
+    const scaleY = canvas.height / Math.max(canvas.clientHeight, 1);
 
     return {
-      x: ((event.clientX - rect.left) / rect.width) * canvas.width,
-      y: ((event.clientY - rect.top) / rect.height) * canvas.height,
+      x: nativeEvent.offsetX * scaleX,
+      y: nativeEvent.offsetY * scaleY,
     };
   }
 
@@ -347,10 +354,11 @@ export function MiniGameContainer({
     }
 
     const segment: DrawSegment = {
-      fromX: previousPoint.x,
-      fromY: previousPoint.y,
-      toX: nextPoint.x,
-      toY: nextPoint.y,
+      startX: previousPoint.x,
+      startY: previousPoint.y,
+      endX: nextPoint.x,
+      endY: nextPoint.y,
+      color: STROKE_COLOR,
     };
 
     appendSegment(segment);
@@ -400,7 +408,13 @@ export function MiniGameContainer({
 
     canvas.width = CANVAS_WIDTH;
     canvas.height = CANVAS_HEIGHT;
-    hydrateCanvasFromStorage();
+
+    if (isDrawer) {
+      hydrateCanvasFromStorage();
+    } else {
+      clearCanvasState();
+    }
+
     resolveSecretWord();
   }, [isDrawer, strokesStorageKey, wordStorageKey]);
 
@@ -418,12 +432,34 @@ export function MiniGameContainer({
         return;
       }
 
-      appendSegment({
-        fromX: payload.fromX,
-        fromY: payload.fromY,
-        toX: payload.toX,
-        toY: payload.toY,
-      });
+      const context = getCanvasContext();
+
+      if (!context) {
+        appendSegment({
+          startX: payload.startX,
+          startY: payload.startY,
+          endX: payload.endX,
+          endY: payload.endY,
+          color: payload.color,
+        });
+        return;
+      }
+
+      const nextSegment: DrawSegment = {
+        startX: payload.startX,
+        startY: payload.startY,
+        endX: payload.endX,
+        endY: payload.endY,
+        color: payload.color,
+      };
+
+      strokesRef.current = [...strokesRef.current, nextSegment];
+      persistStrokes(strokesRef.current);
+      context.strokeStyle = payload.color;
+      context.beginPath();
+      context.moveTo(payload.startX, payload.startY);
+      context.lineTo(payload.endX, payload.endY);
+      context.stroke();
     };
 
     const handleRemoteClear = (payload: RealtimeGameClearPayload) => {

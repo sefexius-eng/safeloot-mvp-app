@@ -62,10 +62,11 @@ export interface ConversationGameMetadata {
 
 export interface RealtimeGameDrawPayload {
   sessionId: string;
-  fromX: number;
-  fromY: number;
-  toX: number;
-  toY: number;
+  startX: number;
+  startY: number;
+  endX: number;
+  endY: number;
+  color: string;
 }
 
 export interface RealtimeGameGuessPayload {
@@ -143,7 +144,7 @@ export const PUSHER_MESSAGE_EVENT = "new-message";
 export const PUSHER_NOTIFICATION_EVENT = "new-notification";
 export const PUSHER_CONVERSATION_ALERT_EVENT = "conversation-message-alert";
 export const PUSHER_TYPING_EVENT = "typing-state";
-export const PUSHER_GAME_DRAW_EVENT = "client-draw";
+export const PUSHER_GAME_DRAW_EVENT = "client-draw-line";
 export const PUSHER_GAME_GUESS_EVENT = "client-guess";
 export const PUSHER_GAME_WIN_EVENT = "client-win";
 export const PUSHER_GAME_CLEAR_EVENT = "client-clear";
