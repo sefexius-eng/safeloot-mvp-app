@@ -58,12 +58,18 @@ const CROCODILE_GAME_DEFINITION: MiniGameDefinition = {
   ],
 };
 
-export const MINI_GAME_REGISTRY: Record<ConversationGameType, MiniGameDefinition> = {
+export const MINI_GAME_REGISTRY: Partial<Record<ConversationGameType, MiniGameDefinition>> = {
   crocodile: CROCODILE_GAME_DEFINITION,
 };
 
 export function getMiniGameDefinition(game: ConversationGameType) {
-  return MINI_GAME_REGISTRY[game];
+  const definition = MINI_GAME_REGISTRY[game];
+
+  if (!definition) {
+    throw new Error(`Mini-game ${game} is not implemented in the UI yet.`);
+  }
+
+  return definition;
 }
 
 export function pickRandomMiniGameWord(game: ConversationGameType) {

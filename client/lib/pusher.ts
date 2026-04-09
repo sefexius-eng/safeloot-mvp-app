@@ -49,7 +49,7 @@ export type ConversationMessageType =
   | "SYSTEM"
   | "GAME_INVITE";
 
-export type ConversationGameType = "crocodile";
+export type ConversationGameType = "crocodile" | "chess";
 
 export type ConversationGameStatus = "pending" | "active" | "completed";
 
@@ -59,6 +59,9 @@ export interface ConversationGameMetadata {
   initiatorId: string;
   sessionId?: string | null;
   canvasSnapshot?: string | null;
+  fen?: string | null;
+  whitePlayerId?: string | null;
+  blackPlayerId?: string | null;
 }
 
 export interface RealtimeGameDrawPayload {

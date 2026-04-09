@@ -44,11 +44,15 @@ function uniqueUserIds(userIds: string[]) {
 }
 
 function isConversationGameType(value: unknown): value is ConversationGameType {
-  return value === "crocodile";
+  return value === "crocodile" || value === "chess";
 }
 
 function isConversationGameStatus(value: unknown): value is ConversationGameStatus {
   return value === "pending" || value === "active" || value === "completed";
+}
+
+function isNonEmptyString(value: unknown): value is string {
+  return typeof value === "string" && value.trim().length > 0;
 }
 
 const MAX_GAME_CANVAS_SNAPSHOT_LENGTH = 1_500_000;
@@ -77,6 +81,9 @@ function parseConversationGameMetadata(
   const initiatorId = metadata.initiatorId;
   const sessionId = metadata.sessionId;
   const canvasSnapshot = metadata.canvasSnapshot;
+  const fen = metadata.fen;
+  const whitePlayerId = metadata.whitePlayerId;
+  const blackPlayerId = metadata.blackPlayerId;
 
   if (
     !isConversationGameType(game) ||
@@ -87,7 +94,7 @@ function parseConversationGameMetadata(
     return null;
   }
 
-  return {
+  const baseMetadata = {
     game,
     status,
     initiatorId,
@@ -99,6 +106,31 @@ function parseConversationGameMetadata(
             ? canvasSnapshot
             : null,
         }),
+  };
+
+  if (game === "chess") {
+    const normalizedFen = fen;
+    const normalizedWhitePlayerId = whitePlayerId;
+    const normalizedBlackPlayerId = blackPlayerId;
+
+    if (
+      !isNonEmptyString(normalizedFen) ||
+      !isNonEmptyString(normalizedWhitePlayerId) ||
+      !isNonEmptyString(normalizedBlackPlayerId)
+    ) {
+      return null;
+    }
+
+    return {
+      ...baseMetadata,
+      fen: normalizedFen,
+      whitePlayerId: normalizedWhitePlayerId,
+      blackPlayerId: normalizedBlackPlayerId,
+    };
+  }
+
+  return {
+    ...baseMetadata,
   };
 }
 
@@ -117,6 +149,16 @@ function toConversationGameMetadataData(
     ...(gameMetadata.canvasSnapshot
       ? {
           canvasSnapshot: gameMetadata.canvasSnapshot,
+        }
+      : {}),
+    ...(gameMetadata.game === "chess" &&
+    gameMetadata.fen &&
+    gameMetadata.whitePlayerId &&
+    gameMetadata.blackPlayerId
+      ? {
+          fen: gameMetadata.fen,
+          whitePlayerId: gameMetadata.whitePlayerId,
+          blackPlayerId: gameMetadata.blackPlayerId,
         }
       : {}),
   };

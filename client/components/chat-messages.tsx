@@ -119,7 +119,13 @@ function getGameTitle(game: ConversationGameType) {
   switch (game) {
     case "crocodile":
       return "Крокодил";
+    case "chess":
+      return "Шахматы";
   }
+}
+
+function supportsInlineMiniGameRuntime(game: ConversationGameType) {
+  return game === "crocodile";
 }
 
 function getGameInviteStatusLabel(status: ConversationGameStatus) {
@@ -300,11 +306,16 @@ export function ChatMessages({
   }, [messages]);
 
   useEffect(() => {
-    const activeGameMessages = messages.filter(
-      (message) =>
-        message.type === "GAME_INVITE" &&
-        message.gameMetadata?.status === "active",
-    );
+    const activeGameMessages = messages.filter((message) => {
+      if (message.type !== "GAME_INVITE" || !message.gameMetadata) {
+        return false;
+      }
+
+      return (
+        message.gameMetadata.status === "active" &&
+        supportsInlineMiniGameRuntime(message.gameMetadata.game)
+      );
+    });
     const latestActiveGameMessage =
       activeGameMessages[activeGameMessages.length - 1] ?? null;
 
@@ -789,7 +800,11 @@ export function ChatMessages({
             mergeMessages(currentMessages, [result.message]),
           );
 
-          if (status === "active") {
+          if (
+            status === "active" &&
+            result.message.gameMetadata &&
+            supportsInlineMiniGameRuntime(result.message.gameMetadata.game)
+          ) {
             autoOpenedGameMessageIdsRef.current.add(result.message.id);
             setOpenGameMessageId(result.message.id);
           }
@@ -814,12 +829,20 @@ export function ChatMessages({
 
   const isMutating = isSending || isProcessingAttachment || isSendingInvite;
   const openGameMessage = openGameMessageId
-    ? messages.find(
-        (message) =>
-          message.id === openGameMessageId &&
-          message.type === "GAME_INVITE" &&
-          message.gameMetadata?.status !== "pending",
-      ) ?? null
+    ? messages.find((message) => {
+        if (
+          message.id !== openGameMessageId ||
+          message.type !== "GAME_INVITE" ||
+          !message.gameMetadata
+        ) {
+          return false;
+        }
+
+        return (
+          message.gameMetadata.status !== "pending" &&
+          supportsInlineMiniGameRuntime(message.gameMetadata.game)
+        );
+      }) ?? null
     : null;
   const openGameInitiatorName = openGameMessage
     ? openGameMessage.senderId === currentUserId
@@ -883,7 +906,13 @@ export function ChatMessages({
                 isInviteInitiator;
               const canResumeGame =
                 message.type === "GAME_INVITE" &&
-                message.gameMetadata?.status === "active";
+                message.gameMetadata?.status === "active" &&
+                supportsInlineMiniGameRuntime(message.gameMetadata.game);
+              const isInlineRuntimeAvailable =
+                message.type === "GAME_INVITE" &&
+                message.gameMetadata
+                  ? supportsInlineMiniGameRuntime(message.gameMetadata.game)
+                  : false;
               const isInviteActionPending =
                 isUpdatingGameInvite && pendingGameInviteMessageId === message.id;
               const inviteHeadline =
@@ -939,7 +968,12 @@ export function ChatMessages({
                         </div>
 
                         <p className="mt-3 text-sm leading-6 text-zinc-100/90">
-                          {canAcceptInvite
+                          {message.type === "GAME_INVITE" &&
+                          message.gameMetadata?.game === "chess" &&
+                          message.gameMetadata.status === "active" &&
+                          !isInlineRuntimeAvailable
+                            ? "Шахматная партия уже создана и сохранена в чате. Игровая доска будет подключена следующим патчем."
+                            : canAcceptInvite
                             ? "Примите приглашение, чтобы открыть игровое окно у обоих участников."
                             : canCancelInvite
                               ? "Вы можете отменить приглашение, пока собеседник его не принял."
@@ -1099,6 +1133,17 @@ export function ChatMessages({
                 </span>
                 <div className="flex flex-col">
                   <span>Крокодил</span>
+                  <span className="text-xs font-normal text-zinc-400">
+                    Отправить инвайт в чат
+                  </span>
+                </div>
+              </DropdownMenuItem>
+              <DropdownMenuItem onSelect={() => handleSendGameInvite("chess")}>
+                <span className="text-base" aria-hidden="true">
+                  ♟️
+                </span>
+                <div className="flex flex-col">
+                  <span>Шахматы</span>
                   <span className="text-xs font-normal text-zinc-400">
                     Отправить инвайт в чат
                   </span>

@@ -12,6 +12,7 @@ import {
   createConversationMessage,
   getOrCreateDirectConversation as getOrCreateDirectConversationRecord,
   getOrCreateConversation as getOrCreateConversationRecord,
+  getConversationRoom as getConversationRoomRecord,
   markChatMessagesAsRead,
   markConversationMessagesAsRead as markConversationMessagesAsReadRecord,
   softDeleteConversationByUser,
@@ -20,6 +21,8 @@ import {
   updateConversationGameInviteStatus as updateConversationGameInviteStatusRecord,
 } from "@/lib/domain/chat-service";
 import type { ConversationGameStatus, ConversationGameType } from "@/lib/pusher";
+
+const CHESS_START_FEN = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1";
 
 interface StartDirectConversationResult {
   ok: boolean;
@@ -211,7 +214,7 @@ export async function sendConversationMessage(
 function isSupportedConversationGameType(
   gameType: string,
 ): gameType is ConversationGameType {
-  return gameType === "crocodile";
+  return gameType === "crocodile" || gameType === "chess";
 }
 
 function isSupportedConversationGameStatus(
@@ -224,12 +227,14 @@ function getConversationGameInviteText(gameType: ConversationGameType) {
   switch (gameType) {
     case "crocodile":
       return "Приглашение в мини-игру: Крокодил.";
+    case "chess":
+      return "Приглашение в мини-игру: Шахматы.";
   }
 }
 
 export async function sendGameInvite(
   conversationId: string,
-  gameType: "crocodile",
+  gameType: ConversationGameType,
 ) {
   const userId = await requireActiveChatUserId();
 
@@ -237,16 +242,29 @@ export async function sendGameInvite(
     throw new Error("Unsupported game type.");
   }
 
+  const conversation = await getConversationRoomRecord(conversationId, userId);
+  const targetUserId = conversation.otherParty.id;
+
   const result = await createConversationMessage({
     conversationId,
     senderId: userId,
     text: getConversationGameInviteText(gameType),
     type: MessageType.GAME_INVITE,
-    gameMetadata: {
-      game: gameType,
-      status: "pending",
-      initiatorId: userId,
-    },
+    gameMetadata:
+      gameType === "chess"
+        ? {
+            game: gameType,
+            status: "pending",
+            initiatorId: userId,
+            fen: CHESS_START_FEN,
+            whitePlayerId: userId,
+            blackPlayerId: targetUserId,
+          }
+        : {
+            game: gameType,
+            status: "pending",
+            initiatorId: userId,
+          },
   });
 
   revalidateChatPaths(result.conversationId);
