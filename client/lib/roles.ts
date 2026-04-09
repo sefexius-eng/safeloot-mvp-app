@@ -19,6 +19,10 @@ export function isSuperAdminRole(role: Role | null | undefined) {
   return role === "SUPER_ADMIN";
 }
 
+export function canManageForeignProducts(role: Role | null | undefined) {
+  return role === "ADMIN" || role === "SUPER_ADMIN";
+}
+
 export function getRoleLabel(role: Role) {
   switch (role) {
     case "MODERATOR":

@@ -14,7 +14,12 @@ import {
   normalizeManageableProfileBadgeIds,
 } from "@/lib/profile-badges";
 import { prisma } from "@/lib/prisma";
-import { isSuperAdminRole, isTeamRole, ROLE_OPTIONS } from "@/lib/roles";
+import {
+  canManageForeignProducts,
+  isSuperAdminRole,
+  isTeamRole,
+  ROLE_OPTIONS,
+} from "@/lib/roles";
 import { generateSlug } from "@/lib/generate-slug";
 
 export interface AdminActionResult {
@@ -449,6 +454,7 @@ export async function deleteProductAdmin(
     },
     select: {
       id: true,
+      sellerId: true,
       game: {
         select: {
           slug: true,
@@ -477,6 +483,16 @@ export async function deleteProductAdmin(
     return {
       ok: false,
       message: "Товар не найден.",
+    };
+  }
+
+  if (
+    !canManageForeignProducts(currentUser.role) &&
+    product.sellerId !== currentUser.id
+  ) {
+    return {
+      ok: false,
+      message: "Модератор может удалять только свои товары.",
     };
   }
 

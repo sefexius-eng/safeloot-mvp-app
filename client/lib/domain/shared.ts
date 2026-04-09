@@ -7,7 +7,7 @@ import {
 } from "@prisma/client";
 
 import { prisma } from "@/lib/prisma";
-import { isAdminRole } from "@/lib/roles";
+import { canManageForeignProducts } from "@/lib/roles";
 
 export const MONEY_SCALE = 2;
 const COMMISSION_RATE = 0.05;
@@ -485,12 +485,14 @@ export function ensureProductManagementAccess(
 ) {
   if (
     userId === product.sellerId ||
-    isAdminRole((role as Role | null | undefined) ?? undefined)
+    canManageForeignProducts((role as Role | null | undefined) ?? undefined)
   ) {
     return;
   }
 
-  throw new Error("Only the seller or admin can manage this product.");
+  throw new Error(
+    "Только продавец, администратор или супер-админ могут управлять этим товаром.",
+  );
 }
 
 export function normalizeOptionalText(value?: string | null) {

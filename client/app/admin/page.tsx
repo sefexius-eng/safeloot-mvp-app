@@ -45,7 +45,7 @@ import { getAuthSession } from "@/lib/auth";
 import { formatStoredOrderAmount } from "@/lib/currency-config";
 import { formatCurrency } from "@/lib/formatters";
 import { prisma } from "@/lib/prisma";
-import { isSuperAdminRole } from "@/lib/roles";
+import { canManageForeignProducts, isSuperAdminRole } from "@/lib/roles";
 import { getSellerAutomaticBadgeDataMap } from "@/lib/seller-achievements";
 import { getWithdrawalStatusMeta } from "@/lib/withdrawals";
 
@@ -187,6 +187,7 @@ export default async function AdminDashboardPage() {
         price: true,
         seller: {
           select: {
+            id: true,
             email: true,
             name: true,
             rank: true,
@@ -340,6 +341,7 @@ export default async function AdminDashboardPage() {
   const canManagePromoCodes = isSuperAdminRole(currentUser.role);
   const canManageGames = isAdminRole(currentUser.role);
   const canForceDelete = isSuperAdminRole(currentUser.role);
+  const canManageForeignProductRecords = canManageForeignProducts(currentUser.role);
   const visiblePromoCodes = activePromoCodes.filter(
     (promoCode) => promoCode.usedCount < promoCode.maxUses,
   );
@@ -706,7 +708,10 @@ export default async function AdminDashboardPage() {
                         {products.map((product) => {
                           const latestOrderStatus = product.orders[0]?.status;
                           const statusMeta = getOrderStatusMeta(latestOrderStatus);
-                          const canDelete = canForceDelete || product._count.orders === 0;
+                          const canDelete =
+                            (canForceDelete || product._count.orders === 0) &&
+                            (canManageForeignProductRecords ||
+                              product.seller.id === currentUser.id);
 
                           return (
                             <TableRow key={product.id}>
