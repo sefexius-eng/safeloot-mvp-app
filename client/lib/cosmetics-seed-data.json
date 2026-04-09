@@ -161,6 +161,24 @@
       "type": "DECORATION",
       "price": 600,
       "value": "/cosmetics/angel-wings.png"
+    },
+    {
+      "name": "Серафический Нимб",
+      "type": "DECORATION",
+      "price": 450,
+      "value": "/cosmetics/seraph-halo.png"
+    },
+    {
+      "name": "Дьявольские Крылья [Анимированная]",
+      "type": "DECORATION",
+      "price": 950,
+      "value": "/cosmetics/devil-wings-animated.gif"
+    },
+    {
+      "name": "Маска Кицунэ",
+      "type": "DECORATION",
+      "price": 700,
+      "value": "/cosmetics/kitsune-mask.png"
     }
   ]
 }
