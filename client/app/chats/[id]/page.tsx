@@ -8,7 +8,10 @@ import { BuyProductDialog } from "@/components/product/buy-product-dialog";
 import { TeamBadge } from "@/components/ui/team-badge";
 import { getCurrentSessionUser } from "@/lib/access-control";
 import { getAuthSession } from "@/lib/auth";
-import { getConversationMessages, getConversationRoom } from "@/lib/marketplace";
+import {
+  getConversationMessages,
+  getConversationRoom,
+} from "@/lib/domain/chat-service";
 
 interface ChatPageProps {
   params: Promise<{

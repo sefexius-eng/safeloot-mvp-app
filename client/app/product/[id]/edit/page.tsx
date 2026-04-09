@@ -6,7 +6,7 @@ import { getAuthSession } from "@/lib/auth";
 import {
   getProductById,
   listCatalogGamesForProductForms,
-} from "@/lib/marketplace";
+} from "@/lib/domain/products";
 
 interface EditProductPageProps {
   params: Promise<{

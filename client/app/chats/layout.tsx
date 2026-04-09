@@ -3,7 +3,7 @@ import { redirect } from "next/navigation";
 import { ChatLayoutShell } from "@/components/chat-layout-shell";
 import { getCurrentSessionUser } from "@/lib/access-control";
 import { getAuthSession } from "@/lib/auth";
-import { listConversationsByUser } from "@/lib/marketplace";
+import { listConversationsByUser } from "@/lib/domain/chat-service";
 
 interface ChatsLayoutProps {
   children: React.ReactNode;

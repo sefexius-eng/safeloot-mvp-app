@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 
-import { completeOrder, mapMarketplaceErrorToStatusCode } from "@/lib/marketplace";
+import { completeOrder } from "@/lib/domain/orders";
+import { mapMarketplaceErrorToStatusCode } from "@/lib/domain/shared";
 import { requireActiveSessionUserId } from "@/lib/session-user";
 
 export async function POST(

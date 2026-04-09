@@ -5,7 +5,7 @@ import { MockPaymentButton } from "@/components/payment/mock-payment-button";
 import { FormattedPrice } from "@/components/ui/formatted-price";
 import { getCurrentSessionUser } from "@/lib/access-control";
 import { getAuthSession } from "@/lib/auth";
-import { getPendingCheckoutOrder } from "@/lib/marketplace";
+import { getPendingCheckoutOrder } from "@/lib/domain/orders";
 
 interface PaymentMockPageProps {
   searchParams: Promise<{

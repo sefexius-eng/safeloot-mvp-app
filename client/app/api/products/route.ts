@@ -2,10 +2,9 @@ import { revalidatePath } from "next/cache";
 import { NextResponse } from "next/server";
 
 import {
-  createProduct,
-  listProducts,
   mapMarketplaceErrorToStatusCode,
-} from "@/lib/marketplace";
+} from "@/lib/domain/shared";
+import { createProduct, listProducts } from "@/lib/domain/products";
 import { requireActiveSessionUserId } from "@/lib/session-user";
 
 interface CreateProductPayload {

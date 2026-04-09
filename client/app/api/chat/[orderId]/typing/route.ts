@@ -2,9 +2,9 @@ import { NextResponse } from "next/server";
 
 import {
   getChatTyping,
-  mapMarketplaceErrorToStatusCode,
   setChatTyping,
-} from "@/lib/marketplace";
+} from "@/lib/domain/chat-service";
+import { mapMarketplaceErrorToStatusCode } from "@/lib/domain/shared";
 import { requireActiveSessionUserId } from "@/lib/session-user";
 
 export async function GET(

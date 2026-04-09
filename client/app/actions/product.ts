@@ -12,7 +12,7 @@ import {
   toggleAllProductsVisibilityBySeller,
   toggleProductVisibilityBySeller,
   updateProductByActor,
-} from "@/lib/marketplace";
+} from "@/lib/domain/products";
 
 interface ProductActionResult {
   ok: boolean;

@@ -6,7 +6,7 @@ import {
   type MarketplaceProductCardData,
 } from "@/components/product/marketplace-product-card";
 import catalogSeedData from "@/lib/catalog-seed-data.json";
-import { listProducts } from "@/lib/marketplace";
+import { listProducts } from "@/lib/domain/products";
 import { prisma } from "@/lib/prisma";
 
 interface GameDirectoryItem {

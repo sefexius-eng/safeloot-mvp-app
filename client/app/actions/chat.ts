@@ -10,7 +10,7 @@ import {
   getOrCreateConversation as getOrCreateConversationRecord,
   markChatMessagesAsRead,
   markConversationMessagesAsRead as markConversationMessagesAsReadRecord,
-} from "@/lib/marketplace";
+} from "@/lib/domain/chat-service";
 
 async function requireActiveChatUserId() {
   const session = await getAuthSession();

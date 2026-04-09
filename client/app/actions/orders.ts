@@ -17,7 +17,7 @@ import {
   refundOrder as refundOrderBySeller,
   resolveOrderDisputeToBuyer,
   resolveOrderDisputeToSeller,
-} from "@/lib/marketplace";
+} from "@/lib/domain/orders";
 
 interface OrderActionResult {
   ok: boolean;

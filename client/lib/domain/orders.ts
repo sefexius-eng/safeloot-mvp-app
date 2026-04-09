@@ -1,0 +1,1162 @@
+import {
+  OrderStatus,
+  Prisma,
+  TransactionStatus,
+  TransactionType,
+} from "@prisma/client";
+
+import {
+  sendNotificationEmails,
+  type NotificationEmailDeliveryInput,
+} from "@/lib/notification-delivery";
+import { prisma } from "@/lib/prisma";
+import { normalizeCurrencyCode } from "@/lib/currency-config";
+
+import {
+  calculateCommissionBreakdown,
+  ensureOrderAccess,
+  ensureOrderIsNotTerminal,
+  ensureOrderParticipant,
+  ensurePendingCheckoutAccess,
+  ensureSufficientUserBalance,
+  findCompletedEscrowHoldTransaction,
+  formatMoney,
+  getPlatformAdminAccount,
+  normalizeText,
+  roundMoney,
+  ZERO_MONEY,
+} from "@/lib/domain/shared";
+import {
+  createUserNotification,
+  sendBuyerRefundTelegramNotification,
+  sendOrderDisputeOpenedTelegramNotification,
+  sendSellerOrderCompletedTelegramNotification,
+  sendSellerOrderTelegramNotification,
+} from "@/lib/domain/notifications-service";
+
+export async function createOrder(input: {
+  productId?: string;
+  buyerId: string;
+  currency?: string;
+}) {
+  const productId = normalizeText(input.productId);
+  const buyerId = normalizeText(input.buyerId);
+  const orderCurrency = normalizeCurrencyCode(input.currency);
+
+  if (!productId) {
+    throw new Error("productId is required.");
+  }
+
+  if (!buyerId) {
+    throw new Error("buyerId is required.");
+  }
+
+  const emailDeliveryQueue: NotificationEmailDeliveryInput[] = [];
+
+  const result = await prisma.$transaction(
+    async (transactionClient) => {
+      const [buyer, product] = await Promise.all([
+        transactionClient.user.findUnique({
+          where: { id: buyerId },
+          select: {
+            id: true,
+            availableBalance: true,
+          },
+        }),
+        transactionClient.product.findUnique({
+          where: { id: productId },
+          select: {
+            id: true,
+            title: true,
+            price: true,
+            sellerId: true,
+            isActive: true,
+            seller: {
+              select: {
+                telegramId: true,
+              },
+            },
+          },
+        }),
+      ]);
+
+      if (!buyer) {
+        throw new Error(`Buyer with id ${buyerId} was not found.`);
+      }
+
+      if (!product) {
+        throw new Error(`Product with id ${productId} was not found.`);
+      }
+
+      if (!product.isActive) {
+        throw new Error("Товар скрыт продавцом и недоступен для покупки.");
+      }
+
+      if (product.sellerId === buyerId) {
+        throw new Error("Вы не можете купить свой собственный товар");
+      }
+
+      const orderPrice = roundMoney(product.price);
+
+      if (buyer.availableBalance.comparedTo(orderPrice) < 0) {
+        throw new Error("Недостаточно средств");
+      }
+
+      const existingPendingOrder = await transactionClient.order.findFirst({
+        where: {
+          buyerId,
+          productId: product.id,
+          status: OrderStatus.PENDING,
+        },
+        select: {
+          id: true,
+          sellerId: true,
+        },
+        orderBy: {
+          createdAt: "desc",
+        },
+      });
+
+      const debitedBuyer = await transactionClient.user.updateMany({
+        where: {
+          id: buyerId,
+          availableBalance: {
+            gte: orderPrice,
+          },
+        },
+        data: {
+          availableBalance: {
+            decrement: orderPrice,
+          },
+        },
+      });
+
+      if (debitedBuyer.count !== 1) {
+        throw new Error("Недостаточно средств");
+      }
+
+      let orderId = existingPendingOrder?.id;
+
+      if (existingPendingOrder) {
+        const updatedOrder = await transactionClient.order.updateMany({
+          where: {
+            id: existingPendingOrder.id,
+            status: OrderStatus.PENDING,
+          },
+          data: {
+            sellerId: product.sellerId,
+            price: orderPrice,
+            currency: orderCurrency,
+            status: OrderStatus.PAID,
+          },
+        });
+
+        if (updatedOrder.count !== 1) {
+          throw new Error(`Order ${existingPendingOrder.id} could not be funded.`);
+        }
+      } else {
+        const createdOrder = await transactionClient.order.create({
+          data: {
+            buyerId,
+            sellerId: product.sellerId,
+            productId: product.id,
+            price: orderPrice,
+            currency: orderCurrency,
+            status: OrderStatus.PAID,
+          },
+          select: {
+            id: true,
+          },
+        });
+
+        orderId = createdOrder.id;
+      }
+
+      if (!orderId) {
+        throw new Error("Не удалось создать заказ.");
+      }
+
+      const platformAdmin = await getPlatformAdminAccount(transactionClient);
+
+      await transactionClient.user.update({
+        where: {
+          id: platformAdmin.id,
+        },
+        data: {
+          holdBalance: {
+            increment: orderPrice,
+          },
+        },
+      });
+
+      await transactionClient.transaction.create({
+        data: {
+          userId: platformAdmin.id,
+          orderId,
+          amount: orderPrice,
+          type: TransactionType.ESCROW_HOLD,
+          status: TransactionStatus.COMPLETED,
+        },
+      });
+
+      await createUserNotification(
+        transactionClient,
+        {
+          userId: product.sellerId,
+          title: "Новый заказ!",
+          message: "У вас купили товар. Перейдите к сделке.",
+          link: `/orders/${orderId}`,
+        },
+        emailDeliveryQueue,
+      );
+
+      return {
+        orderId,
+        status: OrderStatus.PAID,
+        sellerTelegramId: product.seller.telegramId,
+        productTitle: product.title,
+        orderPrice: formatMoney(orderPrice),
+        orderCurrency,
+      };
+    },
+    {
+      isolationLevel: Prisma.TransactionIsolationLevel.Serializable,
+    },
+  );
+
+  await sendNotificationEmails(emailDeliveryQueue);
+  await sendSellerOrderTelegramNotification({
+    telegramId: result.sellerTelegramId,
+    productTitle: result.productTitle,
+    price: result.orderPrice,
+    currency: result.orderCurrency,
+  });
+
+  return {
+    orderId: result.orderId,
+    status: result.status,
+    hosted_url: `/orders/${result.orderId}`,
+  };
+}
+
+export async function getPendingCheckoutOrder(input: {
+  orderId?: string;
+  buyerId: string;
+}) {
+  const orderId = normalizeText(input.orderId);
+  const buyerId = normalizeText(input.buyerId);
+
+  if (!orderId) {
+    throw new Error("orderId is required.");
+  }
+
+  if (!buyerId) {
+    throw new Error("buyerId is required.");
+  }
+
+  const order = await prisma.order.findUnique({
+    where: {
+      id: orderId,
+    },
+    select: {
+      id: true,
+      buyerId: true,
+      price: true,
+      status: true,
+      product: {
+        select: {
+          id: true,
+          title: true,
+        },
+      },
+    },
+  });
+
+  const checkoutOrder = ensurePendingCheckoutAccess(buyerId, orderId, order);
+
+  return {
+    id: checkoutOrder.id,
+    price: formatMoney(checkoutOrder.price),
+    status: checkoutOrder.status,
+    product: checkoutOrder.product,
+  };
+}
+
+export async function getOrderById(
+  orderId: string,
+  userId: string,
+  role?: string,
+) {
+  const normalizedOrderId = normalizeText(orderId);
+  const normalizedUserId = normalizeText(userId);
+
+  if (!normalizedOrderId) {
+    throw new Error("orderId is required.");
+  }
+
+  if (!normalizedUserId) {
+    throw new Error("userId is required.");
+  }
+
+  const order = await prisma.order.findUnique({
+    where: { id: normalizedOrderId },
+    include: {
+      buyer: {
+        select: {
+          id: true,
+          name: true,
+          image: true,
+          lastSeen: true,
+          role: true,
+        },
+      },
+      seller: {
+        select: {
+          id: true,
+          name: true,
+          image: true,
+          lastSeen: true,
+          role: true,
+        },
+      },
+      review: {
+        select: {
+          id: true,
+          rating: true,
+          comment: true,
+          sellerReply: true,
+          replyCreatedAt: true,
+          createdAt: true,
+          author: {
+            select: {
+              id: true,
+              name: true,
+              image: true,
+            },
+          },
+        },
+      },
+      product: {
+        select: {
+          id: true,
+          title: true,
+        },
+      },
+    },
+  });
+
+  if (!order) {
+    throw new Error(`Order with id ${normalizedOrderId} was not found.`);
+  }
+
+  ensureOrderAccess(normalizedUserId, order, role);
+
+  return {
+    id: order.id,
+    buyerId: order.buyerId,
+    sellerId: order.sellerId,
+    productId: order.productId,
+    price: formatMoney(order.price),
+    currency: order.currency,
+    platformFee: formatMoney(order.platformFee),
+    status: order.status,
+    chatRoomId: null,
+    review: order.review
+      ? {
+          ...order.review,
+          createdAt: order.review.createdAt.toISOString(),
+          replyCreatedAt: order.review.replyCreatedAt?.toISOString() ?? null,
+        }
+      : null,
+    buyer: {
+      ...order.buyer,
+      lastSeen: order.buyer.lastSeen.toISOString(),
+    },
+    seller: {
+      ...order.seller,
+      lastSeen: order.seller.lastSeen.toISOString(),
+    },
+    product: order.product,
+  };
+}
+
+export async function confirmOrder(input: { orderId?: string; buyerId: string }) {
+  const orderId = normalizeText(input.orderId);
+  const buyerId = normalizeText(input.buyerId);
+
+  if (!orderId) {
+    throw new Error("orderId is required.");
+  }
+
+  if (!buyerId) {
+    throw new Error("buyerId is required.");
+  }
+
+  const emailDeliveryQueue: NotificationEmailDeliveryInput[] = [];
+
+  const result = await prisma.$transaction(
+    async (transactionClient) => {
+      const existingOrder = await transactionClient.order.findUnique({
+        where: { id: orderId },
+        select: {
+          id: true,
+          buyerId: true,
+          sellerId: true,
+          price: true,
+          currency: true,
+          status: true,
+          seller: {
+            select: {
+              telegramId: true,
+            },
+          },
+          product: {
+            select: {
+              title: true,
+            },
+          },
+        },
+      });
+
+      const checkoutOrder = ensurePendingCheckoutAccess(
+        buyerId,
+        orderId,
+        existingOrder,
+      );
+      const escrowAmount = roundMoney(checkoutOrder.price);
+
+      const updatedOrder = await transactionClient.order.updateMany({
+        where: {
+          id: orderId,
+          status: OrderStatus.PENDING,
+        },
+        data: {
+          status: OrderStatus.PAID,
+        },
+      });
+
+      if (updatedOrder.count !== 1) {
+        throw new Error(`Order ${orderId} could not be confirmed.`);
+      }
+
+      const platformAdmin = await getPlatformAdminAccount(transactionClient);
+
+      await transactionClient.user.update({
+        where: {
+          id: platformAdmin.id,
+        },
+        data: {
+          holdBalance: {
+            increment: escrowAmount,
+          },
+        },
+      });
+
+      await transactionClient.transaction.create({
+        data: {
+          userId: platformAdmin.id,
+          orderId: checkoutOrder.id,
+          amount: escrowAmount,
+          type: TransactionType.ESCROW_HOLD,
+          status: TransactionStatus.COMPLETED,
+        },
+      });
+
+      await createUserNotification(
+        transactionClient,
+        {
+          userId: checkoutOrder.sellerId,
+          title: "Новый заказ!",
+          message: "У вас купили товар. Перейдите к сделке.",
+          link: `/orders/${checkoutOrder.id}`,
+        },
+        emailDeliveryQueue,
+      );
+
+      return {
+        orderId: checkoutOrder.id,
+        status: OrderStatus.PAID,
+        sellerTelegramId: checkoutOrder.seller.telegramId,
+        productTitle: checkoutOrder.product.title,
+        orderPrice: formatMoney(escrowAmount),
+        orderCurrency: checkoutOrder.currency,
+      };
+    },
+    {
+      isolationLevel: Prisma.TransactionIsolationLevel.Serializable,
+    },
+  );
+
+  await sendNotificationEmails(emailDeliveryQueue);
+  await sendSellerOrderTelegramNotification({
+    telegramId: result.sellerTelegramId,
+    productTitle: result.productTitle,
+    price: result.orderPrice,
+    currency: result.orderCurrency,
+  });
+
+  return {
+    orderId: result.orderId,
+    status: result.status,
+  };
+}
+
+export async function completeOrder(input: { orderId: string; buyerId: string }) {
+  const orderId = normalizeText(input.orderId);
+  const buyerId = normalizeText(input.buyerId);
+
+  if (!orderId) {
+    throw new Error("orderId is required.");
+  }
+
+  if (!buyerId) {
+    throw new Error("buyerId is required.");
+  }
+
+  const result = await prisma.$transaction(
+    async (transactionClient) => {
+      const order = await transactionClient.order.findUnique({
+        where: { id: orderId },
+        select: {
+          id: true,
+          buyerId: true,
+          sellerId: true,
+          price: true,
+          currency: true,
+          status: true,
+          seller: {
+            select: {
+              telegramId: true,
+            },
+          },
+          product: {
+            select: {
+              title: true,
+            },
+          },
+        },
+      });
+
+      if (!order) {
+        throw new Error(`Order with id ${orderId} was not found.`);
+      }
+
+      if (order.buyerId !== buyerId) {
+        throw new Error("Only the buyer can complete this order.");
+      }
+
+      ensureOrderIsNotTerminal(order.id, order.status, "completed");
+
+      if (
+        order.status !== OrderStatus.PAID &&
+        order.status !== OrderStatus.DISPUTED
+      ) {
+        throw new Error(
+          `Order ${orderId} cannot be completed from status ${order.status}.`,
+        );
+      }
+
+      const orderAmount = roundMoney(order.price);
+      const { fee, sellerPayout, feeAsNumber } = calculateCommissionBreakdown(
+        orderAmount,
+      );
+      const platformAdmin = await getPlatformAdminAccount(transactionClient);
+      const escrowHoldTransaction = await findCompletedEscrowHoldTransaction(
+        transactionClient,
+        {
+          orderId: order.id,
+          adminUserId: platformAdmin.id,
+        },
+      );
+
+      const updatedOrder = await transactionClient.order.updateMany({
+        where: {
+          id: order.id,
+          status: {
+            in: [OrderStatus.PAID, OrderStatus.DISPUTED],
+          },
+        },
+        data: {
+          status: OrderStatus.COMPLETED,
+          platformFee: fee,
+          commission: feeAsNumber,
+        },
+      });
+
+      if (updatedOrder.count !== 1) {
+        throw new Error(`Order ${orderId} could not be completed.`);
+      }
+
+      if (escrowHoldTransaction) {
+        await ensureSufficientUserBalance(transactionClient, {
+          userId: platformAdmin.id,
+          balanceField: "holdBalance",
+          requiredAmount: orderAmount,
+          errorMessage: "Недостаточно средств в escrow-холде платформы для завершения заказа.",
+        });
+
+        await transactionClient.user.update({
+          where: {
+            id: platformAdmin.id,
+          },
+          data: {
+            holdBalance: {
+              decrement: orderAmount,
+            },
+            platformRevenue: {
+              increment: feeAsNumber,
+            },
+          },
+        });
+      } else {
+        await transactionClient.user.update({
+          where: {
+            id: platformAdmin.id,
+          },
+          data: {
+            platformRevenue: {
+              increment: feeAsNumber,
+            },
+          },
+        });
+      }
+
+      await transactionClient.user.update({
+        where: {
+          id: order.sellerId,
+        },
+        data: {
+          availableBalance: {
+            increment: sellerPayout,
+          },
+        },
+      });
+
+      const transaction = await transactionClient.transaction.create({
+        data: {
+          userId: order.sellerId,
+          orderId: order.id,
+          amount: sellerPayout,
+          type: TransactionType.ESCROW_RELEASE,
+          status: TransactionStatus.COMPLETED,
+        },
+        select: {
+          id: true,
+        },
+      });
+
+      return {
+        orderId: order.id,
+        transactionId: transaction.id,
+        status: OrderStatus.COMPLETED,
+        platformFee: formatMoney(fee),
+        sellerNetAmount: formatMoney(sellerPayout),
+        sellerTelegramId: order.seller.telegramId,
+        productTitle: order.product.title,
+        orderCurrency: order.currency,
+      };
+    },
+    {
+      isolationLevel: Prisma.TransactionIsolationLevel.Serializable,
+    },
+  );
+
+  await sendSellerOrderCompletedTelegramNotification({
+    telegramId: result.sellerTelegramId,
+    productTitle: result.productTitle,
+    sellerNetAmount: result.sellerNetAmount,
+    currency: result.orderCurrency,
+  });
+
+  return {
+    orderId: result.orderId,
+    transactionId: result.transactionId,
+    status: result.status,
+    platformFee: result.platformFee,
+    sellerNetAmount: result.sellerNetAmount,
+  };
+}
+
+export async function refundOrder(input: { orderId: string; sellerId: string }) {
+  const orderId = normalizeText(input.orderId);
+  const sellerId = normalizeText(input.sellerId);
+
+  if (!orderId) {
+    throw new Error("orderId is required.");
+  }
+
+  if (!sellerId) {
+    throw new Error("sellerId is required.");
+  }
+
+  const emailDeliveryQueue: NotificationEmailDeliveryInput[] = [];
+
+  const result = await prisma.$transaction(
+    async (transactionClient) => {
+      const order = await transactionClient.order.findUnique({
+        where: { id: orderId },
+        select: {
+          id: true,
+          buyerId: true,
+          sellerId: true,
+          price: true,
+          currency: true,
+          status: true,
+          buyer: {
+            select: {
+              telegramId: true,
+            },
+          },
+          product: {
+            select: {
+              title: true,
+            },
+          },
+        },
+      });
+
+      if (!order) {
+        throw new Error(`Order with id ${orderId} was not found.`);
+      }
+
+      if (order.sellerId !== sellerId) {
+        throw new Error("Only the seller can refund this order.");
+      }
+
+      ensureOrderIsNotTerminal(order.id, order.status, "refunded");
+
+      if (
+        order.status !== OrderStatus.PAID &&
+        order.status !== OrderStatus.DISPUTED
+      ) {
+        throw new Error(
+          `Order ${orderId} cannot be refunded from status ${order.status}.`,
+        );
+      }
+
+      const refundAmount = roundMoney(order.price);
+      const platformAdmin = await getPlatformAdminAccount(transactionClient);
+      const escrowHoldTransaction = await findCompletedEscrowHoldTransaction(
+        transactionClient,
+        {
+          orderId: order.id,
+          adminUserId: platformAdmin.id,
+        },
+      );
+
+      const updatedOrder = await transactionClient.order.updateMany({
+        where: {
+          id: order.id,
+          status: {
+            in: [OrderStatus.PAID, OrderStatus.DISPUTED],
+          },
+        },
+        data: {
+          status: OrderStatus.REFUNDED,
+          platformFee: ZERO_MONEY,
+          commission: 0,
+        },
+      });
+
+      if (updatedOrder.count !== 1) {
+        throw new Error(`Order ${orderId} could not be refunded.`);
+      }
+
+      if (escrowHoldTransaction) {
+        await ensureSufficientUserBalance(transactionClient, {
+          userId: platformAdmin.id,
+          balanceField: "holdBalance",
+          requiredAmount: refundAmount,
+          errorMessage: "Недостаточно средств в escrow-холде платформы для возврата средств.",
+        });
+
+        await transactionClient.user.update({
+          where: {
+            id: platformAdmin.id,
+          },
+          data: {
+            holdBalance: {
+              decrement: refundAmount,
+            },
+          },
+        });
+      }
+
+      await transactionClient.user.update({
+        where: {
+          id: order.buyerId,
+        },
+        data: {
+          availableBalance: {
+            increment: refundAmount,
+          },
+        },
+      });
+
+      await createUserNotification(
+        transactionClient,
+        {
+          userId: order.buyerId,
+          title: "Возврат по сделке",
+          message: "Продавец оформил возврат средств по заказу.",
+          link: `/orders/${order.id}`,
+        },
+        emailDeliveryQueue,
+      );
+
+      return {
+        orderId: order.id,
+        status: OrderStatus.REFUNDED,
+        refundAmount: formatMoney(refundAmount),
+        buyerTelegramId: order.buyer.telegramId,
+        productTitle: order.product.title,
+        orderCurrency: order.currency,
+      };
+    },
+    {
+      isolationLevel: Prisma.TransactionIsolationLevel.Serializable,
+    },
+  );
+
+  await sendNotificationEmails(emailDeliveryQueue);
+
+  await sendBuyerRefundTelegramNotification({
+    telegramId: result.buyerTelegramId,
+    productTitle: result.productTitle,
+    refundAmount: result.refundAmount,
+    currency: result.orderCurrency,
+  });
+
+  return {
+    orderId: result.orderId,
+    status: result.status,
+    refundAmount: result.refundAmount,
+  };
+}
+
+export async function openOrderDispute(input: {
+  orderId: string;
+  userId: string;
+}) {
+  const orderId = normalizeText(input.orderId);
+  const userId = normalizeText(input.userId);
+
+  if (!orderId) {
+    throw new Error("orderId is required.");
+  }
+
+  if (!userId) {
+    throw new Error("userId is required.");
+  }
+
+  const result = await prisma.$transaction(
+    async (transactionClient) => {
+      const order = await transactionClient.order.findUnique({
+        where: { id: orderId },
+        select: {
+          id: true,
+          buyerId: true,
+          sellerId: true,
+          status: true,
+          buyer: {
+            select: {
+              telegramId: true,
+            },
+          },
+          seller: {
+            select: {
+              telegramId: true,
+            },
+          },
+          product: {
+            select: {
+              title: true,
+            },
+          },
+        },
+      });
+
+      if (!order) {
+        throw new Error(`Order with id ${orderId} was not found.`);
+      }
+
+      ensureOrderParticipant(userId, order);
+
+      if (
+        order.status !== OrderStatus.PAID &&
+        order.status !== OrderStatus.DELIVERED
+      ) {
+        throw new Error(
+          `Order ${orderId} cannot be disputed from status ${order.status}.`,
+        );
+      }
+
+      const updatedOrder = await transactionClient.order.updateMany({
+        where: {
+          id: order.id,
+          status: {
+            in: [OrderStatus.PAID, OrderStatus.DELIVERED],
+          },
+        },
+        data: {
+          status: OrderStatus.DISPUTED,
+        },
+      });
+
+      if (updatedOrder.count !== 1) {
+        throw new Error(`Order ${orderId} could not be disputed.`);
+      }
+
+      const disputeOpenedBy = order.buyerId === userId ? "buyer" : "seller";
+
+      return {
+        orderId: order.id,
+        status: OrderStatus.DISPUTED,
+        recipientTelegramId:
+          disputeOpenedBy === "buyer"
+            ? order.seller.telegramId
+            : order.buyer.telegramId,
+        productTitle: order.product.title,
+        openedBy: disputeOpenedBy,
+      };
+    },
+    {
+      isolationLevel: Prisma.TransactionIsolationLevel.Serializable,
+    },
+  );
+
+  await sendOrderDisputeOpenedTelegramNotification({
+    telegramId: result.recipientTelegramId,
+    productTitle: result.productTitle,
+    openedBy: result.openedBy as "buyer" | "seller",
+  });
+
+  return {
+    orderId: result.orderId,
+    status: result.status,
+  };
+}
+
+export async function resolveOrderDisputeToBuyer(input: { orderId: string }) {
+  const orderId = normalizeText(input.orderId);
+
+  if (!orderId) {
+    throw new Error("orderId is required.");
+  }
+
+  return prisma.$transaction(
+    async (transactionClient) => {
+      const order = await transactionClient.order.findUnique({
+        where: { id: orderId },
+        select: {
+          id: true,
+          buyerId: true,
+          price: true,
+          status: true,
+        },
+      });
+
+      if (!order) {
+        throw new Error(`Order with id ${orderId} was not found.`);
+      }
+
+      if (order.status !== OrderStatus.DISPUTED) {
+        throw new Error(
+          `Order ${orderId} cannot be resolved from status ${order.status}.`,
+        );
+      }
+
+      const refundAmount = roundMoney(order.price);
+      const platformAdmin = await getPlatformAdminAccount(transactionClient);
+      const escrowHoldTransaction = await findCompletedEscrowHoldTransaction(
+        transactionClient,
+        {
+          orderId: order.id,
+          adminUserId: platformAdmin.id,
+        },
+      );
+
+      const updatedOrder = await transactionClient.order.updateMany({
+        where: {
+          id: order.id,
+          status: OrderStatus.DISPUTED,
+        },
+        data: {
+          status: OrderStatus.REFUNDED,
+          platformFee: ZERO_MONEY,
+          commission: 0,
+        },
+      });
+
+      if (updatedOrder.count !== 1) {
+        throw new Error(`Order ${orderId} could not be resolved to buyer.`);
+      }
+
+      if (escrowHoldTransaction) {
+        await ensureSufficientUserBalance(transactionClient, {
+          userId: platformAdmin.id,
+          balanceField: "holdBalance",
+          requiredAmount: refundAmount,
+          errorMessage: "Недостаточно средств в escrow-холде платформы для возврата средств.",
+        });
+
+        await transactionClient.user.update({
+          where: {
+            id: platformAdmin.id,
+          },
+          data: {
+            holdBalance: {
+              decrement: refundAmount,
+            },
+          },
+        });
+      }
+
+      await transactionClient.user.update({
+        where: {
+          id: order.buyerId,
+        },
+        data: {
+          availableBalance: {
+            increment: refundAmount,
+          },
+        },
+      });
+
+      return {
+        orderId: order.id,
+        status: OrderStatus.REFUNDED,
+        refundAmount: formatMoney(refundAmount),
+      };
+    },
+    {
+      isolationLevel: Prisma.TransactionIsolationLevel.Serializable,
+    },
+  );
+}
+
+export async function resolveOrderDisputeToSeller(input: { orderId: string }) {
+  const orderId = normalizeText(input.orderId);
+
+  if (!orderId) {
+    throw new Error("orderId is required.");
+  }
+
+  return prisma.$transaction(
+    async (transactionClient) => {
+      const order = await transactionClient.order.findUnique({
+        where: { id: orderId },
+        select: {
+          id: true,
+          sellerId: true,
+          price: true,
+          status: true,
+        },
+      });
+
+      if (!order) {
+        throw new Error(`Order with id ${orderId} was not found.`);
+      }
+
+      if (order.status !== OrderStatus.DISPUTED) {
+        throw new Error(
+          `Order ${orderId} cannot be resolved from status ${order.status}.`,
+        );
+      }
+
+      const orderAmount = roundMoney(order.price);
+      const { fee, sellerPayout, feeAsNumber } = calculateCommissionBreakdown(
+        orderAmount,
+      );
+      const platformAdmin = await getPlatformAdminAccount(transactionClient);
+      const escrowHoldTransaction = await findCompletedEscrowHoldTransaction(
+        transactionClient,
+        {
+          orderId: order.id,
+          adminUserId: platformAdmin.id,
+        },
+      );
+
+      const updatedOrder = await transactionClient.order.updateMany({
+        where: {
+          id: order.id,
+          status: OrderStatus.DISPUTED,
+        },
+        data: {
+          status: OrderStatus.COMPLETED,
+          platformFee: fee,
+          commission: feeAsNumber,
+        },
+      });
+
+      if (updatedOrder.count !== 1) {
+        throw new Error(`Order ${orderId} could not be resolved to seller.`);
+      }
+
+      if (escrowHoldTransaction) {
+        await ensureSufficientUserBalance(transactionClient, {
+          userId: platformAdmin.id,
+          balanceField: "holdBalance",
+          requiredAmount: orderAmount,
+          errorMessage: "Недостаточно средств в escrow-холде платформы для завершения заказа.",
+        });
+
+        await transactionClient.user.update({
+          where: {
+            id: platformAdmin.id,
+          },
+          data: {
+            holdBalance: {
+              decrement: orderAmount,
+            },
+            platformRevenue: {
+              increment: feeAsNumber,
+            },
+          },
+        });
+      } else {
+        await transactionClient.user.update({
+          where: {
+            id: platformAdmin.id,
+          },
+          data: {
+            platformRevenue: {
+              increment: feeAsNumber,
+            },
+          },
+        });
+      }
+
+      await transactionClient.user.update({
+        where: {
+          id: order.sellerId,
+        },
+        data: {
+          availableBalance: {
+            increment: sellerPayout,
+          },
+        },
+      });
+
+      await transactionClient.transaction.create({
+        data: {
+          userId: order.sellerId,
+          orderId: order.id,
+          amount: sellerPayout,
+          type: TransactionType.ESCROW_RELEASE,
+          status: TransactionStatus.COMPLETED,
+        },
+      });
+
+      return {
+        orderId: order.id,
+        status: OrderStatus.COMPLETED,
+        platformFee: formatMoney(fee),
+        sellerNetAmount: formatMoney(sellerPayout),
+      };
+    },
+    {
+      isolationLevel: Prisma.TransactionIsolationLevel.Serializable,
+    },
+  );
+}

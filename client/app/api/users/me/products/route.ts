@@ -1,9 +1,9 @@
 import { NextResponse } from "next/server";
 
 import {
-  listProductsBySeller,
   mapMarketplaceErrorToStatusCode,
-} from "@/lib/marketplace";
+} from "@/lib/domain/shared";
+import { listProductsBySeller } from "@/lib/domain/products";
 import { requireSessionUserId } from "@/lib/session-user";
 
 export async function GET() {

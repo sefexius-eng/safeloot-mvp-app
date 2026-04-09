@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 
-import { getUserById, mapMarketplaceErrorToStatusCode } from "@/lib/marketplace";
+import { mapMarketplaceErrorToStatusCode } from "@/lib/domain/shared";
+import { getUserById } from "@/lib/domain/users";
 import { requireSessionUserId } from "@/lib/session-user";
 
 export async function GET() {

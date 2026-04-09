@@ -3,8 +3,8 @@ import { NextResponse } from "next/server";
 import {
   createChatMessage,
   getChatMessages,
-  mapMarketplaceErrorToStatusCode,
-} from "@/lib/marketplace";
+} from "@/lib/domain/chat-service";
+import { mapMarketplaceErrorToStatusCode } from "@/lib/domain/shared";
 import { requireActiveSessionUserId } from "@/lib/session-user";
 
 export async function GET(

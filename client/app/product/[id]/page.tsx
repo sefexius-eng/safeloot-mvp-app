@@ -10,7 +10,7 @@ import { FormattedPrice } from "@/components/ui/formatted-price";
 import { getCurrentSessionUser } from "@/lib/access-control";
 import { getAuthSession } from "@/lib/auth";
 import { formatCurrency } from "@/lib/formatters";
-import { getProductById } from "@/lib/marketplace";
+import { getProductById } from "@/lib/domain/products";
 import { prisma } from "@/lib/prisma";
 import type { SellerReviewSummary } from "@/lib/review-summary";
 

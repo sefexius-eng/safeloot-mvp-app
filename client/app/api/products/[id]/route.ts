@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 
-import { getProductById, mapMarketplaceErrorToStatusCode } from "@/lib/marketplace";
+import { getProductById } from "@/lib/domain/products";
+import { mapMarketplaceErrorToStatusCode } from "@/lib/domain/shared";
 
 export async function GET(
   _request: Request,

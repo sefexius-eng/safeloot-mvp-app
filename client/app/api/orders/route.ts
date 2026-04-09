@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 
-import { createOrder, mapMarketplaceErrorToStatusCode } from "@/lib/marketplace";
+import { createOrder } from "@/lib/domain/orders";
+import { mapMarketplaceErrorToStatusCode } from "@/lib/domain/shared";
 import { requireActiveSessionUserId } from "@/lib/session-user";
 
 interface CreateOrderPayload {
