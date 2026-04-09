@@ -1,4 +1,3 @@
-import { OrderStatus } from "@prisma/client";
 import Link from "next/link";
 
 import { ProfilePageClient } from "@/app/profile/profile-page-client";
@@ -15,7 +14,6 @@ import {
   type ProfileTabsReview,
 } from "@/components/profile-tabs";
 import { getAuthSession } from "@/lib/auth";
-import { formatStoredOrderAmount } from "@/lib/currency-config";
 import { formatCurrency } from "@/lib/formatters";
 import { mergeProfileBadgeIds } from "@/lib/profile-badges";
 import { prisma } from "@/lib/prisma";
@@ -24,107 +22,11 @@ import { mapWithdrawalListItem } from "@/lib/withdrawals";
 
 export const dynamic = "force-dynamic";
 
-const ACTIVE_SELLER_ORDER_STATUSES: OrderStatus[] = [
-  OrderStatus.PAID,
-  OrderStatus.DISPUTED,
-];
-const ACTIVE_BUYER_ORDER_STATUSES: OrderStatus[] = [
-  OrderStatus.PAID,
-  OrderStatus.DELIVERED,
-  OrderStatus.DISPUTED,
-];
-
-function getOrderStatusLabel(status: string) {
-  switch (status) {
-    case "PENDING":
-      return "Ожидает оплаты";
-    case "PAID":
-      return "Оплачен";
-    case "DELIVERED":
-      return "Передан";
-    case "COMPLETED":
-      return "Завершен";
-    case "DISPUTED":
-      return "Спор";
-    case "REFUNDED":
-      return "Возврат покупателю";
-    case "CANCELLED":
-      return "Отменен";
-    default:
-      return status;
-  }
-}
-
-function getOrderStatusClassName(status: string) {
-  switch (status) {
-    case "PAID":
-      return "border-sky-500/20 bg-sky-500/10 text-sky-200";
-    case "COMPLETED":
-      return "border-emerald-500/20 bg-emerald-500/10 text-emerald-200";
-    case "DISPUTED":
-      return "border-red-500/20 bg-red-500/10 text-red-200";
-    case "REFUNDED":
-      return "border-amber-500/20 bg-amber-500/10 text-amber-200";
-    case "CANCELLED":
-      return "border-zinc-500/20 bg-zinc-500/10 text-zinc-300";
-    default:
-      return "border-amber-500/20 bg-amber-500/10 text-amber-200";
-  }
-}
-
-function getUserDisplayName(input: {
-  name?: string | null;
-  email?: string | null;
-  id?: string | null;
-}) {
-  return (
-    input.name?.trim() ||
-    input.email?.split("@")[0] ||
-    input.id?.trim() ||
-    "Пользователь"
-  );
-}
-
 export default async function ProfilePage() {
   const session = await getAuthSession();
   const sellerId = session?.user?.id?.trim() ?? "";
   const profileData = sellerId
     ? await Promise.all([
-        prisma.order.findMany({
-          where: {
-            sellerId,
-            status: {
-              in: ACTIVE_SELLER_ORDER_STATUSES,
-            },
-          },
-          include: {
-            product: true,
-          },
-          orderBy: {
-            createdAt: "desc",
-          },
-        }),
-        prisma.order.findMany({
-          where: {
-            buyerId: sellerId,
-            status: {
-              in: ACTIVE_BUYER_ORDER_STATUSES,
-            },
-          },
-          include: {
-            product: true,
-            seller: {
-              select: {
-                id: true,
-                name: true,
-                email: true,
-              },
-            },
-          },
-          orderBy: {
-            createdAt: "desc",
-          },
-        }),
         prisma.user.findUnique({
           where: {
             id: sellerId,
@@ -224,11 +126,9 @@ export default async function ProfilePage() {
       ])
     : null;
 
-  const sales = profileData?.[0] ?? [];
-  const purchases = profileData?.[1] ?? [];
-  const sellerProfile = profileData?.[2] ?? null;
-  const withdrawals = profileData?.[3] ?? [];
-  const automaticBadgeData = profileData?.[4] ?? null;
+  const sellerProfile = profileData?.[0] ?? null;
+  const withdrawals = profileData?.[1] ?? [];
+  const automaticBadgeData = profileData?.[2] ?? null;
   const sellerDisplayName =
     sellerProfile?.name?.trim() ||
     session?.user?.name?.trim() ||
@@ -335,6 +235,12 @@ export default async function ProfilePage() {
               </Link>
             ) : null}
             <Link
+              href="/orders"
+              className="inline-flex h-11 items-center justify-center rounded-2xl border border-[#00C853]/25 bg-[#00C853]/10 px-5 text-sm font-semibold text-[#c8ffd9] transition hover:-translate-y-0.5 hover:bg-[#00C853]/16"
+            >
+              Мои заказы
+            </Link>
+            <Link
               href="/shop"
               className="inline-flex h-11 items-center justify-center rounded-2xl border border-sky-400/20 bg-sky-500/10 px-5 text-sm font-semibold text-sky-100 transition hover:-translate-y-0.5 hover:bg-sky-500/20"
             >
@@ -374,146 +280,6 @@ export default async function ProfilePage() {
           currentUserRole={(session?.user?.role ?? currentProfileRole) ?? null}
         />
       ) : null}
-
-      <section className="rounded-[2rem] border border-white/10 bg-zinc-900/80 p-6 shadow-[0_24px_80px_rgba(0,0,0,0.28)] backdrop-blur md:p-8">
-        <div className="flex flex-col gap-3 border-b border-white/10 pb-5 md:flex-row md:items-end md:justify-between">
-          <div>
-            <p className="text-sm font-semibold tracking-[0.24em] uppercase text-zinc-500">
-              Buyer Activity
-            </p>
-            <h2 className="mt-2 text-2xl font-semibold tracking-tight text-white md:text-3xl">
-              Мои покупки (Активные заказы)
-            </h2>
-          </div>
-
-          {session?.user?.email ? (
-            <div className="text-sm text-zinc-400">
-              Аккаунт покупателя: <span className="font-medium text-zinc-200">{session.user.email}</span>
-            </div>
-          ) : null}
-        </div>
-
-        {!sellerId ? (
-          <div className="mt-6 rounded-[1.5rem] border border-white/10 bg-white/5 p-6 text-sm leading-7 text-zinc-400">
-            После входа здесь появятся ваши активные заказы на покупку и ссылка на чат по каждой сделке.
-          </div>
-        ) : purchases.length === 0 ? (
-          <div className="mt-6 rounded-[1.5rem] border border-white/10 bg-white/5 p-6 text-sm leading-7 text-zinc-400">
-            У вас пока нет активных заказов на покупку.
-          </div>
-        ) : (
-          <div className="mt-6 space-y-4">
-            {purchases.map((order) => (
-              <article
-                key={order.id}
-                className="flex flex-col gap-4 rounded-[1.5rem] border border-white/10 bg-white/5 p-5 shadow-[0_12px_30px_rgba(0,0,0,0.18)] md:flex-row md:items-center md:justify-between"
-              >
-                <div className="min-w-0 flex-1 space-y-3">
-                  <div className="flex flex-wrap items-center gap-3">
-                    <span
-                      className={`inline-flex rounded-full border px-3 py-1.5 text-xs font-semibold ${getOrderStatusClassName(order.status)}`}
-                    >
-                      {getOrderStatusLabel(order.status)}
-                    </span>
-                    <span className="text-sm text-zinc-500">Заказ #{order.id}</span>
-                  </div>
-
-                  <div>
-                    <p className="text-lg font-semibold text-white">
-                      {order.product.title}
-                    </p>
-                    <p className="mt-1 text-sm leading-7 text-zinc-400">
-                      Продавец: <span className="text-zinc-300">{getUserDisplayName(order.seller)}</span>
-                    </p>
-                  </div>
-                </div>
-
-                <div className="flex flex-col items-start gap-3 md:items-end">
-                  <div className="text-sm text-zinc-400">
-                    Сумма заказа: <span className="font-semibold text-white">{formatStoredOrderAmount(order.price.toString(), order.currency)}</span>
-                  </div>
-                  <Link
-                    href={`/order/${order.id}`}
-                    className="inline-flex h-11 items-center justify-center rounded-2xl bg-sky-600 px-5 text-sm font-semibold text-white shadow-[0_16px_40px_rgba(2,132,199,0.28)] transition hover:-translate-y-0.5 hover:bg-sky-500"
-                  >
-                    Открыть чат сделки
-                  </Link>
-                </div>
-              </article>
-            ))}
-          </div>
-        )}
-      </section>
-
-      <section className="rounded-[2rem] border border-white/10 bg-zinc-900/80 p-6 shadow-[0_24px_80px_rgba(0,0,0,0.28)] backdrop-blur md:p-8">
-        <div className="flex flex-col gap-3 border-b border-white/10 pb-5 md:flex-row md:items-end md:justify-between">
-          <div>
-            <p className="text-sm font-semibold tracking-[0.24em] uppercase text-zinc-500">
-              Seller Activity
-            </p>
-            <h2 className="mt-2 text-2xl font-semibold tracking-tight text-white md:text-3xl">
-              Мои продажи (Активные сделки)
-            </h2>
-          </div>
-
-          {session?.user?.email ? (
-            <div className="text-sm text-zinc-400">
-              Аккаунт продавца: <span className="font-medium text-zinc-200">{session.user.email}</span>
-            </div>
-          ) : null}
-        </div>
-
-        {!sellerId ? (
-          <div className="mt-6 rounded-[1.5rem] border border-white/10 bg-white/5 p-6 text-sm leading-7 text-zinc-400">
-            После входа здесь появятся заказы покупателей и ссылка на чат по каждой сделке.
-          </div>
-        ) : sales.length === 0 ? (
-          <div className="mt-6 rounded-[1.5rem] border border-white/10 bg-white/5 p-6 text-sm leading-7 text-zinc-400">
-            У вас пока нет активных сделок. Здесь показываются только заказы со статусами PAID и DISPUTED.
-          </div>
-        ) : (
-          <div className="mt-6 space-y-4">
-            {sales.map((order) => (
-              <article
-                key={order.id}
-                className="flex flex-col gap-4 rounded-[1.5rem] border border-white/10 bg-white/5 p-5 shadow-[0_12px_30px_rgba(0,0,0,0.18)] md:flex-row md:items-center md:justify-between"
-              >
-                <div className="min-w-0 flex-1 space-y-3">
-                  <div className="flex flex-wrap items-center gap-3">
-                    <span
-                      className={`inline-flex rounded-full border px-3 py-1.5 text-xs font-semibold ${getOrderStatusClassName(order.status)}`}
-                    >
-                      {getOrderStatusLabel(order.status)}
-                    </span>
-                    <span className="text-sm text-zinc-500">Заказ #{order.id}</span>
-                  </div>
-
-                  <div>
-                    <p className="text-lg font-semibold text-white">
-                      {order.product.title}
-                    </p>
-                    <p className="mt-1 text-sm leading-7 text-zinc-400">
-                      Покупатель: <span className="text-zinc-300">{order.buyerId}</span>
-                    </p>
-                  </div>
-                </div>
-
-                <div className="flex flex-col items-start gap-3 md:items-end">
-                  <div className="text-sm text-zinc-400">
-                    Сумма сделки: <span className="font-semibold text-white">{formatStoredOrderAmount(order.price.toString(), order.currency)}</span>
-                  </div>
-                  <Link
-                    href={`/order/${order.id}`}
-                    className="inline-flex h-11 items-center justify-center rounded-2xl bg-sky-600 px-5 text-sm font-semibold text-white shadow-[0_16px_40px_rgba(2,132,199,0.28)] transition hover:-translate-y-0.5 hover:bg-sky-500"
-                  >
-                    Открыть чат сделки
-                  </Link>
-                </div>
-              </article>
-            ))}
-          </div>
-        )}
-      </section>
     </main>
   );
 }

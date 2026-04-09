@@ -66,6 +66,7 @@ async function requireAdminOrderUser() {
 function revalidateOrderPaths(orderId: string) {
   revalidatePath(`/order/${orderId}`);
   revalidatePath(`/orders/${orderId}`);
+  revalidatePath("/orders");
   revalidatePath("/admin");
   revalidatePath("/profile");
 }
@@ -99,9 +100,12 @@ export async function createPendingOrder(
 
 export async function processPayment(
   orderId: string,
-  _previousState: ProcessPaymentState,
-  _formData: FormData,
+  previousState: ProcessPaymentState,
+  formData: FormData,
 ): Promise<ProcessPaymentState> {
+  void previousState;
+  void formData;
+
   let result:
     | {
         orderId: string;

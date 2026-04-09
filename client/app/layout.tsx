@@ -21,7 +21,6 @@ const yandexSiteVerification =
 const EMAIL_VERIFICATION_ADMIN_EMAIL = "sefexius@gmail.com";
 const APP_NAME = "SafeLoot Market";
 const APP_SHORT_NAME = "SafeLoot";
-const PWA_BACKGROUND_COLOR = "#0B0E14";
 const PWA_THEME_COLOR = "#00C853";
 
 const geistSans = Geist({
@@ -42,25 +41,9 @@ export const metadata: Metadata = {
   description:
     "Маркетплейс цифровых товаров. Безопасные сделки, Escrow система, защита покупателей и продавцов 24/7.",
   icons: {
-    icon: [
-      {
-        url: "/icon-192x192.png",
-        sizes: "192x192",
-        type: "image/png",
-      },
-      {
-        url: "/icon-512x512.png",
-        sizes: "512x512",
-        type: "image/png",
-      },
-    ],
-    apple: [
-      {
-        url: "/icon-192x192.png",
-        sizes: "192x192",
-        type: "image/png",
-      },
-    ],
+    icon: "/favicon.ico",
+    shortcut: "/favicon.ico",
+    apple: "/apple-icon.png",
   },
   appleWebApp: {
     capable: true,
