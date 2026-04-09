@@ -110,7 +110,7 @@ export default async function OrdersPage() {
     );
 
   return (
-    <main className="mx-auto flex w-full max-w-7xl flex-col gap-8 px-4 py-10 sm:px-6 lg:px-8 lg:py-14">
+    <main className="mx-auto flex w-full max-w-7xl flex-col gap-8 bg-slate-50 px-4 py-10 sm:px-6 lg:px-8 lg:py-14">
       <OrdersHubClient
         purchases={purchases}
         sales={sales}

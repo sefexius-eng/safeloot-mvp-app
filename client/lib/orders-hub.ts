@@ -89,21 +89,21 @@ export function getOrdersHubStatusLabel(status: OrdersHubStatus) {
 export function getOrdersHubStatusClassName(status: OrdersHubStatus) {
   switch (status) {
     case "PENDING":
-      return "border-amber-500/20 bg-amber-500/10 text-amber-200";
+      return "border-amber-300 bg-amber-50 text-amber-900";
     case "PAID":
-      return "border-sky-500/20 bg-sky-500/10 text-sky-200";
+      return "border-sky-300 bg-sky-50 text-sky-900";
     case "DELIVERED":
-      return "border-indigo-500/20 bg-indigo-500/10 text-indigo-200";
+      return "border-indigo-300 bg-indigo-50 text-indigo-900";
     case "COMPLETED":
-      return "border-emerald-500/20 bg-emerald-500/10 text-emerald-200";
+      return "border-emerald-300 bg-emerald-50 text-emerald-900";
     case "DISPUTED":
-      return "border-red-500/20 bg-red-500/10 text-red-200";
+      return "border-red-300 bg-red-50 text-red-900";
     case "REFUNDED":
-      return "border-yellow-500/20 bg-yellow-500/10 text-yellow-200";
+      return "border-yellow-300 bg-yellow-50 text-yellow-900";
     case "CANCELLED":
-      return "border-zinc-500/20 bg-zinc-500/10 text-zinc-300";
+      return "border-slate-300 bg-slate-100 text-slate-700";
     default:
-      return "border-white/10 bg-white/5 text-zinc-200";
+      return "border-slate-300 bg-slate-100 text-slate-900";
   }
 }
 
