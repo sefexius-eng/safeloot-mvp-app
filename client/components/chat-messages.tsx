@@ -310,7 +310,12 @@ export function ChatMessages({
 
     if (
       openGameMessageId &&
-      !activeGameMessages.some((message) => message.id === openGameMessageId)
+      !messages.some(
+        (message) =>
+          message.id === openGameMessageId &&
+          message.type === "GAME_INVITE" &&
+          message.gameMetadata?.status !== "pending",
+      )
     ) {
       setOpenGameMessageId(null);
     }
@@ -813,13 +818,18 @@ export function ChatMessages({
         (message) =>
           message.id === openGameMessageId &&
           message.type === "GAME_INVITE" &&
-          message.gameMetadata?.status === "active",
+          message.gameMetadata?.status !== "pending",
       ) ?? null
     : null;
-  const openGameHostName = openGameMessage
+  const openGameInitiatorName = openGameMessage
     ? openGameMessage.senderId === currentUserId
       ? "Вы"
       : getConversationUserLabel(openGameMessage.sender.name)
+    : "";
+  const openGameGuesserName = openGameMessage
+    ? openGameMessage.senderId === currentUserId
+      ? "Собеседник"
+      : "Вы"
     : "";
 
   return (
@@ -1006,9 +1016,15 @@ export function ChatMessages({
 
       {openGameMessage?.gameMetadata ? (
         <MiniGameContainer
+          conversationId={conversationId}
+          messageId={openGameMessage.id}
           game={openGameMessage.gameMetadata.game}
+          status={openGameMessage.gameMetadata.status}
           sessionId={openGameMessage.gameMetadata.sessionId ?? openGameMessage.id}
-          hostName={openGameHostName}
+          initiatorId={openGameMessage.gameMetadata.initiatorId}
+          initiatorName={openGameInitiatorName}
+          guesserName={openGameGuesserName}
+          currentUserId={currentUserId}
           onClose={() => setOpenGameMessageId(null)}
         />
       ) : null}

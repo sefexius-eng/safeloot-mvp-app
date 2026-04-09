@@ -7,6 +7,9 @@ type PusherServerConstructor = typeof import("pusher");
 export type BrowserPusherChannel = import("pusher-js").Channel;
 export type BrowserPusherPresenceChannel = import("pusher-js").PresenceChannel;
 export type BrowserPusherMembers = import("pusher-js").Members;
+export type BrowserPusherClientEventChannel = BrowserPusherChannel & {
+  trigger: (eventName: string, data: unknown) => boolean;
+};
 
 export type RealtimeChannelDescriptor =
   | { kind: "user"; id: string }
@@ -55,6 +58,32 @@ export interface ConversationGameMetadata {
   status: ConversationGameStatus;
   initiatorId: string;
   sessionId?: string | null;
+}
+
+export interface RealtimeGameDrawPayload {
+  sessionId: string;
+  fromX: number;
+  fromY: number;
+  toX: number;
+  toY: number;
+}
+
+export interface RealtimeGameGuessPayload {
+  sessionId: string;
+  guess: string;
+  guesserId: string;
+  guesserLabel: string;
+}
+
+export interface RealtimeGameWinPayload {
+  sessionId: string;
+  word: string;
+  winnerId: string;
+  winnerLabel: string;
+}
+
+export interface RealtimeGameClearPayload {
+  sessionId: string;
 }
 
 export interface RealtimeTypingUser {
@@ -114,6 +143,10 @@ export const PUSHER_MESSAGE_EVENT = "new-message";
 export const PUSHER_NOTIFICATION_EVENT = "new-notification";
 export const PUSHER_CONVERSATION_ALERT_EVENT = "conversation-message-alert";
 export const PUSHER_TYPING_EVENT = "typing-state";
+export const PUSHER_GAME_DRAW_EVENT = "client-draw";
+export const PUSHER_GAME_GUESS_EVENT = "client-guess";
+export const PUSHER_GAME_WIN_EVENT = "client-win";
+export const PUSHER_GAME_CLEAR_EVENT = "client-clear";
 export const PUSHER_ORDER_UPDATED_EVENT = "order-updated";
 export const PUSHER_GLOBAL_PRESENCE_CHANNEL = "presence-site-users";
 export const PUSHER_GLOBAL_TAVERN_CHANNEL = "tavern-chat";

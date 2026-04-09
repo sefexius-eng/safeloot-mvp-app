@@ -1161,12 +1161,12 @@ export async function updateConversationGameInviteStatus(input: {
   }
 
   if (input.status === "completed") {
-    if (currentGameMetadata.status !== "pending") {
-      throw new Error("Only pending game invites can be cancelled.");
-    }
-
-    if (!isInitiator) {
-      throw new Error("Only the initiator can cancel this game invite.");
+    if (currentGameMetadata.status === "pending") {
+      if (!isInitiator) {
+        throw new Error("Only the initiator can cancel this game invite.");
+      }
+    } else if (currentGameMetadata.status !== "active") {
+      throw new Error("Only pending or active game invites can be completed.");
     }
   }
 
