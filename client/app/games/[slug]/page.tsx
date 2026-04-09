@@ -8,6 +8,10 @@ import {
   MarketplaceProductCard,
   type MarketplaceProductCardData,
 } from "@/components/product/marketplace-product-card";
+import {
+  convertCurrencyAmountToUsd,
+  normalizeCurrencyCode,
+} from "@/lib/currency-config";
 import { prisma } from "@/lib/prisma";
 import {
   getSellerReviewSummary,
@@ -24,6 +28,7 @@ interface GameCatalogPageProps {
     minPrice?: string;
     maxPrice?: string;
     online?: string;
+    selectedCurrency?: string;
   }>;
 }
 
@@ -33,7 +38,7 @@ function normalizeSearchText(value?: string) {
   return value?.trim() ?? "";
 }
 
-function parsePriceFilter(value?: string) {
+function parsePriceFilter(value?: string, selectedCurrency?: string) {
   const normalizedValue = normalizeSearchText(value);
 
   if (!normalizedValue) {
@@ -46,7 +51,12 @@ function parsePriceFilter(value?: string) {
     return null;
   }
 
-  return new Prisma.Decimal(numericValue.toString());
+  const storedPriceValue = convertCurrencyAmountToUsd(
+    numericValue,
+    normalizeCurrencyCode(selectedCurrency, "USD"),
+  );
+
+  return new Prisma.Decimal(storedPriceValue.toString());
 }
 
 function getProductOrderBy(sort?: string) {
@@ -75,6 +85,7 @@ async function getGameCatalog(
     minPrice?: string;
     maxPrice?: string;
     online?: string;
+    selectedCurrency?: string;
   },
 ) {
   const game = await prisma.game.findUnique({
@@ -97,8 +108,8 @@ async function getGameCatalog(
   const activeCategory =
     game.categories.find((category) => category.slug === search.category) ?? null;
 
-  const minPrice = parsePriceFilter(search.minPrice);
-  const maxPrice = parsePriceFilter(search.maxPrice);
+  const minPrice = parsePriceFilter(search.minPrice, search.selectedCurrency);
+  const maxPrice = parsePriceFilter(search.maxPrice, search.selectedCurrency);
   const isOnlineOnly = search.online === "true";
 
   const products = await prisma.product.findMany({
@@ -224,6 +235,10 @@ export default async function GameCatalogPage({
       nextParams.set("online", "true");
     }
 
+    if (resolvedSearchParams.selectedCurrency) {
+      nextParams.set("selectedCurrency", resolvedSearchParams.selectedCurrency);
+    }
+
     const nextQuery = nextParams.toString();
 
     return nextQuery ? `/games/${gameSlug}?${nextQuery}` : `/games/${gameSlug}`;
@@ -273,7 +288,18 @@ export default async function GameCatalogPage({
       </section>
 
       <section className="space-y-6">
-        <CatalogFilters />
+        <CatalogFilters
+          key={[
+            resolvedSearchParams.minPrice ?? "",
+            resolvedSearchParams.maxPrice ?? "",
+            resolvedSearchParams.selectedCurrency ?? "",
+            resolvedSearchParams.sort ?? "",
+            resolvedSearchParams.online ?? "",
+          ].join(":")}
+          initialMinPrice={resolvedSearchParams.minPrice ?? ""}
+          initialMaxPrice={resolvedSearchParams.maxPrice ?? ""}
+          initialSelectedCurrency={resolvedSearchParams.selectedCurrency}
+        />
 
         <div className="flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
           <div>

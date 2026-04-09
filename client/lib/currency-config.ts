@@ -48,6 +48,34 @@ export function convertUsdToCurrencyAmount(amountInUsd: number, currency: Curren
   return Math.round((amountInUsd * currencyDefinition.rate + Number.EPSILON) * 100) / 100;
 }
 
+export function convertCurrencyAmountToUsd(
+  amountInCurrency: number,
+  currency: CurrencyCode,
+) {
+  const currencyDefinition = getCurrencyDefinition(currency);
+
+  if (!Number.isFinite(amountInCurrency) || currencyDefinition.rate <= 0) {
+    return 0;
+  }
+
+  return (
+    Math.round(
+      ((amountInCurrency / currencyDefinition.rate) + Number.EPSILON) * 100000000,
+    ) / 100000000
+  );
+}
+
+export function convertCurrencyAmount(
+  amount: number,
+  fromCurrency: CurrencyCode,
+  toCurrency: CurrencyCode,
+) {
+  return convertUsdToCurrencyAmount(
+    convertCurrencyAmountToUsd(amount, fromCurrency),
+    toCurrency,
+  );
+}
+
 export function formatStoredOrderAmount(
   amountInUsd: string | number,
   currencyValue?: string | null,
