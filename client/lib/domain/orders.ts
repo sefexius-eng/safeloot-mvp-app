@@ -9,6 +9,7 @@ import {
   sendNotificationEmails,
   type NotificationEmailDeliveryInput,
 } from "@/lib/notification-delivery";
+import { publishSystemTavernPurchaseAnnouncement } from "@/lib/domain/tavern";
 import { publishOrderUpdatedEvent } from "@/lib/pusher";
 import { prisma } from "@/lib/prisma";
 import { normalizeCurrencyCode } from "@/lib/currency-config";
@@ -66,6 +67,8 @@ export async function createOrder(input: {
           where: { id: buyerId },
           select: {
             id: true,
+            email: true,
+            name: true,
             availableBalance: true,
           },
         }),
@@ -77,6 +80,11 @@ export async function createOrder(input: {
             price: true,
             sellerId: true,
             isActive: true,
+            game: {
+              select: {
+                name: true,
+              },
+            },
             seller: {
               select: {
                 telegramId: true,
@@ -224,6 +232,9 @@ export async function createOrder(input: {
         productTitle: product.title,
         orderPrice: formatMoney(orderPrice),
         orderCurrency,
+        buyerDisplayName:
+          normalizeText(buyer.name ?? undefined) || buyer.email.split("@")[0],
+        gameName: normalizeText(product.game.name) || "игры",
       };
     },
     {
@@ -246,6 +257,15 @@ export async function createOrder(input: {
       platformFee: ZERO_PLATFORM_FEE,
     }),
   ]);
+
+  try {
+    await publishSystemTavernPurchaseAnnouncement({
+      buyerName: result.buyerDisplayName,
+      gameName: result.gameName,
+    });
+  } catch (error) {
+    console.error("[TAVERN_PURCHASE_ANNOUNCEMENT_ERROR]", error);
+  }
 
   return {
     orderId: result.orderId,

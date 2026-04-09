@@ -1,11 +1,13 @@
 import Image from "next/image";
 import Link from "next/link";
 
+import { TavernPanel } from "@/components/tavern/tavern-panel";
 import {
   MarketplaceProductCard,
   type MarketplaceProductCardData,
 } from "@/components/product/marketplace-product-card";
 import catalogSeedData from "@/lib/catalog-seed-data.json";
+import { listRecentTavernMessages } from "@/lib/domain/tavern";
 import { listProducts } from "@/lib/domain/products";
 import { prisma } from "@/lib/prisma";
 
@@ -69,6 +71,15 @@ async function getGames(): Promise<GameDirectoryItem[]> {
   }
 }
 
+async function getTavernMessages() {
+  try {
+    return await listRecentTavernMessages();
+  } catch (error) {
+    console.error("[HOME_TAVERN_MESSAGES_ERROR]", error);
+    return [];
+  }
+}
+
 function groupGamesByInitial(games: GameDirectoryItem[]) {
   return games.reduce<Record<string, GameDirectoryItem[]>>((accumulator, game) => {
     const initial = game.name.slice(0, 1).toUpperCase() || "#";
@@ -123,7 +134,11 @@ function getGamePosterBackground(slug: string) {
 }
 
 export default async function Home() {
-  const [products, games] = await Promise.all([getProducts(), getGames()]);
+  const [products, games, tavernMessages] = await Promise.all([
+    getProducts(),
+    getGames(),
+    getTavernMessages(),
+  ]);
   const groupedGames = groupGamesByInitial(games);
   const gameInitials = Object.keys(groupedGames).sort((left, right) =>
     left.localeCompare(right, "ru-RU"),
@@ -354,6 +369,8 @@ export default async function Home() {
           </div>
         )}
       </section>
+
+      <TavernPanel initialMessages={tavernMessages} />
     </main>
   );
 }

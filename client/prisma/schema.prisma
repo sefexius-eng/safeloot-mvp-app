@@ -78,6 +78,7 @@ model User {
   withdrawals      Withdrawal[]
   notifications    Notification[]
   promoUsages      PromoUsage[]
+  tavernMessages   TavernMessage[]
   createdAt        DateTime      @default(now())
   updatedAt        DateTime      @updatedAt
 
@@ -329,4 +330,17 @@ model Notification {
   @@index([userId, isRead])
   @@index([createdAt])
   @@map("notifications")
+}
+
+model TavernMessage {
+  id        String   @id @default(cuid())
+  userId    String?
+  text      String
+  isSystem  Boolean  @default(false)
+  createdAt DateTime @default(now())
+  user      User?    @relation(fields: [userId], references: [id], onDelete: SetNull, onUpdate: Cascade)
+
+  @@index([userId])
+  @@index([createdAt])
+  @@map("tavern_messages")
 }

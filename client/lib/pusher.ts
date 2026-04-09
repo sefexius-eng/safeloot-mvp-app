@@ -67,11 +67,21 @@ export interface RealtimeOrderUpdatedPayload {
   sellerNetAmount?: string | null;
 }
 
+export interface RealtimeTavernMessagePayload {
+  id: string;
+  text: string;
+  isSystem: boolean;
+  createdAt: string;
+  displayName: string;
+  user: RealtimeUserIdentity | null;
+}
+
 export const PUSHER_MESSAGE_EVENT = "new-message";
 export const PUSHER_NOTIFICATION_EVENT = "new-notification";
 export const PUSHER_TYPING_EVENT = "typing-state";
 export const PUSHER_ORDER_UPDATED_EVENT = "order-updated";
 export const PUSHER_GLOBAL_PRESENCE_CHANNEL = "presence-site-users";
+export const PUSHER_GLOBAL_TAVERN_CHANNEL = "global-tavern";
 
 const PUSHER_AUTH_ENDPOINT = "/api/pusher/auth";
 const USER_CHANNEL_PREFIX = "private-user-";
@@ -137,6 +147,10 @@ export function getUserNotificationChannelName(userId: string) {
 
 export function getGlobalPresenceChannelName() {
   return PUSHER_GLOBAL_PRESENCE_CHANNEL;
+}
+
+export function getGlobalTavernChannelName() {
+  return PUSHER_GLOBAL_TAVERN_CHANNEL;
 }
 
 function parsePrefixedChannelName(
@@ -329,5 +343,15 @@ export async function publishOrderUpdatedEvent(
     getOrderChannelName(payload.orderId),
     PUSHER_ORDER_UPDATED_EVENT,
     payload,
+  );
+}
+
+export async function publishTavernMessageEvent(
+  messageData: RealtimeTavernMessagePayload,
+) {
+  await triggerPusherEvent(
+    getGlobalTavernChannelName(),
+    PUSHER_MESSAGE_EVENT,
+    messageData,
   );
 }
