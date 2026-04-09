@@ -5,6 +5,7 @@ import { useEffect, useRef, useState } from "react";
 
 import { markConversationMessagesAsRead } from "@/app/actions/chat";
 import CensoredText from "@/components/censored-text";
+import { useTabNotification } from "@/components/chat/use-tab-notification";
 import { Button } from "@/components/ui/button";
 import { CosmeticName } from "@/components/ui/cosmetic-name";
 import { Input } from "@/components/ui/input";
@@ -218,6 +219,7 @@ export function ChatMessages({
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const typingTimeoutRef = useRef<number | null>(null);
   const hasActiveTypingRef = useRef(false);
+  const { triggerNotification } = useTabNotification();
   const remoteTypingUsers = typingUsers.filter(
     (typingUser) => typingUser.senderId !== currentUserId,
   );
@@ -328,6 +330,10 @@ export function ChatMessages({
     const handleRealtimeMessage = (
       message: RealtimeConversationMessagePayload,
     ) => {
+      if (message.senderId !== currentUserId) {
+        triggerNotification();
+      }
+
       latestMessageCreatedAtRef.current = message.createdAt;
       setMessages((currentMessages) => mergeMessages(currentMessages, [message]));
       setErrorMessage("");
@@ -364,7 +370,7 @@ export function ChatMessages({
       pusherChannel.unbind(PUSHER_TYPING_EVENT, handleRealtimeTypingState);
       pusherClient.unsubscribe(getConversationChannelName(conversationId));
     };
-  }, [conversationId]);
+  }, [conversationId, currentUserId, triggerNotification]);
 
   useEffect(() => {
     const chatScrollContainer = chatScrollContainerRef.current;

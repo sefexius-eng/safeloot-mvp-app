@@ -19,6 +19,7 @@ import {
   type CurrencyCode,
 } from "@/components/providers/currency-provider";
 import { createReview } from "@/app/actions/reviews";
+import { useTabNotification } from "@/components/chat/use-tab-notification";
 import CensoredText from "@/components/censored-text";
 import { RatingStars } from "@/components/reviews/rating-stars";
 import {
@@ -355,6 +356,7 @@ export function ActiveOrderView({ orderId }: ActiveOrderViewProps) {
   const currentUserId = session?.user?.id ?? "";
   const currentUserAccountRole = session?.user?.role ?? "USER";
   const isCurrentUserSeller = order?.sellerId === currentUserId;
+  const { triggerNotification } = useTabNotification();
 
   useEffect(() => {
     previousMessageCountRef.current = 0;
@@ -541,6 +543,10 @@ export function ActiveOrderView({ orderId }: ActiveOrderViewProps) {
     let pusherClient: Awaited<ReturnType<typeof getPusherClient>> = null;
 
     const handleRealtimeMessage = (message: RealtimeOrderMessagePayload) => {
+      if (message.senderId !== currentUserId) {
+        triggerNotification();
+      }
+
       setMessages((currentMessages) => mergeOrderMessages(currentMessages, [message]));
       setChatError("");
     };
@@ -593,7 +599,7 @@ export function ActiveOrderView({ orderId }: ActiveOrderViewProps) {
       pusherChannel.unbind(PUSHER_ORDER_UPDATED_EVENT, handleOrderUpdated);
       pusherClient.unsubscribe(getOrderChannelName(orderId));
     };
-  }, [orderId, sessionStatus]);
+  }, [currentUserId, orderId, sessionStatus, triggerNotification]);
 
   useEffect(() => {
     const chatScrollContainer = chatScrollContainerRef.current;
