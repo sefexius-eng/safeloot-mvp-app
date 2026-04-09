@@ -134,7 +134,13 @@ export default async function RootLayout({
           ) : null}
           <BannedModal />
 
-          <main className="relative flex-1">{children}</main>
+          <main className="relative isolate flex-1">
+            <div aria-hidden="true" className="pointer-events-none absolute inset-0 overflow-hidden">
+              <div className="absolute top-0 left-1/2 z-[-1] h-[400px] w-[600px] -translate-x-1/2 rounded-full bg-[#00C853]/10 blur-[120px]" />
+              <div className="absolute right-[-140px] top-[28%] z-[-1] h-[320px] w-[320px] rounded-full bg-[#00C853]/6 blur-[110px]" />
+            </div>
+            {children}
+          </main>
           <SiteFooter />
         </AuthSessionProvider>
         <ExternalAnalytics />

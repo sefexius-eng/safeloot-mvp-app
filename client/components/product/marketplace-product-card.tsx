@@ -75,7 +75,7 @@ export function MarketplaceProductCard({ product }: MarketplaceProductCardProps)
   const coverImage = getProductCover(product);
 
   return (
-    <article className="group flex h-full flex-col overflow-hidden rounded-[1.75rem] border border-white/10 bg-[radial-gradient(circle_at_top_left,rgba(0,200,83,0.1),transparent_32%),linear-gradient(180deg,rgba(22,27,34,0.96),rgba(13,17,23,0.98))] shadow-[0_18px_48px_rgba(0,0,0,0.3)] transition hover:-translate-y-1.5 hover:border-[#00C853]/30 hover:shadow-[0_28px_64px_rgba(0,0,0,0.36)]">
+    <article className="group flex h-full flex-col overflow-hidden rounded-[1.75rem] border border-white/5 bg-[#13171F] shadow-[0_18px_48px_rgba(0,0,0,0.3)] transition hover:-translate-y-1.5 hover:border-[#00C853]/50 hover:shadow-[0_0_15px_rgba(0,200,83,0.15)]">
       <Link href={`/product/${product.id}`} className="block">
         <div className="relative h-40 w-full overflow-hidden border-b border-white/10 bg-zinc-900">
           {coverImage ? (
@@ -88,7 +88,7 @@ export function MarketplaceProductCard({ product }: MarketplaceProductCardProps)
               className="h-full w-full object-cover transition duration-500 group-hover:scale-105"
             />
           ) : (
-            <div className="flex h-full w-full items-end bg-[radial-gradient(circle_at_top_left,rgba(0,200,83,0.28),transparent_38%),radial-gradient(circle_at_bottom_right,rgba(0,96,48,0.22),transparent_42%),linear-gradient(135deg,rgba(22,27,34,1),rgba(9,12,17,1))] p-4">
+            <div className="flex h-full w-full items-end bg-[linear-gradient(135deg,rgba(26,29,36,1),rgba(10,13,20,1))] p-4">
               <div className="rounded-full border border-white/10 bg-black/25 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.24em] text-zinc-300">
                 {product.game.name}
               </div>

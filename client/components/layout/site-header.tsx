@@ -442,7 +442,7 @@ export function SiteHeader() {
                 {!isBanned ? (
                   <Link
                     href="/sell"
-                    className="sell-link inline-flex h-9 w-9 items-center justify-center rounded-md border border-[#00C853]/35 bg-[#00C853] text-black shadow-[0_16px_40px_rgba(0,200,83,0.24)] transition hover:-translate-y-0.5 hover:bg-[#00A344] md:w-auto md:px-4"
+                    className="sell-link inline-flex h-9 w-9 items-center justify-center rounded-md border border-[#00C853]/35 bg-[#00C853] text-[#0A0D14] shadow-[0_16px_40px_rgba(0,200,83,0.24)] transition hover:-translate-y-0.5 hover:bg-[#00B04A] md:w-auto md:px-4"
                     aria-label="Продать"
                   >
                     <span aria-hidden="true">+</span>
@@ -459,7 +459,7 @@ export function SiteHeader() {
                 </Link>
                 <Link
                   href="/register"
-                  className="inline-flex h-9 items-center justify-center rounded-md border border-[#00C853]/35 bg-[#00C853] px-3 text-sm font-bold text-black shadow-[0_16px_40px_rgba(0,200,83,0.24)] transition hover:-translate-y-0.5 hover:bg-[#00A344]"
+                  className="inline-flex h-9 items-center justify-center rounded-md border border-[#00C853]/35 bg-[#00C853] px-3 text-sm font-semibold text-[#0A0D14] shadow-[0_16px_40px_rgba(0,200,83,0.24)] transition hover:-translate-y-0.5 hover:bg-[#00B04A]"
                 >
                   Регистрация
                 </Link>
@@ -699,7 +699,7 @@ export function SiteHeader() {
                   <>
                     <Link
                       href="/sell"
-                      className="sell-link inline-flex h-9 w-9 items-center justify-center rounded-md border border-[#00C853]/35 bg-[#00C853] text-black shadow-[0_16px_40px_rgba(0,200,83,0.24)] transition hover:-translate-y-0.5 hover:bg-[#00A344] md:h-10 md:w-auto md:px-4 md:rounded-xl"
+                      className="sell-link inline-flex h-9 w-9 items-center justify-center rounded-md border border-[#00C853]/35 bg-[#00C853] text-[#0A0D14] shadow-[0_16px_40px_rgba(0,200,83,0.24)] transition hover:-translate-y-0.5 hover:bg-[#00B04A] md:h-10 md:w-auto md:px-4 md:rounded-xl"
                       aria-label="Продать"
                     >
                       <span className="md:hidden" aria-hidden="true">+</span>
@@ -739,7 +739,7 @@ export function SiteHeader() {
 
                 <Link
                   href="/register"
-                  className="inline-flex h-10 items-center justify-center rounded-xl border border-[#00C853]/35 bg-[#00C853] px-4 text-sm font-bold text-black shadow-[0_16px_40px_rgba(0,200,83,0.24)] transition hover:-translate-y-0.5 hover:bg-[#00A344]"
+                  className="inline-flex h-10 items-center justify-center rounded-xl border border-[#00C853]/35 bg-[#00C853] px-4 text-sm font-semibold text-[#0A0D14] shadow-[0_16px_40px_rgba(0,200,83,0.24)] transition hover:-translate-y-0.5 hover:bg-[#00B04A]"
                 >
                   Регистрация
                 </Link>
