@@ -350,7 +350,7 @@ export function ChatSidebar({ conversations }: ChatSidebarProps) {
         open={Boolean(deleteTarget)}
         onOpenChange={handleDeleteDialogOpenChange}
       >
-        <DialogContent className="border-white/5 bg-[#1A1D24] text-zinc-100 sm:max-w-md">
+        <DialogContent className="border-white/10 bg-[radial-gradient(circle_at_top_left,rgba(0,200,83,0.12),transparent_36%),linear-gradient(180deg,rgba(22,27,34,0.96),rgba(13,17,23,0.98))] text-zinc-100 sm:max-w-md">
           <DialogHeader className="space-y-3 pr-10">
             <DialogTitle>Удалить чат?</DialogTitle>
             <DialogDescription>

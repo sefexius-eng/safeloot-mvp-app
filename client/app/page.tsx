@@ -150,7 +150,7 @@ export default async function Home() {
 
   return (
     <main className="mx-auto flex w-full max-w-7xl flex-col gap-12 px-4 py-10 sm:px-6 lg:gap-16 lg:px-8 lg:py-14">
-      <section className="overflow-hidden rounded-[2.4rem] border border-white/5 bg-[#13171F] shadow-[0_24px_80px_rgba(0,0,0,0.34)] transition hover:border-[#00C853]/50 hover:shadow-[0_0_15px_rgba(0,200,83,0.15)] backdrop-blur-xl">
+      <section className="overflow-hidden rounded-[2.4rem] border border-white/10 bg-[radial-gradient(circle_at_top_left,rgba(0,200,83,0.2),transparent_30%),radial-gradient(circle_at_bottom_right,rgba(0,94,48,0.18),transparent_36%),linear-gradient(135deg,rgba(22,27,34,0.96),rgba(13,17,23,0.94))] shadow-[0_24px_80px_rgba(0,0,0,0.34)] backdrop-blur-xl">
         <div className="grid gap-10 px-6 py-8 md:grid-cols-2 md:items-center md:px-10 md:py-12 lg:px-14 lg:py-16">
           <div>
             <div>
@@ -162,7 +162,7 @@ export default async function Home() {
             <div className="mt-6 flex flex-wrap gap-3">
               <Link
                 href={featuredCatalogHref}
-                className="inline-flex rounded-2xl border border-[#00C853]/35 bg-[#00C853] px-6 py-3 text-sm font-semibold text-[#0A0D14] shadow-[0_18px_45px_rgba(0,200,83,0.22)] transition hover:-translate-y-0.5 hover:bg-[#00B04A]"
+                className="inline-flex rounded-2xl border border-[#00C853]/35 bg-[#00C853] px-6 py-3 text-sm font-bold text-[#03130a] shadow-[0_18px_45px_rgba(0,200,83,0.22)] transition hover:-translate-y-0.5 hover:bg-[#00A344]"
               >
                 Смотреть каталог
               </Link>
@@ -175,19 +175,19 @@ export default async function Home() {
             </div>
 
             <div className="mt-6 grid grid-cols-3 gap-2">
-              <div className="rounded-[1.25rem] border border-white/5 bg-[#1A1D24] p-3 shadow-[0_12px_30px_rgba(0,0,0,0.18)] md:rounded-[1.5rem] md:p-4">
+              <div className="rounded-[1.25rem] border border-white/10 bg-white/5 p-3 shadow-[0_12px_30px_rgba(0,0,0,0.18)] md:rounded-[1.5rem] md:p-4">
                 <p className="text-[10px] tracking-[0.2em] uppercase text-zinc-500 md:text-xs md:tracking-[0.24em]">
                   Сделки
                 </p>
                 <p className="mt-2 text-base font-semibold text-white md:mt-3 md:text-2xl">24/7</p>
               </div>
-              <div className="rounded-[1.25rem] border border-white/5 bg-[#1A1D24] p-3 shadow-[0_12px_30px_rgba(0,0,0,0.18)] md:rounded-[1.5rem] md:p-4">
+              <div className="rounded-[1.25rem] border border-white/10 bg-white/5 p-3 shadow-[0_12px_30px_rgba(0,0,0,0.18)] md:rounded-[1.5rem] md:p-4">
                 <p className="text-[10px] tracking-[0.2em] uppercase text-zinc-500 md:text-xs md:tracking-[0.24em]">
                   Баланс
                 </p>
                 <p className="mt-2 text-base font-semibold text-white md:mt-3 md:text-2xl">USDT</p>
               </div>
-              <div className="rounded-[1.25rem] border border-white/5 bg-[#1A1D24] p-3 shadow-[0_12px_30px_rgba(0,0,0,0.18)] md:rounded-[1.5rem] md:p-4">
+              <div className="rounded-[1.25rem] border border-white/10 bg-white/5 p-3 shadow-[0_12px_30px_rgba(0,0,0,0.18)] md:rounded-[1.5rem] md:p-4">
                 <p className="text-[10px] tracking-[0.2em] uppercase text-zinc-500 md:text-xs md:tracking-[0.24em]">
                   Защита
                 </p>
@@ -197,8 +197,8 @@ export default async function Home() {
           </div>
 
           <div className="relative">
-            <div className="pointer-events-none absolute -right-6 top-6 h-36 w-36 rounded-full bg-[#00C853]/10 blur-3xl animate-pulse" />
-            <div className="pointer-events-none absolute -left-6 bottom-10 h-28 w-28 rounded-full bg-[#00C853]/8 blur-3xl animate-pulse" />
+            <div className="pointer-events-none absolute -right-6 top-6 h-36 w-36 rounded-full bg-[#00C853]/22 blur-3xl animate-pulse" />
+            <div className="pointer-events-none absolute -left-6 bottom-10 h-28 w-28 rounded-full bg-[#00A344]/18 blur-3xl animate-pulse" />
 
             <div className="group relative mx-auto min-h-[360px] overflow-hidden rounded-[2rem] border border-white/10 bg-black/25 shadow-[0_26px_90px_rgba(0,0,0,0.34)] transition-all duration-500 hover:-translate-y-2">
               <Image

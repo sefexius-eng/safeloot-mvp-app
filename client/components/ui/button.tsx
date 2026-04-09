@@ -54,7 +54,7 @@ const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
           variant === "default"
             ? usesCustomBackground
               ? cn(!usesCustomTextColor && "text-white")
-              : "border border-[#00C853]/35 bg-[#00C853] text-[#0A0D14] shadow-[0_18px_42px_rgba(0,200,83,0.24)] hover:-translate-y-0.5 hover:bg-[#00B04A]"
+              : "border border-[#00C853]/35 bg-[#00C853] text-[#03130c] shadow-[0_18px_42px_rgba(0,200,83,0.24)] hover:-translate-y-0.5 hover:bg-[#00A344]"
             : variantClasses[variant],
           sizeClasses[size],
           className,
