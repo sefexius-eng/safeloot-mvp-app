@@ -1118,8 +1118,8 @@ export function ActiveOrderView({ orderId }: ActiveOrderViewProps) {
                     id: result.review.id,
                     rating: result.review.rating,
                     comment: result.review.comment,
-                    sellerReply: null,
-                    replyCreatedAt: null,
+                    sellerReply: result.review.sellerReply,
+                    replyCreatedAt: result.review.replyCreatedAt,
                     createdAt: result.review.createdAt,
                     author: {
                       id: currentOrder.buyer.id,

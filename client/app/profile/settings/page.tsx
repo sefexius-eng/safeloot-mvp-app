@@ -33,6 +33,23 @@ export default async function ProfileSettingsPage() {
       emailNotifications: true,
       pushNotifications: true,
       telegramId: true,
+      sellerSettings: {
+        select: {
+          autoGreeting: true,
+          isAutoReplyReviewsEnabled: true,
+          positiveReviewReply: true,
+          negativeReviewReply: true,
+        },
+      },
+      keywordRules: {
+        orderBy: [{ isActive: "desc" }, { keyword: "asc" }],
+        select: {
+          id: true,
+          keyword: true,
+          response: true,
+          isActive: true,
+        },
+      },
       role: true,
     },
   });
@@ -58,6 +75,13 @@ export default async function ProfileSettingsPage() {
   const initialPushNotifications = userProfile.pushNotifications;
   const initialTelegramId = userProfile.telegramId?.toString() ?? null;
   const initialRole = userProfile.role;
+  const initialAutoGreeting = userProfile.sellerSettings?.autoGreeting ?? null;
+  const initialAutoReplyReviewsEnabled =
+    userProfile.sellerSettings?.isAutoReplyReviewsEnabled ?? false;
+  const initialPositiveReviewReply =
+    userProfile.sellerSettings?.positiveReviewReply ?? null;
+  const initialNegativeReviewReply =
+    userProfile.sellerSettings?.negativeReviewReply ?? null;
 
   return (
     <main className="mx-auto flex w-full max-w-7xl flex-col gap-8 px-4 py-10 sm:px-6 lg:px-8 lg:py-14">
@@ -95,6 +119,11 @@ export default async function ProfileSettingsPage() {
         initialActiveColor={userProfile.activeColor ?? null}
         initialActiveDecoration={userProfile.activeDecoration ?? null}
         initialActiveFont={userProfile.activeFont ?? null}
+        initialAutoGreeting={initialAutoGreeting}
+        initialAutoReplyReviewsEnabled={initialAutoReplyReviewsEnabled}
+        initialPositiveReviewReply={initialPositiveReviewReply}
+        initialNegativeReviewReply={initialNegativeReviewReply}
+        initialKeywordRules={userProfile.keywordRules}
         initialPushNotifications={initialPushNotifications}
         initialTelegramId={initialTelegramId}
         initialRole={initialRole}

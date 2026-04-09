@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import { useSession } from "next-auth/react";
 
 import { updateUserProfile } from "@/app/actions/profile";
+import { updateSellerAutomationSettings } from "@/app/actions/seller-automation";
 import {
   createTelegramLinkAction,
   disconnectTelegramAction,
@@ -22,6 +23,7 @@ import {
 } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Switch } from "@/components/ui/switch";
+import { Textarea } from "@/components/ui/textarea";
 
 interface ProfileSettingsFormProps {
   initialBadges: string[];
@@ -33,6 +35,16 @@ interface ProfileSettingsFormProps {
   initialActiveColor: string | null;
   initialActiveDecoration: string | null;
   initialActiveFont: string | null;
+  initialAutoGreeting: string | null;
+  initialAutoReplyReviewsEnabled: boolean;
+  initialPositiveReviewReply: string | null;
+  initialNegativeReviewReply: string | null;
+  initialKeywordRules: Array<{
+    id: string;
+    keyword: string;
+    response: string;
+    isActive: boolean;
+  }>;
   initialPushNotifications: boolean;
   initialTelegramId: string | null;
   initialRole: Role;
@@ -50,6 +62,63 @@ interface ImageCompressionOptions {
   maxHeight: number;
   quality: number;
   subjectLabel: string;
+}
+
+interface SellerAutomationKeywordRuleDraft {
+  id: string;
+  keyword: string;
+  response: string;
+  isActive: boolean;
+}
+
+type ProfileSettingsTab = "profile" | "automation";
+
+function createKeywordRuleDraft(
+  rule?: Partial<SellerAutomationKeywordRuleDraft>,
+): SellerAutomationKeywordRuleDraft {
+  const generatedId =
+    typeof crypto !== "undefined" && "randomUUID" in crypto
+      ? crypto.randomUUID()
+      : `keyword-rule-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+
+  return {
+    id: rule?.id ?? generatedId,
+    keyword: rule?.keyword ?? "",
+    response: rule?.response ?? "",
+    isActive: rule?.isActive ?? true,
+  };
+}
+
+function normalizeKeywordRuleDrafts(
+  rules: SellerAutomationKeywordRuleDraft[],
+) {
+  return rules.map((rule) => ({
+    keyword: rule.keyword.trim(),
+    response: rule.response.trim(),
+    isActive: rule.isActive,
+  }));
+}
+
+function areKeywordRuleDraftsEqual(
+  left: SellerAutomationKeywordRuleDraft[],
+  right: SellerAutomationKeywordRuleDraft[],
+) {
+  const normalizedLeft = normalizeKeywordRuleDrafts(left);
+  const normalizedRight = normalizeKeywordRuleDrafts(right);
+
+  if (normalizedLeft.length !== normalizedRight.length) {
+    return false;
+  }
+
+  return normalizedLeft.every((rule, index) => {
+    const comparedRule = normalizedRight[index];
+
+    return (
+      rule.keyword === comparedRule.keyword &&
+      rule.response === comparedRule.response &&
+      rule.isActive === comparedRule.isActive
+    );
+  });
 }
 
 function readFileAsDataUrl(file: Blob) {
@@ -189,6 +258,11 @@ export function ProfileSettingsForm({
   initialActiveColor,
   initialActiveDecoration,
   initialActiveFont,
+  initialAutoGreeting,
+  initialAutoReplyReviewsEnabled,
+  initialPositiveReviewReply,
+  initialNegativeReviewReply,
+  initialKeywordRules,
   initialPushNotifications,
   initialTelegramId,
   initialRole,
@@ -196,6 +270,7 @@ export function ProfileSettingsForm({
   const router = useRouter();
   const { update } = useSession();
   const bannerInputRef = useRef<HTMLInputElement | null>(null);
+  const [activeTab, setActiveTab] = useState<ProfileSettingsTab>("profile");
   const [name, setName] = useState(initialName);
   const [image, setImage] = useState<string | null>(initialImage);
   const [bannerUrl, setBannerUrl] = useState(initialBannerUrl ?? "");
@@ -206,12 +281,41 @@ export function ProfileSettingsForm({
   const [savedBannerUrl, setSavedBannerUrl] = useState(initialBannerUrl ?? "");
   const [savedEmailNotifications, setSavedEmailNotifications] = useState(initialEmailNotifications);
   const [savedPushNotifications, setSavedPushNotifications] = useState(initialPushNotifications);
+  const [autoGreeting, setAutoGreeting] = useState(initialAutoGreeting ?? "");
+  const [autoReplyReviewsEnabled, setAutoReplyReviewsEnabled] = useState(
+    initialAutoReplyReviewsEnabled,
+  );
+  const [positiveReviewReply, setPositiveReviewReply] = useState(
+    initialPositiveReviewReply ?? "",
+  );
+  const [negativeReviewReply, setNegativeReviewReply] = useState(
+    initialNegativeReviewReply ?? "",
+  );
+  const [keywordRules, setKeywordRules] = useState<SellerAutomationKeywordRuleDraft[]>(
+    initialKeywordRules.map((rule) => createKeywordRuleDraft(rule)),
+  );
+  const [savedAutoGreeting, setSavedAutoGreeting] = useState(initialAutoGreeting ?? "");
+  const [savedAutoReplyReviewsEnabled, setSavedAutoReplyReviewsEnabled] = useState(
+    initialAutoReplyReviewsEnabled,
+  );
+  const [savedPositiveReviewReply, setSavedPositiveReviewReply] = useState(
+    initialPositiveReviewReply ?? "",
+  );
+  const [savedNegativeReviewReply, setSavedNegativeReviewReply] = useState(
+    initialNegativeReviewReply ?? "",
+  );
+  const [savedKeywordRules, setSavedKeywordRules] = useState<
+    SellerAutomationKeywordRuleDraft[]
+  >(initialKeywordRules.map((rule) => createKeywordRuleDraft(rule)));
   const [telegramId, setTelegramId] = useState<string | null>(initialTelegramId);
   const [errorMessage, setErrorMessage] = useState("");
   const [successMessage, setSuccessMessage] = useState("");
+  const [automationErrorMessage, setAutomationErrorMessage] = useState("");
+  const [automationSuccessMessage, setAutomationSuccessMessage] = useState("");
   const [isProcessingAvatar, setIsProcessingAvatar] = useState(false);
   const [isProcessingBanner, setIsProcessingBanner] = useState(false);
-  const [isPending, startTransition] = useTransition();
+  const [isProfilePending, startProfileTransition] = useTransition();
+  const [isAutomationPending, startAutomationTransition] = useTransition();
   const [isTelegramPending, startTelegramTransition] = useTransition();
 
   const displayName = name.trim() || initialEmail.split("@")[0] || "Профиль";
@@ -223,7 +327,50 @@ export function ProfileSettingsForm({
     normalizedBannerUrl !== savedBannerUrl ||
     emailNotifications !== savedEmailNotifications ||
     pushNotifications !== savedPushNotifications;
-  const isSaveDisabled = !name.trim() || !hasChanges || isPending || isProcessingImage;
+  const hasAutomationChanges =
+    autoGreeting.trim() !== savedAutoGreeting.trim() ||
+    autoReplyReviewsEnabled !== savedAutoReplyReviewsEnabled ||
+    positiveReviewReply.trim() !== savedPositiveReviewReply.trim() ||
+    negativeReviewReply.trim() !== savedNegativeReviewReply.trim() ||
+    !areKeywordRuleDraftsEqual(keywordRules, savedKeywordRules);
+  const isProfileSaveDisabled =
+    !name.trim() || !hasChanges || isProfilePending || isProcessingImage;
+  const isAutomationSaveDisabled = !hasAutomationChanges || isAutomationPending;
+
+  function clearAutomationMessages() {
+    setAutomationErrorMessage("");
+    setAutomationSuccessMessage("");
+  }
+
+  function updateKeywordRuleField(
+    ruleId: string,
+    field: keyof Omit<SellerAutomationKeywordRuleDraft, "id">,
+    value: string | boolean,
+  ) {
+    clearAutomationMessages();
+    setKeywordRules((currentRules) =>
+      currentRules.map((rule) =>
+        rule.id === ruleId
+          ? {
+              ...rule,
+              [field]: value,
+            }
+          : rule,
+      ),
+    );
+  }
+
+  function handleAddKeywordRule() {
+    clearAutomationMessages();
+    setKeywordRules((currentRules) => [...currentRules, createKeywordRuleDraft()]);
+  }
+
+  function handleRemoveKeywordRule(ruleId: string) {
+    clearAutomationMessages();
+    setKeywordRules((currentRules) =>
+      currentRules.filter((rule) => rule.id !== ruleId),
+    );
+  }
 
   async function handleAvatarSelection(file: File) {
     setErrorMessage("");
@@ -336,6 +483,61 @@ export function ProfileSettingsForm({
         error instanceof Error
           ? error.message
           : "Не удалось сохранить профиль.",
+      );
+    }
+  }
+
+  async function saveAutomationSettings() {
+    clearAutomationMessages();
+
+    try {
+      const result = await updateSellerAutomationSettings(
+        autoGreeting,
+        autoReplyReviewsEnabled,
+        positiveReviewReply,
+        negativeReviewReply,
+        keywordRules.map((rule) => ({
+          id: rule.id,
+          keyword: rule.keyword,
+          response: rule.response,
+          isActive: rule.isActive,
+        })),
+      );
+
+      if (!result.ok) {
+        setAutomationErrorMessage(
+          result.message || "Не удалось сохранить настройки автоматизации.",
+        );
+        return;
+      }
+
+      const nextAutoGreeting = result.autoGreeting ?? "";
+      const nextAutoReplyReviewsEnabled =
+        result.isAutoReplyReviewsEnabled ?? autoReplyReviewsEnabled;
+      const nextPositiveReviewReply = result.positiveReviewReply ?? "";
+      const nextNegativeReviewReply = result.negativeReviewReply ?? "";
+      const nextKeywordRules = (result.keywordRules ?? []).map((rule) =>
+        createKeywordRuleDraft(rule),
+      );
+
+      setAutoGreeting(nextAutoGreeting);
+      setAutoReplyReviewsEnabled(nextAutoReplyReviewsEnabled);
+      setPositiveReviewReply(nextPositiveReviewReply);
+      setNegativeReviewReply(nextNegativeReviewReply);
+      setKeywordRules(nextKeywordRules);
+      setSavedAutoGreeting(nextAutoGreeting);
+      setSavedAutoReplyReviewsEnabled(nextAutoReplyReviewsEnabled);
+      setSavedPositiveReviewReply(nextPositiveReviewReply);
+      setSavedNegativeReviewReply(nextNegativeReviewReply);
+      setSavedKeywordRules(nextKeywordRules);
+
+      router.refresh();
+      setAutomationSuccessMessage("Настройки автоматизации сохранены.");
+    } catch (error) {
+      setAutomationErrorMessage(
+        error instanceof Error
+          ? error.message
+          : "Не удалось сохранить настройки автоматизации.",
       );
     }
   }
@@ -465,238 +667,482 @@ export function ProfileSettingsForm({
         </CardHeader>
 
         <CardContent className="space-y-6">
-          <div className="space-y-3">
-            <label htmlFor="profile-name" className="text-sm font-semibold text-zinc-200">
-              Никнейм
-            </label>
-            <Input
-              id="profile-name"
-              name="name"
-              maxLength={40}
-              value={name}
-              onChange={(event) => {
-                setName(event.target.value);
-                setErrorMessage("");
-                setSuccessMessage("");
-              }}
-              placeholder="Введите ваш никнейм"
-            />
-            <p className="text-sm text-zinc-500">
-              До 40 символов. Если ник пустой, сохранить изменения нельзя.
-            </p>
+          <div className="flex flex-wrap gap-2 border-b border-white/10 pb-2">
+            <button
+              type="button"
+              onClick={() => setActiveTab("profile")}
+              className={[
+                "inline-flex items-center justify-center rounded-2xl border px-4 py-2.5 text-sm font-semibold transition",
+                activeTab === "profile"
+                  ? "border-orange-400/40 bg-orange-500/10 text-orange-200"
+                  : "border-white/10 bg-white/5 text-zinc-400 hover:text-zinc-200",
+              ].join(" ")}
+            >
+              Профиль и уведомления
+            </button>
+            <button
+              type="button"
+              onClick={() => setActiveTab("automation")}
+              className={[
+                "inline-flex items-center justify-center rounded-2xl border px-4 py-2.5 text-sm font-semibold transition",
+                activeTab === "automation"
+                  ? "border-orange-400/40 bg-orange-500/10 text-orange-200"
+                  : "border-white/10 bg-white/5 text-zinc-400 hover:text-zinc-200",
+              ].join(" ")}
+            >
+              Автоматизация продавца
+            </button>
           </div>
 
-          <div className="space-y-3">
-            <label htmlFor="profile-banner" className="text-sm font-semibold text-zinc-200">
-              Баннер профиля
-            </label>
-            <input
-              ref={bannerInputRef}
-              id="profile-banner"
-              type="file"
-              accept="image/jpeg,image/png,image/webp"
-              onChange={handleBannerFileChange}
-              className="sr-only"
-            />
-            <div className="rounded-[1.5rem] border border-white/10 bg-white/5 p-4">
-              <div className="flex flex-wrap items-center gap-3">
+          {activeTab === "profile" ? (
+            <>
+              <div className="space-y-3">
+                <label htmlFor="profile-name" className="text-sm font-semibold text-zinc-200">
+                  Никнейм
+                </label>
+                <Input
+                  id="profile-name"
+                  name="name"
+                  maxLength={40}
+                  value={name}
+                  onChange={(event) => {
+                    setName(event.target.value);
+                    setErrorMessage("");
+                    setSuccessMessage("");
+                  }}
+                  placeholder="Введите ваш никнейм"
+                />
+                <p className="text-sm text-zinc-500">
+                  До 40 символов. Если ник пустой, сохранить изменения нельзя.
+                </p>
+              </div>
+
+              <div className="space-y-3">
+                <label htmlFor="profile-banner" className="text-sm font-semibold text-zinc-200">
+                  Баннер профиля
+                </label>
+                <input
+                  ref={bannerInputRef}
+                  id="profile-banner"
+                  type="file"
+                  accept="image/jpeg,image/png,image/webp"
+                  onChange={handleBannerFileChange}
+                  className="sr-only"
+                />
+                <div className="rounded-[1.5rem] border border-white/10 bg-white/5 p-4">
+                  <div className="flex flex-wrap items-center gap-3">
+                    <Button
+                      type="button"
+                      onClick={() => bannerInputRef.current?.click()}
+                      disabled={isProfilePending || isProcessingImage}
+                      className="bg-sky-600 text-white shadow-[0_16px_40px_rgba(2,132,199,0.28)] hover:bg-sky-500"
+                    >
+                      {isProcessingBanner ? "Подготавливаем баннер..." : "Выбрать файл баннера"}
+                    </Button>
+
+                    {normalizedBannerUrl ? (
+                      <span className="rounded-full border border-emerald-500/20 bg-emerald-500/10 px-3 py-1.5 text-sm text-emerald-200">
+                        Превью обновлено
+                      </span>
+                    ) : (
+                      <span className="rounded-full border border-white/10 bg-black/20 px-3 py-1.5 text-sm text-zinc-400">
+                        Будет использован стандартный фон
+                      </span>
+                    )}
+                  </div>
+                  <p className="mt-3 text-sm leading-7 text-zinc-500">
+                    Поддерживаются JPG, PNG и WebP. После выбора файл конвертируется в WebP, а превью слева обновляется сразу, ещё до нажатия кнопки «Сохранить профиль».
+                  </p>
+                </div>
+                <p className="text-sm leading-7 text-zinc-500">
+                  Если очистить баннер, в профиле снова появится фирменный градиентный фон.
+                </p>
+              </div>
+
+              <div className="space-y-3">
+                <label htmlFor="profile-avatar" className="text-sm font-semibold text-zinc-200">
+                  Аватар
+                </label>
+                <input
+                  id="profile-avatar"
+                  type="file"
+                  accept="image/jpeg,image/png,image/webp"
+                  onChange={handleFileChange}
+                  className="block w-full rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-sm text-zinc-200 file:mr-4 file:rounded-xl file:border-0 file:bg-orange-600 file:px-4 file:py-2 file:font-semibold file:text-white file:transition hover:file:bg-orange-500"
+                />
+                <p className="text-sm leading-7 text-zinc-500">
+                  Поддерживаются JPG, PNG и WebP. Перед сохранением изображение сжимается до компактного формата для Vercel-friendly MVP.
+                </p>
+              </div>
+
+              <section className="space-y-4 rounded-[1.75rem] border border-white/10 bg-white/5 p-5">
+                <div>
+                  <h3 className="text-base font-semibold text-white">Настройки уведомлений</h3>
+                  <p className="mt-1 text-sm leading-7 text-zinc-400">
+                    Выберите, как получать уведомления о новых заказах, сообщениях и событиях аккаунта.
+                  </p>
+                </div>
+
+                <div className="space-y-3">
+                  <div className="flex items-start justify-between gap-4 rounded-[1.25rem] border border-white/10 bg-black/20 px-4 py-3">
+                    <div className="min-w-0">
+                      <label htmlFor="profile-email-notifications" className="text-sm font-semibold text-zinc-100">
+                        Email-уведомления
+                      </label>
+                      <p className="mt-1 text-sm leading-6 text-zinc-400">
+                        Получать письма о новых заказах и сообщениях
+                      </p>
+                    </div>
+                    <Switch
+                      id="profile-email-notifications"
+                      checked={emailNotifications}
+                      onCheckedChange={(checked) => {
+                        setEmailNotifications(checked);
+                        setErrorMessage("");
+                        setSuccessMessage("");
+                      }}
+                    />
+                  </div>
+
+                  <div className="flex items-start justify-between gap-4 rounded-[1.25rem] border border-white/10 bg-black/20 px-4 py-3">
+                    <div className="min-w-0">
+                      <label htmlFor="profile-push-notifications" className="text-sm font-semibold text-zinc-100">
+                        Браузерные push-уведомления
+                      </label>
+                      <p className="mt-1 text-sm leading-6 text-zinc-400">
+                        Мгновенные всплывающие уведомления на экране
+                      </p>
+                    </div>
+                    <Switch
+                      id="profile-push-notifications"
+                      checked={pushNotifications}
+                      onCheckedChange={(checked) => {
+                        setPushNotifications(checked);
+                        setErrorMessage("");
+                        setSuccessMessage("");
+
+                        if (!checked) {
+                          return;
+                        }
+
+                        void requestBrowserPushPermissionIfNeeded().then((result) => {
+                          if (!result.ok) {
+                            setErrorMessage(result.message);
+                          }
+                        });
+                      }}
+                    />
+                  </div>
+
+                  <div className="flex flex-col gap-4 rounded-[1.25rem] border border-white/10 bg-black/20 px-4 py-4 sm:flex-row sm:items-center sm:justify-between">
+                    <div className="min-w-0">
+                      <div className="text-sm font-semibold text-zinc-100">
+                        Telegram-бот
+                      </div>
+                      {telegramId ? (
+                        <p className="mt-1 break-words text-sm leading-6 text-emerald-300">
+                          ✅ Подключено (ID: {telegramId})
+                        </p>
+                      ) : (
+                        <p className="mt-1 text-sm leading-6 text-zinc-400">
+                          Подключите Telegram, чтобы получать уведомления о сделках напрямую в боте SafeLoot.
+                        </p>
+                      )}
+                    </div>
+
+                    {telegramId ? (
+                      <Button
+                        type="button"
+                        onClick={handleDisconnectTelegram}
+                        disabled={isTelegramPending}
+                        className="border border-white/10 bg-white/5 text-zinc-200 shadow-none hover:bg-white/10"
+                      >
+                        {isTelegramPending ? "Отключаем..." : "Отключить"}
+                      </Button>
+                    ) : (
+                      <Button
+                        type="button"
+                        onClick={handleConnectTelegram}
+                        disabled={isTelegramPending}
+                        className="bg-sky-600 text-white shadow-[0_16px_40px_rgba(2,132,199,0.28)] hover:bg-sky-500"
+                      >
+                        {isTelegramPending ? "Готовим ссылку..." : "Подключить Telegram"}
+                      </Button>
+                    )}
+                  </div>
+                </div>
+              </section>
+
+              {errorMessage ? (
+                <div className="rounded-[1.5rem] border border-red-500/20 bg-red-500/10 px-4 py-3 text-sm text-red-200">
+                  {errorMessage}
+                </div>
+              ) : null}
+
+              {successMessage ? (
+                <div className="rounded-[1.5rem] border border-emerald-500/20 bg-emerald-500/10 px-4 py-3 text-sm text-emerald-200">
+                  {successMessage}
+                </div>
+              ) : null}
+
+              <div className="flex flex-wrap gap-3">
                 <Button
                   type="button"
-                  onClick={() => bannerInputRef.current?.click()}
-                  disabled={isPending || isProcessingImage}
-                  className="bg-sky-600 text-white shadow-[0_16px_40px_rgba(2,132,199,0.28)] hover:bg-sky-500"
-                >
-                  {isProcessingBanner ? "Подготавливаем баннер..." : "Выбрать файл баннера"}
-                </Button>
-
-                {normalizedBannerUrl ? (
-                  <span className="rounded-full border border-emerald-500/20 bg-emerald-500/10 px-3 py-1.5 text-sm text-emerald-200">
-                    Превью обновлено
-                  </span>
-                ) : (
-                  <span className="rounded-full border border-white/10 bg-black/20 px-3 py-1.5 text-sm text-zinc-400">
-                    Будет использован стандартный фон
-                  </span>
-                )}
-              </div>
-              <p className="mt-3 text-sm leading-7 text-zinc-500">
-                Поддерживаются JPG, PNG и WebP. После выбора файл конвертируется в WebP, а превью слева обновляется сразу, ещё до нажатия кнопки «Сохранить профиль».
-              </p>
-            </div>
-            <p className="text-sm leading-7 text-zinc-500">
-              Если очистить баннер, в профиле снова появится фирменный градиентный фон.
-            </p>
-          </div>
-
-          <div className="space-y-3">
-            <label htmlFor="profile-avatar" className="text-sm font-semibold text-zinc-200">
-              Аватар
-            </label>
-            <input
-              id="profile-avatar"
-              type="file"
-              accept="image/jpeg,image/png,image/webp"
-              onChange={handleFileChange}
-              className="block w-full rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-sm text-zinc-200 file:mr-4 file:rounded-xl file:border-0 file:bg-orange-600 file:px-4 file:py-2 file:font-semibold file:text-white file:transition hover:file:bg-orange-500"
-            />
-            <p className="text-sm leading-7 text-zinc-500">
-              Поддерживаются JPG, PNG и WebP. Перед сохранением изображение сжимается до компактного формата для Vercel-friendly MVP.
-            </p>
-          </div>
-
-          <section className="space-y-4 rounded-[1.75rem] border border-white/10 bg-white/5 p-5">
-            <div>
-              <h3 className="text-base font-semibold text-white">Настройки уведомлений</h3>
-              <p className="mt-1 text-sm leading-7 text-zinc-400">
-                Выберите, как получать уведомления о новых заказах, сообщениях и событиях аккаунта.
-              </p>
-            </div>
-
-            <div className="space-y-3">
-              <div className="flex items-start justify-between gap-4 rounded-[1.25rem] border border-white/10 bg-black/20 px-4 py-3">
-                <div className="min-w-0">
-                  <label htmlFor="profile-email-notifications" className="text-sm font-semibold text-zinc-100">
-                    Email-уведомления
-                  </label>
-                  <p className="mt-1 text-sm leading-6 text-zinc-400">
-                    Получать письма о новых заказах и сообщениях
-                  </p>
-                </div>
-                <Switch
-                  id="profile-email-notifications"
-                  checked={emailNotifications}
-                  onCheckedChange={(checked) => {
-                    setEmailNotifications(checked);
-                    setErrorMessage("");
-                    setSuccessMessage("");
-                  }}
-                />
-              </div>
-
-              <div className="flex items-start justify-between gap-4 rounded-[1.25rem] border border-white/10 bg-black/20 px-4 py-3">
-                <div className="min-w-0">
-                  <label htmlFor="profile-push-notifications" className="text-sm font-semibold text-zinc-100">
-                    Браузерные push-уведомления
-                  </label>
-                  <p className="mt-1 text-sm leading-6 text-zinc-400">
-                    Мгновенные всплывающие уведомления на экране
-                  </p>
-                </div>
-                <Switch
-                  id="profile-push-notifications"
-                  checked={pushNotifications}
-                  onCheckedChange={(checked) => {
-                    setPushNotifications(checked);
-                    setErrorMessage("");
-                    setSuccessMessage("");
-
-                    if (!checked) {
-                      return;
-                    }
-
-                    void requestBrowserPushPermissionIfNeeded().then((result) => {
-                      if (!result.ok) {
-                        setErrorMessage(result.message);
-                      }
+                  onClick={() => {
+                    startProfileTransition(async () => {
+                      await saveProfile();
                     });
                   }}
-                />
+                  disabled={isProfileSaveDisabled}
+                  className="bg-orange-600 shadow-[0_16px_40px_rgba(249,115,22,0.28)] hover:bg-orange-500"
+                >
+                  {isProfilePending ? "Сохраняем..." : "Сохранить профиль"}
+                </Button>
+
+                <Button
+                  type="button"
+                  onClick={handleRemoveAvatar}
+                  disabled={!image || isProfilePending || isProcessingImage}
+                  className="border border-white/10 bg-white/5 text-zinc-200 shadow-none hover:bg-white/10"
+                >
+                  Удалить аватар
+                </Button>
+
+                <Button
+                  type="button"
+                  onClick={() => {
+                    setBannerUrl("");
+                    setErrorMessage("");
+                    setSuccessMessage("");
+                  }}
+                  disabled={!bannerUrl.trim() || isProfilePending || isProcessingImage}
+                  className="border border-white/10 bg-white/5 text-zinc-200 shadow-none hover:bg-white/10"
+                >
+                  Очистить баннер
+                </Button>
               </div>
 
-              <div className="flex flex-col gap-4 rounded-[1.25rem] border border-white/10 bg-black/20 px-4 py-4 sm:flex-row sm:items-center sm:justify-between">
-                <div className="min-w-0">
-                  <div className="text-sm font-semibold text-zinc-100">
-                    Telegram-бот
-                  </div>
-                  {telegramId ? (
-                    <p className="mt-1 break-words text-sm leading-6 text-emerald-300">
-                      ✅ Подключено (ID: {telegramId})
-                    </p>
-                  ) : (
-                    <p className="mt-1 text-sm leading-6 text-zinc-400">
-                      Подключите Telegram, чтобы получать уведомления о сделках напрямую в боте SafeLoot.
-                    </p>
-                  )}
+              {isProcessingAvatar ? (
+                <p className="text-sm text-zinc-400">Подготавливаем аватар для загрузки...</p>
+              ) : null}
+              {isProcessingBanner ? (
+                <p className="text-sm text-zinc-400">Подготавливаем баннер для загрузки...</p>
+              ) : null}
+            </>
+          ) : (
+            <>
+              <section className="space-y-4 rounded-[1.75rem] border border-white/10 bg-white/5 p-5">
+                <div>
+                  <h3 className="text-base font-semibold text-white">Автоприветствие</h3>
+                  <p className="mt-1 text-sm leading-7 text-zinc-400">
+                    Это сообщение отправится автоматически, когда покупатель впервые откроет с вами новый диалог.
+                  </p>
                 </div>
 
-                {telegramId ? (
+                <Textarea
+                  id="seller-auto-greeting"
+                  value={autoGreeting}
+                  onChange={(event) => {
+                    setAutoGreeting(event.target.value);
+                    clearAutomationMessages();
+                  }}
+                  maxLength={1200}
+                  placeholder="Например: Привет! Я онлайн и обычно отвечаю в течение пары минут. Если нужен конкретный формат товара, напишите сразу детали."
+                  className="min-h-36 border-white/10 bg-black/20 text-zinc-100 placeholder:text-zinc-500 focus:border-orange-400/40 focus:bg-black/30"
+                />
+                <p className="text-sm text-zinc-500">
+                  До 1200 символов. Оставьте поле пустым, если автоприветствие не нужно.
+                </p>
+              </section>
+
+              <section className="space-y-4 rounded-[1.75rem] border border-white/10 bg-white/5 p-5">
+                <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                  <div>
+                    <h3 className="text-base font-semibold text-white">Автоответы по ключевым словам</h3>
+                    <p className="mt-1 text-sm leading-7 text-zinc-400">
+                      Если покупатель напишет фразу с ключевым словом, система отправит подготовленный ответ от вашего имени.
+                    </p>
+                  </div>
+
                   <Button
                     type="button"
-                    onClick={handleDisconnectTelegram}
-                    disabled={isTelegramPending}
-                    className="border border-white/10 bg-white/5 text-zinc-200 shadow-none hover:bg-white/10"
-                  >
-                    {isTelegramPending ? "Отключаем..." : "Отключить"}
-                  </Button>
-                ) : (
-                  <Button
-                    type="button"
-                    onClick={handleConnectTelegram}
-                    disabled={isTelegramPending}
+                    onClick={handleAddKeywordRule}
                     className="bg-sky-600 text-white shadow-[0_16px_40px_rgba(2,132,199,0.28)] hover:bg-sky-500"
                   >
-                    {isTelegramPending ? "Готовим ссылку..." : "Подключить Telegram"}
+                    Добавить правило
                   </Button>
+                </div>
+
+                {keywordRules.length === 0 ? (
+                  <div className="rounded-[1.5rem] border border-dashed border-white/10 bg-black/20 px-4 py-5 text-sm leading-7 text-zinc-400">
+                    Правил пока нет. Добавьте ключевые слова вроде «наличие», «скидка», «онлайн», чтобы отвечать мгновенно на частые вопросы.
+                  </div>
+                ) : (
+                  <div className="space-y-4">
+                    {keywordRules.map((rule, index) => (
+                      <div
+                        key={rule.id}
+                        className="rounded-[1.5rem] border border-white/10 bg-black/20 p-4"
+                      >
+                        <div className="flex flex-col gap-4 lg:flex-row lg:items-start">
+                          <div className="grid flex-1 gap-4 md:grid-cols-[minmax(0,220px)_minmax(0,1fr)]">
+                            <div className="space-y-2">
+                              <label className="text-sm font-semibold text-zinc-200">
+                                Ключевое слово #{index + 1}
+                              </label>
+                              <Input
+                                value={rule.keyword}
+                                maxLength={80}
+                                onChange={(event) =>
+                                  updateKeywordRuleField(
+                                    rule.id,
+                                    "keyword",
+                                    event.target.value,
+                                  )
+                                }
+                                placeholder="Например: наличие"
+                              />
+                            </div>
+
+                            <div className="space-y-2">
+                              <label className="text-sm font-semibold text-zinc-200">
+                                Текст ответа
+                              </label>
+                              <Textarea
+                                value={rule.response}
+                                maxLength={1000}
+                                onChange={(event) =>
+                                  updateKeywordRuleField(
+                                    rule.id,
+                                    "response",
+                                    event.target.value,
+                                  )
+                                }
+                                placeholder="Например: Да, товар в наличии. Могу выдать сразу после оплаты."
+                                className="min-h-28 border-white/10 bg-zinc-950/60 text-zinc-100 placeholder:text-zinc-500 focus:border-orange-400/40 focus:bg-zinc-950/80"
+                              />
+                            </div>
+                          </div>
+
+                          <div className="flex w-full shrink-0 flex-col gap-3 lg:w-[220px]">
+                            <div className="flex items-center justify-between rounded-[1.25rem] border border-white/10 bg-white/5 px-4 py-3">
+                              <div>
+                                <div className="text-sm font-semibold text-zinc-100">Правило активно</div>
+                                <div className="mt-1 text-xs leading-5 text-zinc-500">
+                                  Неактивные правила сохраняются, но не срабатывают.
+                                </div>
+                              </div>
+                              <Switch
+                                checked={rule.isActive}
+                                onCheckedChange={(checked) =>
+                                  updateKeywordRuleField(rule.id, "isActive", checked)
+                                }
+                              />
+                            </div>
+
+                            <Button
+                              type="button"
+                              onClick={() => handleRemoveKeywordRule(rule.id)}
+                              className="border border-red-500/20 bg-red-500/10 text-red-100 shadow-none hover:bg-red-500/20"
+                            >
+                              Удалить правило
+                            </Button>
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
                 )}
+              </section>
+
+              <section className="space-y-4 rounded-[1.75rem] border border-white/10 bg-white/5 p-5">
+                <div className="flex items-start justify-between gap-4 rounded-[1.25rem] border border-white/10 bg-black/20 px-4 py-4">
+                  <div className="min-w-0">
+                    <h3 className="text-base font-semibold text-white">Автоответы на отзывы</h3>
+                    <p className="mt-1 text-sm leading-7 text-zinc-400">
+                      После публикации отзыва система автоматически подставит шаблонный ответ от имени продавца в зависимости от оценки.
+                    </p>
+                  </div>
+                  <Switch
+                    checked={autoReplyReviewsEnabled}
+                    onCheckedChange={(checked) => {
+                      setAutoReplyReviewsEnabled(checked);
+                      clearAutomationMessages();
+                    }}
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <label htmlFor="seller-positive-review-reply" className="text-sm font-semibold text-zinc-200">
+                    Ответ на положительные отзывы (4-5 звезд)
+                  </label>
+                  <Textarea
+                    id="seller-positive-review-reply"
+                    value={positiveReviewReply}
+                    onChange={(event) => {
+                      setPositiveReviewReply(event.target.value);
+                      clearAutomationMessages();
+                    }}
+                    maxLength={1000}
+                    placeholder="Спасибо за покупку! Обращайтесь еще"
+                    className="min-h-32 border-white/10 bg-black/20 text-zinc-100 placeholder:text-zinc-500 focus:border-orange-400/40 focus:bg-black/30"
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <label htmlFor="seller-negative-review-reply" className="text-sm font-semibold text-zinc-200">
+                    Ответ на проблемные отзывы (1-3 звезды)
+                  </label>
+                  <Textarea
+                    id="seller-negative-review-reply"
+                    value={negativeReviewReply}
+                    onChange={(event) => {
+                      setNegativeReviewReply(event.target.value);
+                      clearAutomationMessages();
+                    }}
+                    maxLength={1000}
+                    placeholder="Сожалеем, что возникли проблемы. Напишите нам в чат, и мы все решим"
+                    className="min-h-32 border-white/10 bg-black/20 text-zinc-100 placeholder:text-zinc-500 focus:border-orange-400/40 focus:bg-black/30"
+                  />
+                </div>
+              </section>
+
+              {automationErrorMessage ? (
+                <div className="rounded-[1.5rem] border border-red-500/20 bg-red-500/10 px-4 py-3 text-sm text-red-200">
+                  {automationErrorMessage}
+                </div>
+              ) : null}
+
+              {automationSuccessMessage ? (
+                <div className="rounded-[1.5rem] border border-emerald-500/20 bg-emerald-500/10 px-4 py-3 text-sm text-emerald-200">
+                  {automationSuccessMessage}
+                </div>
+              ) : null}
+
+              <div className="flex flex-wrap gap-3">
+                <Button
+                  type="button"
+                  onClick={() => {
+                    startAutomationTransition(async () => {
+                      await saveAutomationSettings();
+                    });
+                  }}
+                  disabled={isAutomationSaveDisabled}
+                  className="bg-orange-600 shadow-[0_16px_40px_rgba(249,115,22,0.28)] hover:bg-orange-500"
+                >
+                  {isAutomationPending ? "Сохраняем..." : "Сохранить автоматизацию"}
+                </Button>
+
+                <Button
+                  type="button"
+                  onClick={handleAddKeywordRule}
+                  className="border border-white/10 bg-white/5 text-zinc-200 shadow-none hover:bg-white/10"
+                >
+                  Добавить ещё правило
+                </Button>
               </div>
-            </div>
-          </section>
-
-          {errorMessage ? (
-            <div className="rounded-[1.5rem] border border-red-500/20 bg-red-500/10 px-4 py-3 text-sm text-red-200">
-              {errorMessage}
-            </div>
-          ) : null}
-
-          {successMessage ? (
-            <div className="rounded-[1.5rem] border border-emerald-500/20 bg-emerald-500/10 px-4 py-3 text-sm text-emerald-200">
-              {successMessage}
-            </div>
-          ) : null}
-
-          <div className="flex flex-wrap gap-3">
-            <Button
-              type="button"
-              onClick={() => {
-                startTransition(async () => {
-                  await saveProfile();
-                });
-              }}
-              disabled={isSaveDisabled}
-              className="bg-orange-600 shadow-[0_16px_40px_rgba(249,115,22,0.28)] hover:bg-orange-500"
-            >
-              {isPending ? "Сохраняем..." : "Сохранить профиль"}
-            </Button>
-
-            <Button
-              type="button"
-              onClick={handleRemoveAvatar}
-              disabled={!image || isPending || isProcessingImage}
-              className="border border-white/10 bg-white/5 text-zinc-200 shadow-none hover:bg-white/10"
-            >
-              Удалить аватар
-            </Button>
-
-            <Button
-              type="button"
-              onClick={() => {
-                setBannerUrl("");
-                setErrorMessage("");
-                setSuccessMessage("");
-              }}
-              disabled={!bannerUrl.trim() || isPending || isProcessingImage}
-              className="border border-white/10 bg-white/5 text-zinc-200 shadow-none hover:bg-white/10"
-            >
-              Очистить баннер
-            </Button>
-          </div>
-
-          {isProcessingAvatar ? (
-            <p className="text-sm text-zinc-400">Подготавливаем аватар для загрузки...</p>
-          ) : null}
-          {isProcessingBanner ? (
-            <p className="text-sm text-zinc-400">Подготавливаем баннер для загрузки...</p>
-          ) : null}
+            </>
+          )}
         </CardContent>
       </Card>
     </div>

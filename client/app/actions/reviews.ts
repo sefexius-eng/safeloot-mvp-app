@@ -13,6 +13,15 @@ import {
   maybeGrantReviewAuthorAchievements,
   runAchievementAutomation,
 } from "@/lib/domain/achievements";
+import {
+  createUserNotification,
+  sendNotificationRealtimeEvents,
+  type NotificationRealtimeDeliveryInput,
+} from "@/lib/domain/notifications-service";
+import {
+  sendNotificationEmails,
+  type NotificationEmailDeliveryInput,
+} from "@/lib/notification-delivery";
 import { prisma } from "@/lib/prisma";
 import { getSiteUrl } from "@/lib/site-url";
 import { escapeTelegramHtml, sendTelegramNotification } from "@/lib/telegram";
@@ -201,6 +210,25 @@ function normalizeReplyText(text?: string | null) {
   return normalizedText;
 }
 
+function getAutoReviewReplyText(input: {
+  rating: number;
+  sellerSettings?: {
+    isAutoReplyReviewsEnabled: boolean;
+    positiveReviewReply: string | null;
+    negativeReviewReply: string | null;
+  } | null;
+}) {
+  if (!input.sellerSettings?.isAutoReplyReviewsEnabled) {
+    return null;
+  }
+
+  if (input.rating >= 4) {
+    return input.sellerSettings.positiveReviewReply?.trim() || null;
+  }
+
+  return input.sellerSettings.negativeReviewReply?.trim() || null;
+}
+
 export async function createReview(
   orderId: string,
   rating: number,
@@ -211,6 +239,8 @@ export async function createReview(
     const normalizedOrderId = orderId.trim();
     const normalizedRating = normalizeReviewRating(rating);
     const normalizedComment = normalizeComment(comment);
+    const emailDeliveryQueue: NotificationEmailDeliveryInput[] = [];
+    const realtimeNotificationQueue: NotificationRealtimeDeliveryInput[] = [];
 
     if (!normalizedOrderId) {
       return {
@@ -251,6 +281,13 @@ export async function createReview(
               select: {
                 id: true,
                 telegramId: true,
+                sellerSettings: {
+                  select: {
+                    isAutoReplyReviewsEnabled: true,
+                    positiveReviewReply: true,
+                    negativeReviewReply: true,
+                  },
+                },
               },
             },
           },
@@ -272,7 +309,7 @@ export async function createReview(
           throw new Error("Отзыв по этому заказу уже существует.");
         }
 
-        const review = await transactionClient.review.create({
+        const createdReview = await transactionClient.review.create({
           data: {
             orderId: order.id,
             authorId: currentUser.id,
@@ -284,9 +321,49 @@ export async function createReview(
             id: true,
             rating: true,
             comment: true,
+            sellerReply: true,
+            replyCreatedAt: true,
             createdAt: true,
           },
         });
+
+        const autoReplyText = getAutoReviewReplyText({
+          rating: normalizedRating,
+          sellerSettings: order.seller.sellerSettings,
+        });
+        const review = autoReplyText
+          ? await transactionClient.review.update({
+              where: {
+                id: createdReview.id,
+              },
+              data: {
+                sellerReply: autoReplyText,
+                replyCreatedAt: new Date(),
+              },
+              select: {
+                id: true,
+                rating: true,
+                comment: true,
+                sellerReply: true,
+                replyCreatedAt: true,
+                createdAt: true,
+              },
+            })
+          : createdReview;
+
+        if (autoReplyText) {
+          await createUserNotification(
+            transactionClient,
+            {
+              userId: order.buyerId,
+              title: "Продавец ответил на ваш отзыв",
+              message: `По заказу \"${order.product.title}\" опубликован ответ продавца.`,
+              link: `/orders/${order.id}`,
+            },
+            emailDeliveryQueue,
+            realtimeNotificationQueue,
+          );
+        }
 
         return {
           order,
@@ -313,6 +390,11 @@ export async function createReview(
       comment: result.review.comment,
     });
 
+    await Promise.all([
+      sendNotificationEmails(emailDeliveryQueue),
+      sendNotificationRealtimeEvents(realtimeNotificationQueue),
+    ]);
+
     await runAchievementAutomation("create-review", [
       {
         label: "review-author-achievements",
@@ -325,6 +407,7 @@ export async function createReview(
       review: {
         ...result.review,
         createdAt: result.review.createdAt.toISOString(),
+        replyCreatedAt: result.review.replyCreatedAt?.toISOString() ?? null,
       },
     };
   } catch (error) {

@@ -102,6 +102,8 @@ model User {
   reviewsReceived  Review[]      @relation("ReviewSeller")
   withdrawals      Withdrawal[]
   notifications    Notification[]
+  sellerSettings   SellerSettings?
+  keywordRules     KeywordRule[]
   promoUsages      PromoUsage[]
   tavernMessages   TavernMessage[]
   ownedCosmetics   UserCosmetic[]
@@ -365,6 +367,31 @@ model Notification {
   @@index([userId, isRead])
   @@index([createdAt])
   @@map("notifications")
+}
+
+model SellerSettings {
+  id                      String   @id @default(cuid())
+  userId                  String   @unique
+  autoGreeting            String?
+  isAutoReplyReviewsEnabled Boolean  @default(false)
+  positiveReviewReply     String?
+  negativeReviewReply     String?
+  user                    User     @relation(fields: [userId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+
+  @@map("seller_settings")
+}
+
+model KeywordRule {
+  id       String  @id @default(cuid())
+  sellerId String
+  keyword  String
+  response String
+  isActive Boolean @default(true)
+  seller   User    @relation(fields: [sellerId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+
+  @@index([sellerId])
+  @@index([sellerId, isActive])
+  @@map("keyword_rules")
 }
 
 model Achievement {

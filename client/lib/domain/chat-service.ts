@@ -50,6 +50,74 @@ function uniqueUserIds(userIds: string[]) {
   return Array.from(new Set(userIds.filter(Boolean)));
 }
 
+const SELLER_AUTO_GREETING_DELAY_MS = 2200;
+const SELLER_KEYWORD_REPLY_DELAY_MS = 1800;
+
+function normalizeSellerAutomationMatchText(value?: string | null) {
+  return normalizeText(value ?? undefined).toLowerCase();
+}
+
+async function getSellerAutomationConfiguration(sellerId: string) {
+  return prisma.user.findUnique({
+    where: {
+      id: sellerId,
+    },
+    select: {
+      sellerSettings: {
+        select: {
+          autoGreeting: true,
+        },
+      },
+      keywordRules: {
+        where: {
+          isActive: true,
+        },
+        select: {
+          keyword: true,
+          response: true,
+        },
+      },
+    },
+  });
+}
+
+function findSellerKeywordRuleMatch(
+  keywordRules: Array<{
+    keyword: string;
+    response: string;
+  }>,
+  buyerMessageText: string,
+) {
+  const normalizedBuyerMessageText = normalizeSellerAutomationMatchText(
+    buyerMessageText,
+  );
+
+  if (!normalizedBuyerMessageText) {
+    return null;
+  }
+
+  return [...keywordRules]
+    .sort((leftRule, rightRule) => rightRule.keyword.length - leftRule.keyword.length)
+    .find((rule) => {
+      const normalizedKeyword = normalizeSellerAutomationMatchText(rule.keyword);
+
+      return normalizedKeyword
+        ? normalizedBuyerMessageText.includes(normalizedKeyword)
+        : false;
+    });
+}
+
+function scheduleSellerAutomationTask(
+  task: () => Promise<void>,
+  delayMs: number,
+) {
+  setTimeout(() => {
+    void task().catch((error) => {
+      console.error("Seller automation task failed", error);
+    });
+  }, delayMs);
+}
+
 async function runChessAchievementAutomation(
   scope: string,
   gameMetadata: ConversationGameMetadata,
@@ -416,10 +484,13 @@ async function getOrCreateConversationRecord(input: {
       });
 
       if (existingConversation) {
-        return existingConversation;
+        return {
+          id: existingConversation.id,
+          isNew: false,
+        };
       }
 
-      return transactionClient.conversation.create({
+      const createdConversation = await transactionClient.conversation.create({
         data: {
           buyerId,
           sellerId,
@@ -430,6 +501,11 @@ async function getOrCreateConversationRecord(input: {
           id: true,
         },
       });
+
+      return {
+        id: createdConversation.id,
+        isNew: true,
+      };
     },
     {
       isolationLevel: Prisma.TransactionIsolationLevel.Serializable,
@@ -663,6 +739,7 @@ export async function getOrCreateDirectConversation(input: {
   if (existingConversation) {
     return {
       conversationId: existingConversation.id,
+      isNewConversation: false,
     };
   }
 
@@ -696,10 +773,13 @@ export async function getOrCreateDirectConversation(input: {
       });
 
       if (existingConversationInTransaction) {
-        return existingConversationInTransaction;
+        return {
+          id: existingConversationInTransaction.id,
+          isNew: false,
+        };
       }
 
-      return transactionClient.conversation.create({
+      const createdConversation = await transactionClient.conversation.create({
         data: {
           buyerId: userId,
           sellerId: targetUserId,
@@ -709,19 +789,137 @@ export async function getOrCreateDirectConversation(input: {
           id: true,
         },
       });
+
+      return {
+        id: createdConversation.id,
+        isNew: true,
+      };
     },
     {
       isolationLevel: Prisma.TransactionIsolationLevel.Serializable,
     },
   );
 
+  if (conversation.isNew) {
+    scheduleConversationAutoGreeting({
+      conversationId: conversation.id,
+      sellerId: targetUserId,
+    });
+  }
+
   return {
     conversationId: conversation.id,
+    isNewConversation: conversation.isNew,
   };
 }
 
 async function getOrCreateConversationByOrder(orderId: string) {
   return resolveConversationByOrder(orderId);
+}
+
+async function publishOrderMirroredMessages(input: {
+  orderId: string;
+  message?: RealtimeConversationMessagePayload | null;
+  systemMessage?: RealtimeConversationMessagePayload | null;
+  typingUsers?: RealtimeTypingUser[];
+  includeTypingState?: boolean;
+}) {
+  const tasks = [] as Promise<unknown>[];
+
+  if (input.includeTypingState && input.typingUsers) {
+    tasks.push(publishOrderTypingStateEvent(input.orderId, input.typingUsers));
+  }
+
+  if (input.message) {
+    tasks.push(
+      publishOrderMessageEvent(
+        input.orderId,
+        mapConversationMessageToOrderMessage(input.message),
+      ),
+    );
+  }
+
+  if (input.systemMessage) {
+    tasks.push(
+      publishOrderMessageEvent(
+        input.orderId,
+        mapConversationMessageToOrderMessage(input.systemMessage),
+      ),
+    );
+  }
+
+  if (tasks.length > 0) {
+    await Promise.all(tasks);
+  }
+}
+
+async function sendSellerAutomatedConversationMessage(input: {
+  conversationId: string;
+  sellerId: string;
+  text: string;
+}) {
+  const result = await createConversationMessage({
+    conversationId: input.conversationId,
+    senderId: input.sellerId,
+    text: input.text,
+    disableSellerAutomation: true,
+  });
+
+  if (result.orderId) {
+    await publishOrderMirroredMessages({
+      orderId: result.orderId,
+      message: result.message,
+      systemMessage: result.systemMessage,
+    });
+  }
+}
+
+function scheduleConversationAutoGreeting(input: {
+  conversationId: string;
+  sellerId: string;
+}) {
+  scheduleSellerAutomationTask(async () => {
+    const sellerAutomationConfiguration = await getSellerAutomationConfiguration(
+      input.sellerId,
+    );
+    const autoGreeting = sellerAutomationConfiguration?.sellerSettings?.autoGreeting;
+
+    if (!autoGreeting) {
+      return;
+    }
+
+    await sendSellerAutomatedConversationMessage({
+      conversationId: input.conversationId,
+      sellerId: input.sellerId,
+      text: autoGreeting,
+    });
+  }, SELLER_AUTO_GREETING_DELAY_MS);
+}
+
+function scheduleConversationKeywordAutoReply(input: {
+  conversationId: string;
+  sellerId: string;
+  buyerMessageText: string;
+}) {
+  scheduleSellerAutomationTask(async () => {
+    const sellerAutomationConfiguration = await getSellerAutomationConfiguration(
+      input.sellerId,
+    );
+    const matchedRule = findSellerKeywordRuleMatch(
+      sellerAutomationConfiguration?.keywordRules ?? [],
+      input.buyerMessageText,
+    );
+
+    if (!matchedRule?.response) {
+      return;
+    }
+
+    await sendSellerAutomatedConversationMessage({
+      conversationId: input.conversationId,
+      sellerId: input.sellerId,
+      text: matchedRule.response,
+    });
+  }, SELLER_KEYWORD_REPLY_DELAY_MS);
 }
 
 export async function getOrCreateConversation(input: {
@@ -731,8 +929,16 @@ export async function getOrCreateConversation(input: {
 }) {
   const conversation = await getOrCreateConversationRecord(input);
 
+  if (conversation.isNew) {
+    scheduleConversationAutoGreeting({
+      conversationId: conversation.id,
+      sellerId: normalizeText(input.sellerId),
+    });
+  }
+
   return {
     conversationId: conversation.id,
+    isNewConversation: conversation.isNew,
   };
 }
 
@@ -1159,6 +1365,7 @@ export async function createConversationMessage(input: {
   imageBase64?: string | null;
   type?: MessageType;
   gameMetadata?: Prisma.InputJsonValue | null;
+  disableSellerAutomation?: boolean;
 }) {
   const conversationId = normalizeText(input.conversationId);
   const senderId = normalizeText(input.senderId);
@@ -1211,6 +1418,7 @@ export async function createConversationMessage(input: {
       id: true,
       buyerId: true,
       sellerId: true,
+      orderId: true,
       deletedByIds: true,
       buyer: {
         select: {
@@ -1361,8 +1569,22 @@ export async function createConversationMessage(input: {
       : []),
   ]);
 
+  if (
+    !input.disableSellerAutomation &&
+    senderId === conversation.buyerId &&
+    messageType === MessageType.TEXT &&
+    text
+  ) {
+    scheduleConversationKeywordAutoReply({
+      conversationId: conversation.id,
+      sellerId: conversation.sellerId,
+      buyerMessageText: text,
+    });
+  }
+
   return {
     conversationId: conversation.id,
+    orderId: conversation.orderId ?? null,
     message: serializedMessage,
     systemMessage: serializedSystemMessage,
     typingUsers,
@@ -2319,13 +2541,13 @@ export async function createChatMessage(input: {
     ? mapConversationMessageToOrderMessage(result.systemMessage)
     : null;
 
-  await Promise.all([
-    publishOrderTypingStateEvent(order.id, result.typingUsers),
-    ...(orderMessage ? [publishOrderMessageEvent(order.id, orderMessage)] : []),
-    ...(orderSystemMessage
-      ? [publishOrderMessageEvent(order.id, orderSystemMessage)]
-      : []),
-  ]);
+  await publishOrderMirroredMessages({
+    orderId: order.id,
+    typingUsers: result.typingUsers,
+    message: result.message,
+    systemMessage: result.systemMessage,
+    includeTypingState: true,
+  });
 
   triggerDealChatTelegramNotification({
     telegramId: recipient.telegramId,
