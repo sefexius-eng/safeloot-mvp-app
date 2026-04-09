@@ -26,6 +26,13 @@ enum CosmeticType {
   DECORATION
 }
 
+enum AchievementRarity {
+  COMMON
+  RARE
+  EPIC
+  LEGENDARY
+}
+
 enum OrderStatus {
   PENDING
   PAID
@@ -89,6 +96,7 @@ model User {
   promoUsages      PromoUsage[]
   tavernMessages   TavernMessage[]
   ownedCosmetics   UserCosmetic[]
+  earnedAchievements UserAchievement[]
   createdAt        DateTime      @default(now())
   updatedAt        DateTime      @updatedAt
 
@@ -342,6 +350,33 @@ model Notification {
   @@index([userId, isRead])
   @@index([createdAt])
   @@map("notifications")
+}
+
+model Achievement {
+  id               String             @id @default(cuid())
+  key              String             @unique
+  title            String
+  description      String
+  iconUrl          String
+  rarity           AchievementRarity
+  userAchievements UserAchievement[]
+
+  @@map("achievements")
+}
+
+model UserAchievement {
+  id            String      @id @default(cuid())
+  userId        String
+  achievementId String
+  earnedAt      DateTime    @default(now())
+  user          User        @relation(fields: [userId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+  achievement   Achievement @relation(fields: [achievementId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+
+  @@unique([userId, achievementId])
+  @@index([userId])
+  @@index([achievementId])
+  @@index([earnedAt])
+  @@map("user_achievements")
 }
 
 model TavernMessage {
