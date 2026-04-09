@@ -25,6 +25,30 @@
       "value": "#FACC15"
     },
     {
+      "name": "Токсичный неон",
+      "type": "COLOR",
+      "price": 50,
+      "value": "text-green-500 drop-shadow-[0_0_8px_rgba(34,197,94,0.8)]"
+    },
+    {
+      "name": "Кибер-синий",
+      "type": "COLOR",
+      "price": 75,
+      "value": "text-cyan-400 drop-shadow-[0_0_8px_rgba(34,211,238,0.8)]"
+    },
+    {
+      "name": "Кровавый рубин",
+      "type": "COLOR",
+      "price": 100,
+      "value": "text-red-600 font-bold drop-shadow-[0_0_5px_rgba(220,38,38,0.9)]"
+    },
+    {
+      "name": "Золотой VIP",
+      "type": "COLOR",
+      "price": 200,
+      "value": "text-yellow-400 drop-shadow-[0_0_8px_rgba(250,204,21,0.8)]"
+    },
+    {
       "name": "Arcade Nova",
       "type": "FONT",
       "price": 55,
@@ -43,6 +67,24 @@
       "value": "font-cosmetic-velocity-sans"
     },
     {
+      "name": "Хакерский Mono",
+      "type": "FONT",
+      "price": 30,
+      "value": "font-mono"
+    },
+    {
+      "name": "Элегантный Serif",
+      "type": "FONT",
+      "price": 40,
+      "value": "font-serif"
+    },
+    {
+      "name": "Жирный Impact",
+      "type": "FONT",
+      "price": 50,
+      "value": "font-black tracking-widest"
+    },
+    {
       "name": "Ash Ring",
       "type": "DECORATION",
       "price": 70,
@@ -59,6 +101,24 @@
       "type": "DECORATION",
       "price": 110,
       "value": "avatar-frame-obsidian-crest"
+    },
+    {
+      "name": "Золотое кольцо",
+      "type": "DECORATION",
+      "price": 150,
+      "value": "ring-4 ring-yellow-400 ring-offset-2 ring-offset-[#0B0E14]"
+    },
+    {
+      "name": "Неоновый пульс",
+      "type": "DECORATION",
+      "price": 250,
+      "value": "ring-2 ring-fuchsia-500 shadow-[0_0_15px_rgba(217,70,239,0.8)]"
+    },
+    {
+      "name": "Кровавая жатва",
+      "type": "DECORATION",
+      "price": 300,
+      "value": "ring-4 ring-red-600 border-dashed"
     }
   ]
 }

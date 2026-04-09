@@ -1,3 +1,6 @@
+import Image from "next/image";
+
+import { getAvatarDecorationClassName } from "@/lib/cosmetics";
 import { cn } from "@/lib/utils";
 
 interface UserAvatarProps {
@@ -35,15 +38,18 @@ export function UserAvatar({
           aria-hidden="true"
           className={cn(
             "pointer-events-none absolute inset-[-4px] rounded-[inherit]",
-            decoration,
+            getAvatarDecorationClassName(decoration),
           )}
         />
       ) : null}
       <span className="relative z-[1] flex h-full w-full items-center justify-center overflow-hidden rounded-[inherit]">
         {src ? (
-          <img
+          <Image
             src={src}
             alt=""
+            fill
+            unoptimized
+            sizes="128px"
             className={cn("h-full w-full object-cover", imageClassName)}
           />
         ) : (
