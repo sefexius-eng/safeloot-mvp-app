@@ -360,6 +360,7 @@ model Cosmetic {
   name   String
   type   CosmeticType
   price  Float
+  oldPrice Float?
   value  String
   users  UserCosmetic[]
 
