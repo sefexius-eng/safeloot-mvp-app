@@ -29,8 +29,8 @@ import {
   type RealtimeGameWinPayload,
 } from "@/lib/pusher";
 
-const CANVAS_WIDTH = 960;
-const CANVAS_HEIGHT = 540;
+const CANVAS_WIDTH = 800;
+const CANVAS_HEIGHT = 600;
 const STROKE_COLOR = "#111827";
 const STROKE_WIDTH = 5;
 
@@ -123,23 +123,33 @@ export function MiniGameContainer({
     return pickRandomMiniGameWord(game);
   }
 
-  function isNormalizedCoordinate(value: unknown) {
-    return typeof value === "number" && Number.isFinite(value) && value >= 0 && value <= 1;
+  function isCanvasCoordinate(value: unknown): value is number {
+    return typeof value === "number" && Number.isFinite(value) && value >= 0;
   }
 
-  function isNormalizedDrawSegment(value: unknown): value is DrawSegment {
+  function isCanvasDrawSegment(value: unknown): value is DrawSegment {
     if (!value || typeof value !== "object" || Array.isArray(value)) {
       return false;
     }
 
     const segment = value as Record<string, unknown>;
+    const { startX, startY, endX, endY, color } = segment;
+
+    if (
+      !isCanvasCoordinate(startX) ||
+      !isCanvasCoordinate(startY) ||
+      !isCanvasCoordinate(endX) ||
+      !isCanvasCoordinate(endY) ||
+      typeof color !== "string"
+    ) {
+      return false;
+    }
 
     return (
-      isNormalizedCoordinate(segment.startX) &&
-      isNormalizedCoordinate(segment.startY) &&
-      isNormalizedCoordinate(segment.endX) &&
-      isNormalizedCoordinate(segment.endY) &&
-      typeof segment.color === "string"
+      startX <= CANVAS_WIDTH &&
+      endX <= CANVAS_WIDTH &&
+      startY <= CANVAS_HEIGHT &&
+      endY <= CANVAS_HEIGHT
     );
   }
 
@@ -183,9 +193,8 @@ export function MiniGameContainer({
 
   function drawSegment(segment: DrawSegment) {
     const context = getCanvasContext();
-    const canvas = canvasRef.current;
 
-    if (!context || !canvas) {
+    if (!context) {
       return;
     }
 
@@ -193,8 +202,8 @@ export function MiniGameContainer({
     context.lineJoin = "round";
     context.strokeStyle = segment.color;
     context.beginPath();
-    context.moveTo(segment.startX * canvas.width, segment.startY * canvas.height);
-    context.lineTo(segment.endX * canvas.width, segment.endY * canvas.height);
+    context.moveTo(segment.startX, segment.startY);
+    context.lineTo(segment.endX, segment.endY);
     context.stroke();
   }
 
@@ -308,16 +317,16 @@ export function MiniGameContainer({
         return;
       }
 
-      const normalizedSegments = parsedSegments.filter(isNormalizedDrawSegment);
+      const drawSegments = parsedSegments.filter(isCanvasDrawSegment);
 
-      if (normalizedSegments.length !== parsedSegments.length) {
+      if (drawSegments.length !== parsedSegments.length) {
         clearCanvasState();
         return;
       }
 
-      strokesRef.current = normalizedSegments;
+      strokesRef.current = drawSegments;
 
-      for (const segment of normalizedSegments) {
+      for (const segment of drawSegments) {
         drawSegment(segment);
       }
     } catch {
@@ -411,14 +420,14 @@ export function MiniGameContainer({
     }
 
     const rect = canvas.getBoundingClientRect();
-    const x = event.clientX - rect.left;
-    const y = event.clientY - rect.top;
-    const relativeX = x / Math.max(rect.width, 1);
-    const relativeY = y / Math.max(rect.height, 1);
+    const scaleX = canvas.width / Math.max(rect.width, 1);
+    const scaleY = canvas.height / Math.max(rect.height, 1);
+    const x = (event.clientX - rect.left) * scaleX;
+    const y = (event.clientY - rect.top) * scaleY;
 
     return {
-      x: Math.min(1, Math.max(0, relativeX)),
-      y: Math.min(1, Math.max(0, relativeY)),
+      x: Math.min(canvas.width, Math.max(0, x)),
+      y: Math.min(canvas.height, Math.max(0, y)),
     };
   }
 
@@ -513,9 +522,6 @@ export function MiniGameContainer({
     if (!canvas) {
       return;
     }
-
-    canvas.width = CANVAS_WIDTH;
-    canvas.height = CANVAS_HEIGHT;
 
     if (isDrawer) {
       if (!restoreCanvasSnapshotFromStorage()) {
@@ -847,12 +853,14 @@ export function MiniGameContainer({
               <div className="mt-4 overflow-hidden rounded-[1.25rem] border border-white/10 bg-white p-2 shadow-[inset_0_1px_0_rgba(255,255,255,0.4)]">
                 <canvas
                   ref={canvasRef}
+                  width={CANVAS_WIDTH}
+                  height={CANVAS_HEIGHT}
                   onPointerDown={handlePointerDown}
                   onPointerMove={handlePointerMove}
                   onPointerUp={handlePointerUp}
                   onPointerOut={stopDrawing}
                   onPointerCancel={stopDrawing}
-                  className="aspect-video h-auto w-full touch-none rounded-[0.9rem] bg-white"
+                  className="w-full h-auto aspect-[4/3] touch-none bg-white rounded-md"
                 />
               </div>
 
