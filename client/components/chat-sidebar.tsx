@@ -10,6 +10,7 @@ import { UserAvatar } from "@/components/ui/user-avatar";
 export interface ChatSidebarConversation {
   id: string;
   updatedAt: string;
+  isArchived: boolean;
   otherParty: {
     id: string;
     name: string | null;

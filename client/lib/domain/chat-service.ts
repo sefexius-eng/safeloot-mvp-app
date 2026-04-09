@@ -35,6 +35,10 @@ import {
   triggerDealChatTelegramNotification,
 } from "@/lib/domain/notifications-service";
 
+function uniqueUserIds(userIds: string[]) {
+  return Array.from(new Set(userIds.filter(Boolean)));
+}
+
 async function getConversationContextById(conversationId: string) {
   return prisma.conversation.findUnique({
     where: {
@@ -45,6 +49,8 @@ async function getConversationContextById(conversationId: string) {
       buyerId: true,
       sellerId: true,
       productId: true,
+      archivedByIds: true,
+      deletedByIds: true,
       buyer: {
         select: {
           name: true,
@@ -381,6 +387,111 @@ export async function getOrCreateConversation(input: {
   };
 }
 
+export async function toggleArchiveConversationByUser(input: {
+  conversationId: string;
+  userId: string;
+}) {
+  const conversationId = normalizeText(input.conversationId);
+  const userId = normalizeText(input.userId);
+
+  if (!conversationId) {
+    throw new Error("conversationId is required.");
+  }
+
+  if (!userId) {
+    throw new Error("userId is required.");
+  }
+
+  const conversation = await prisma.conversation.findUnique({
+    where: {
+      id: conversationId,
+    },
+    select: {
+      id: true,
+      buyerId: true,
+      sellerId: true,
+      archivedByIds: true,
+    },
+  });
+
+  if (!conversation) {
+    throw new Error(`Conversation with id ${conversationId} was not found.`);
+  }
+
+  ensureConversationParticipant(userId, conversation);
+
+  const isArchived = conversation.archivedByIds.includes(userId);
+  const nextArchivedByIds = isArchived
+    ? conversation.archivedByIds.filter((participantId) => participantId !== userId)
+    : uniqueUserIds([...conversation.archivedByIds, userId]);
+
+  await prisma.conversation.update({
+    where: {
+      id: conversation.id,
+    },
+    data: {
+      archivedByIds: nextArchivedByIds,
+    },
+  });
+
+  return {
+    conversationId: conversation.id,
+    isArchived: !isArchived,
+  };
+}
+
+export async function softDeleteConversationByUser(input: {
+  conversationId: string;
+  userId: string;
+}) {
+  const conversationId = normalizeText(input.conversationId);
+  const userId = normalizeText(input.userId);
+
+  if (!conversationId) {
+    throw new Error("conversationId is required.");
+  }
+
+  if (!userId) {
+    throw new Error("userId is required.");
+  }
+
+  const conversation = await prisma.conversation.findUnique({
+    where: {
+      id: conversationId,
+    },
+    select: {
+      id: true,
+      buyerId: true,
+      sellerId: true,
+      archivedByIds: true,
+      deletedByIds: true,
+    },
+  });
+
+  if (!conversation) {
+    throw new Error(`Conversation with id ${conversationId} was not found.`);
+  }
+
+  ensureConversationParticipant(userId, conversation);
+
+  await prisma.conversation.update({
+    where: {
+      id: conversation.id,
+    },
+    data: {
+      archivedByIds: conversation.archivedByIds.filter(
+        (participantId) => participantId !== userId,
+      ),
+      deletedByIds: uniqueUserIds([...conversation.deletedByIds, userId]),
+    },
+  });
+
+  return {
+    conversationId: conversation.id,
+    isDeleted: true,
+  };
+}
+
 export async function listConversationsByUser(userId: string) {
   const normalizedUserId = normalizeText(userId);
 
@@ -390,6 +501,11 @@ export async function listConversationsByUser(userId: string) {
 
   const conversations = await prisma.conversation.findMany({
     where: {
+      NOT: {
+        deletedByIds: {
+          has: normalizedUserId,
+        },
+      },
       OR: [
         {
           buyerId: normalizedUserId,
@@ -404,6 +520,7 @@ export async function listConversationsByUser(userId: string) {
       buyerId: true,
       sellerId: true,
       productId: true,
+      archivedByIds: true,
       createdAt: true,
       updatedAt: true,
       buyer: {
@@ -459,6 +576,7 @@ export async function listConversationsByUser(userId: string) {
       id: conversation.id,
       createdAt: conversation.createdAt.toISOString(),
       updatedAt: conversation.updatedAt.toISOString(),
+      isArchived: conversation.archivedByIds.includes(normalizedUserId),
       otherParty: {
         id: otherParty.id,
         name: otherParty.name,
@@ -712,6 +830,7 @@ export async function createConversationMessage(input: {
       id: true,
       buyerId: true,
       sellerId: true,
+      deletedByIds: true,
       buyer: {
         select: {
           name: true,
@@ -802,6 +921,7 @@ export async function createConversationMessage(input: {
           id: conversation.id,
         },
         data: {
+          deletedByIds: [],
           updatedAt: new Date(),
         },
       });

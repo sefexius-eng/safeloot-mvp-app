@@ -1,5 +1,6 @@
 "use server";
 
+import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 
 import { BANNED_USER_MESSAGE, getCurrentSessionUser } from "@/lib/access-control";
@@ -12,6 +13,8 @@ import {
   getOrCreateConversation as getOrCreateConversationRecord,
   markChatMessagesAsRead,
   markConversationMessagesAsRead as markConversationMessagesAsReadRecord,
+  softDeleteConversationByUser,
+  toggleArchiveConversationByUser,
 } from "@/lib/domain/chat-service";
 
 interface StartDirectConversationResult {
@@ -19,6 +22,22 @@ interface StartDirectConversationResult {
   conversationId?: string;
   message?: string;
   requiresLogin?: boolean;
+}
+
+interface ConversationPreferenceActionResult {
+  ok: boolean;
+  message?: string;
+  conversationId?: string;
+  isArchived?: boolean;
+  isDeleted?: boolean;
+}
+
+function revalidateChatPaths(conversationId?: string) {
+  revalidatePath("/chats", "layout");
+
+  if (conversationId) {
+    revalidatePath(`/chats/${conversationId}`);
+  }
 }
 
 async function requireActiveChatUserId() {
@@ -88,6 +107,58 @@ export async function startDirectConversation(
   }
 }
 
+export async function toggleArchiveConversation(
+  chatId: string,
+): Promise<ConversationPreferenceActionResult> {
+  try {
+    const userId = await requireActiveChatUserId();
+    const result = await toggleArchiveConversationByUser({
+      conversationId: chatId,
+      userId,
+    });
+
+    revalidateChatPaths(result.conversationId);
+
+    return {
+      ok: true,
+      conversationId: result.conversationId,
+      isArchived: result.isArchived,
+    };
+  } catch (error) {
+    return {
+      ok: false,
+      message:
+        error instanceof Error ? error.message : "Не удалось обновить архив чата.",
+    };
+  }
+}
+
+export async function deleteConversation(
+  chatId: string,
+): Promise<ConversationPreferenceActionResult> {
+  try {
+    const userId = await requireActiveChatUserId();
+    const result = await softDeleteConversationByUser({
+      conversationId: chatId,
+      userId,
+    });
+
+    revalidateChatPaths(result.conversationId);
+
+    return {
+      ok: true,
+      conversationId: result.conversationId,
+      isDeleted: result.isDeleted,
+    };
+  } catch (error) {
+    return {
+      ok: false,
+      message:
+        error instanceof Error ? error.message : "Не удалось удалить чат.",
+    };
+  }
+}
+
 export async function sendMessage(
   orderId: string,
   content?: string,
@@ -121,12 +192,16 @@ export async function sendConversationMessage(
   const userId = await requireActiveChatUserId();
   const sanitizedText = moderateAntiLeakageMessageText(text).text;
 
-  return createConversationMessage({
+  const result = await createConversationMessage({
     conversationId,
     senderId: userId,
     text: sanitizedText,
     imageBase64,
   });
+
+  revalidateChatPaths(result.conversationId);
+
+  return result;
 }
 
 export async function markConversationMessagesAsRead(conversationId: string) {
