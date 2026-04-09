@@ -191,6 +191,12 @@
       "type": "DECORATION",
       "price": 880,
       "value": "/cosmetics/oni-samurai-frame.png"
+    },
+    {
+      "name": "Огненный Oni [Анимированная]",
+      "type": "DECORATION",
+      "price": 980,
+      "value": "/cosmetics/oni-flame-animated.gif"
     }
   ]
 }
