@@ -87,7 +87,7 @@ export function ProfileHero({
           </p>
 
           <div className="mt-3 flex flex-wrap items-center gap-3">
-            <h1 className="min-w-0 break-words text-3xl font-semibold tracking-tight text-white [overflow-wrap:anywhere] md:text-5xl md:leading-[1.02]">
+            <h1 className="min-w-0 break-words text-3xl font-semibold tracking-tight text-white md:text-5xl md:leading-[1.02]">
               <span
                 className={getNicknameAppearanceClassName(appearance)}
                 style={getNicknameAppearanceStyle(appearance)}

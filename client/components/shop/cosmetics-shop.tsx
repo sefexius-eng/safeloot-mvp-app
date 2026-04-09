@@ -1009,8 +1009,8 @@ export function CosmeticsShop({
           </section>
         ) : null}
 
-        <div className="mt-6 flex flex-col gap-6 lg:flex-row lg:items-start">
-          <section className="order-2 min-w-0 flex-1 lg:order-1">
+        <div className="relative mt-6 grid grid-cols-1 items-start gap-6 lg:grid-cols-12">
+          <section className="min-w-0 lg:col-span-8 xl:col-span-9">
             <div className="flex items-center justify-between gap-3 text-sm text-zinc-400">
               <p>
                 Найдено предметов: <span className="font-semibold text-white">{visibleCosmetics.length}</span>
@@ -1249,92 +1249,94 @@ export function CosmeticsShop({
             )}
           </section>
 
-          <section className="order-1 w-full overflow-visible lg:order-2 lg:w-[400px] lg:shrink-0 lg:self-start lg:sticky lg:top-24 lg:h-fit">
-            <div className="flex flex-col gap-2 md:flex-row md:items-end md:justify-between lg:flex-col lg:items-start">
-              <div>
-                <p className="text-xs font-semibold uppercase tracking-[0.24em] text-zinc-500">
-                  Полный preview профиля
-                </p>
-                <p className="mt-2 text-sm leading-6 text-zinc-400">
-                  Большой блок справа остаётся в кадре, чтобы изменения аватара и ника были видны даже на нижних карточках.
-                </p>
+          <section className="sticky top-24 z-20 w-full min-w-[280px] lg:col-span-4 xl:col-span-3">
+            <div className="overflow-visible rounded-[1.85rem] border border-white/10 bg-[linear-gradient(180deg,rgba(9,9,11,0.92),rgba(17,24,39,0.92))] p-4 shadow-[0_18px_48px_rgba(0,0,0,0.24)] backdrop-blur md:p-5">
+              <div className="flex flex-col gap-2 md:flex-row md:items-end md:justify-between lg:flex-col lg:items-start">
+                <div>
+                  <p className="text-xs font-semibold uppercase tracking-[0.24em] text-zinc-500">
+                    Полный preview профиля
+                  </p>
+                  <p className="mt-2 text-sm leading-6 text-zinc-400">
+                    Большой блок справа остаётся в кадре, чтобы изменения аватара и ника были видны даже на нижних карточках.
+                  </p>
+                </div>
+                {previewCosmeticId ? (
+                  <button
+                    type="button"
+                    onClick={() => setPreviewCosmeticId(null)}
+                    className="text-sm font-semibold text-sky-200 transition hover:text-sky-100"
+                  >
+                    Вернуть текущий образ
+                  </button>
+                ) : null}
               </div>
-              {previewCosmeticId ? (
-                <button
-                  type="button"
-                  onClick={() => setPreviewCosmeticId(null)}
-                  className="text-sm font-semibold text-sky-200 transition hover:text-sky-100"
-                >
-                  Вернуть текущий образ
-                </button>
-              ) : null}
-            </div>
 
-            <div className="mt-4">
-              <ProfileHero
-                eyebrow="Preview в магазине"
-                displayName={previewDisplayName}
-                avatarName={previewDisplayName}
-                avatarSrc={viewer?.image ?? null}
-                appearance={previewAppearance}
-                roleBadge={
-                  <span className="inline-flex rounded-full border border-orange-500/20 bg-orange-500/10 px-3 py-1 text-xs font-semibold uppercase tracking-[0.16em] text-orange-100">
-                    SELLER VIEW
-                  </span>
-                }
-                details={
-                  <>
-                    <span className="inline-flex rounded-full border border-white/10 bg-white/5 px-3 py-1 text-zinc-200">
-                      {previewEmail}
+              <div className="mt-4">
+                <ProfileHero
+                  eyebrow="Preview в магазине"
+                  displayName={previewDisplayName}
+                  avatarName={previewDisplayName}
+                  avatarSrc={viewer?.image ?? null}
+                  appearance={previewAppearance}
+                  roleBadge={
+                    <span className="inline-flex rounded-full border border-orange-500/20 bg-orange-500/10 px-3 py-1 text-xs font-semibold uppercase tracking-[0.16em] text-orange-100">
+                      SELLER VIEW
                     </span>
-                    <span className="inline-flex rounded-full border border-white/10 bg-white/5 px-3 py-1 text-zinc-200">
-                      Витрина и отзывы SafeLoot
-                    </span>
-                    <span className="inline-flex rounded-full border border-white/10 bg-white/5 px-3 py-1 text-zinc-200">
-                      Видно в каталоге, чатах и профиле
-                    </span>
-                  </>
-                }
-                aside={
-                  <div className="rounded-[1.4rem] border border-white/10 bg-black/20 p-4 text-sm text-zinc-300">
-                    <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-zinc-500">
-                      Сейчас в фокусе
-                    </p>
-                    <p className="mt-3 text-xl font-semibold text-white">
-                      {previewCosmetic?.name ?? "Текущий образ"}
-                    </p>
-                    {previewRarity && previewRarityAccent ? (
-                      <span
-                        className={cn(
-                          "mt-3 inline-flex rounded-full border px-2.5 py-1 text-[11px] font-semibold uppercase tracking-[0.18em]",
-                          previewRarityAccent.pill,
-                        )}
-                      >
-                        {COSMETIC_RARITY_LABELS[previewRarity]}
+                  }
+                  details={
+                    <>
+                      <span className="inline-flex rounded-full border border-white/10 bg-white/5 px-3 py-1 text-zinc-200">
+                        {previewEmail}
                       </span>
-                    ) : null}
-                    <p className="mt-3 leading-6 text-zinc-300">
-                      {previewRarity
-                        ? COSMETIC_RARITY_DESCRIPTIONS[previewRarity]
-                        : "Сейчас показан ваш текущий косметический образ без усиления карточкой магазина."}
-                    </p>
-                    {previewCosmetic ? (
-                      <div className="mt-4 rounded-[1rem] border border-white/10 bg-white/5 p-3">
-                        <p className="text-[11px] uppercase tracking-[0.18em] text-zinc-500">Цена preview</p>
-                        <div className="mt-2">
-                          <CosmeticPriceBlock
-                            cosmetic={previewCosmetic}
-                            formatPrice={formatPrice}
-                          />
+                      <span className="inline-flex rounded-full border border-white/10 bg-white/5 px-3 py-1 text-zinc-200">
+                        Витрина и отзывы SafeLoot
+                      </span>
+                      <span className="inline-flex rounded-full border border-white/10 bg-white/5 px-3 py-1 text-zinc-200">
+                        Видно в каталоге, чатах и профиле
+                      </span>
+                    </>
+                  }
+                  aside={
+                    <div className="rounded-[1.4rem] border border-white/10 bg-black/20 p-4 text-sm text-zinc-300">
+                      <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-zinc-500">
+                        Сейчас в фокусе
+                      </p>
+                      <p className="mt-3 text-xl font-semibold text-white">
+                        {previewCosmetic?.name ?? "Текущий образ"}
+                      </p>
+                      {previewRarity && previewRarityAccent ? (
+                        <span
+                          className={cn(
+                            "mt-3 inline-flex rounded-full border px-2.5 py-1 text-[11px] font-semibold uppercase tracking-[0.18em]",
+                            previewRarityAccent.pill,
+                          )}
+                        >
+                          {COSMETIC_RARITY_LABELS[previewRarity]}
+                        </span>
+                      ) : null}
+                      <p className="mt-3 leading-6 text-zinc-300">
+                        {previewRarity
+                          ? COSMETIC_RARITY_DESCRIPTIONS[previewRarity]
+                          : "Сейчас показан ваш текущий косметический образ без усиления карточкой магазина."}
+                      </p>
+                      {previewCosmetic ? (
+                        <div className="mt-4 rounded-[1rem] border border-white/10 bg-white/5 p-3">
+                          <p className="text-[11px] uppercase tracking-[0.18em] text-zinc-500">Цена preview</p>
+                          <div className="mt-2">
+                            <CosmeticPriceBlock
+                              cosmetic={previewCosmetic}
+                              formatPrice={formatPrice}
+                            />
+                          </div>
+                          <p className="mt-2 text-xs leading-5 text-zinc-400">
+                            В preview подмешивается текущий образ пользователя и эффект выделенной карточки.
+                          </p>
                         </div>
-                        <p className="mt-2 text-xs leading-5 text-zinc-400">
-                          В preview подмешивается текущий образ пользователя и эффект выделенной карточки.
-                        </p>
-                      </div>
-                    ) : null}
-                  </div>
-                }
-              />
+                      ) : null}
+                    </div>
+                  }
+                />
+              </div>
             </div>
           </section>
         </div>
