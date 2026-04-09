@@ -113,12 +113,15 @@ export default async function ChatRoomPage({ params }: ChatPageProps) {
     <div className="flex min-h-0 flex-1 flex-col">
       <header className="shrink-0 border-b border-gray-800 bg-[#11151b] px-4 py-4">
         <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
-          <div className="flex min-w-0 items-center gap-3">
+          <Link
+            href={`/user/${conversation.otherParty.id}`}
+            className="group flex min-w-0 items-center gap-3 rounded-[1.25rem] transition hover:bg-white/5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-400/50"
+          >
             <UserAvatar
               src={conversation.otherParty.image}
               name={otherPartyName}
               decoration={conversation.otherParty.activeDecoration}
-              className="h-12 w-12 shrink-0 border-gray-700 bg-zinc-800/80"
+              className="h-12 w-12 shrink-0 border-gray-700 bg-zinc-800/80 transition group-hover:border-sky-400/30"
               imageClassName="rounded-full object-cover"
             />
             <div className="min-w-0">
@@ -127,7 +130,7 @@ export default async function ChatRoomPage({ params }: ChatPageProps) {
                   <CosmeticName
                     text={otherPartyName}
                     appearance={conversation.otherParty}
-                    className="block truncate"
+                    className="block truncate transition group-hover:underline group-hover:underline-offset-4 group-hover:brightness-110"
                   />
                   <TeamBadge role={conversation.otherParty.accountRole} />
                 </div>
@@ -152,7 +155,7 @@ export default async function ChatRoomPage({ params }: ChatPageProps) {
                 />
               </div>
             </div>
-          </div>
+          </Link>
 
           <div className="w-full lg:w-auto">
             {statusMeta && conversation.latestOrder ? (
