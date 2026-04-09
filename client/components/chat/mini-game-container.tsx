@@ -27,7 +27,7 @@ import {
 } from "@/lib/pusher";
 
 const CANVAS_WIDTH = 960;
-const CANVAS_HEIGHT = 560;
+const CANVAS_HEIGHT = 540;
 const STROKE_COLOR = "#111827";
 const STROKE_WIDTH = 5;
 
@@ -116,6 +116,26 @@ export function MiniGameContainer({
     return pickRandomMiniGameWord(game);
   }
 
+  function isNormalizedCoordinate(value: unknown) {
+    return typeof value === "number" && Number.isFinite(value) && value >= 0 && value <= 1;
+  }
+
+  function isNormalizedDrawSegment(value: unknown): value is DrawSegment {
+    if (!value || typeof value !== "object" || Array.isArray(value)) {
+      return false;
+    }
+
+    const segment = value as Record<string, unknown>;
+
+    return (
+      isNormalizedCoordinate(segment.startX) &&
+      isNormalizedCoordinate(segment.startY) &&
+      isNormalizedCoordinate(segment.endX) &&
+      isNormalizedCoordinate(segment.endY) &&
+      typeof segment.color === "string"
+    );
+  }
+
   function normalizeGuess(value: string) {
     return value.trim().toLocaleLowerCase("ru-RU").replaceAll("ё", "е");
   }
@@ -156,15 +176,16 @@ export function MiniGameContainer({
 
   function drawSegment(segment: DrawSegment) {
     const context = getCanvasContext();
+    const canvas = canvasRef.current;
 
-    if (!context) {
+    if (!context || !canvas) {
       return;
     }
 
     context.strokeStyle = segment.color;
     context.beginPath();
-    context.moveTo(segment.startX, segment.startY);
-    context.lineTo(segment.endX, segment.endY);
+    context.moveTo(segment.startX * canvas.width, segment.startY * canvas.height);
+    context.lineTo(segment.endX * canvas.width, segment.endY * canvas.height);
     context.stroke();
   }
 
@@ -215,9 +236,16 @@ export function MiniGameContainer({
         return;
       }
 
-      strokesRef.current = parsedSegments;
+      const normalizedSegments = parsedSegments.filter(isNormalizedDrawSegment);
 
-      for (const segment of parsedSegments) {
+      if (normalizedSegments.length !== parsedSegments.length) {
+        clearCanvasState();
+        return;
+      }
+
+      strokesRef.current = normalizedSegments;
+
+      for (const segment of normalizedSegments) {
         drawSegment(segment);
       }
     } catch {
@@ -314,12 +342,12 @@ export function MiniGameContainer({
       offsetX: number;
       offsetY: number;
     };
-    const scaleX = canvas.width / Math.max(canvas.clientWidth, 1);
-    const scaleY = canvas.height / Math.max(canvas.clientHeight, 1);
+    const relativeX = nativeEvent.offsetX / Math.max(canvas.clientWidth, 1);
+    const relativeY = nativeEvent.offsetY / Math.max(canvas.clientHeight, 1);
 
     return {
-      x: nativeEvent.offsetX * scaleX,
-      y: nativeEvent.offsetY * scaleY,
+      x: Math.min(1, Math.max(0, relativeX)),
+      y: Math.min(1, Math.max(0, relativeY)),
     };
   }
 
@@ -432,19 +460,6 @@ export function MiniGameContainer({
         return;
       }
 
-      const context = getCanvasContext();
-
-      if (!context) {
-        appendSegment({
-          startX: payload.startX,
-          startY: payload.startY,
-          endX: payload.endX,
-          endY: payload.endY,
-          color: payload.color,
-        });
-        return;
-      }
-
       const nextSegment: DrawSegment = {
         startX: payload.startX,
         startY: payload.startY,
@@ -453,13 +468,7 @@ export function MiniGameContainer({
         color: payload.color,
       };
 
-      strokesRef.current = [...strokesRef.current, nextSegment];
-      persistStrokes(strokesRef.current);
-      context.strokeStyle = payload.color;
-      context.beginPath();
-      context.moveTo(payload.startX, payload.startY);
-      context.lineTo(payload.endX, payload.endY);
-      context.stroke();
+      appendSegment(nextSegment);
     };
 
     const handleRemoteClear = (payload: RealtimeGameClearPayload) => {
@@ -708,7 +717,7 @@ export function MiniGameContainer({
                   onPointerUp={stopDrawing}
                   onPointerLeave={stopDrawing}
                   onPointerCancel={stopDrawing}
-                  className="aspect-[12/7] h-auto w-full touch-none rounded-[0.9rem] bg-white"
+                  className="aspect-video h-auto w-full touch-none rounded-[0.9rem] bg-white"
                 />
               </div>
 
