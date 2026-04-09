@@ -16,6 +16,11 @@ import { prisma } from "@/lib/prisma";
 import { normalizeCurrencyCode } from "@/lib/currency-config";
 
 import {
+  maybeGrantBuyerPurchaseAchievements,
+  maybeGrantSellerSaleAchievements,
+  runAchievementAutomation,
+} from "@/lib/domain/achievements";
+import {
   calculateCommissionBreakdown,
   ensureOrderAccess,
   ensureOrderIsNotTerminal,
@@ -267,6 +272,13 @@ export async function createOrder(input: {
   } catch (error) {
     console.error("[TAVERN_PURCHASE_ANNOUNCEMENT_ERROR]", error);
   }
+
+  await runAchievementAutomation("create-order", [
+    {
+      label: "buyer-purchase-achievements",
+      run: () => maybeGrantBuyerPurchaseAchievements(buyerId),
+    },
+  ]);
 
   return {
     orderId: result.orderId,
@@ -544,6 +556,13 @@ export async function confirmOrder(input: { orderId?: string; buyerId: string })
     }),
   ]);
 
+  await runAchievementAutomation("confirm-order", [
+    {
+      label: "buyer-purchase-achievements",
+      run: () => maybeGrantBuyerPurchaseAchievements(buyerId),
+    },
+  ]);
+
   return {
     orderId: result.orderId,
     status: result.status,
@@ -697,6 +716,7 @@ export async function completeOrder(input: { orderId: string; buyerId: string })
       return {
         orderId: order.id,
         transactionId: transaction.id,
+        sellerId: order.sellerId,
         status: OrderStatus.COMPLETED,
         platformFee: formatMoney(fee),
         sellerNetAmount: formatMoney(sellerPayout),
@@ -723,6 +743,13 @@ export async function completeOrder(input: { orderId: string; buyerId: string })
       platformFee: result.platformFee,
       sellerNetAmount: result.sellerNetAmount,
     }),
+  ]);
+
+  await runAchievementAutomation("complete-order", [
+    {
+      label: "seller-sale-achievements",
+      run: () => maybeGrantSellerSaleAchievements(result.sellerId),
+    },
   ]);
 
   return {

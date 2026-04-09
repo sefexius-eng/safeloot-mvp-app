@@ -2,6 +2,10 @@ import { OrderStatus } from "@prisma/client";
 import { notFound } from "next/navigation";
 
 import CensoredText from "@/components/censored-text";
+import {
+  ProfileAchievementGrid,
+  type ProfileAchievementItem,
+} from "@/components/profile/profile-achievement-grid";
 import { ProfileHero } from "@/components/profile/profile-hero";
 import { PublicProfileMessageButton } from "@/components/profile/public-profile-message-button";
 import { ProfileRoleBadge } from "@/components/profile/profile-role-badge";
@@ -85,6 +89,25 @@ async function getPublicSellerProfile(id: string) {
       ...USER_APPEARANCE_SELECT,
       bannerUrl: true,
       badges: true,
+      earnedAchievements: {
+        select: {
+          id: true,
+          earnedAt: true,
+          achievement: {
+            select: {
+              id: true,
+              key: true,
+              title: true,
+              description: true,
+              iconUrl: true,
+              rarity: true,
+            },
+          },
+        },
+        orderBy: {
+          earnedAt: "desc",
+        },
+      },
       lastSeen: true,
       role: true,
       rank: true,
@@ -197,6 +220,18 @@ async function getPublicSellerProfile(id: string) {
       seller.badges,
       automaticBadgeData.automaticBadgeIds,
     ),
+    achievements: seller.earnedAchievements.map(
+      (entry) =>
+        ({
+          id: entry.id,
+          key: entry.achievement.key,
+          title: entry.achievement.title,
+          description: entry.achievement.description,
+          iconUrl: entry.achievement.iconUrl,
+          rarity: entry.achievement.rarity,
+          earnedAt: entry.earnedAt.toISOString(),
+        }) satisfies ProfileAchievementItem,
+    ),
     averageRating,
     reviewCount,
     products,
@@ -255,6 +290,9 @@ export default async function PublicUserPage({ params }: PublicUserPageProps) {
             <span className="rounded-full border border-white/10 bg-white/5 px-3 py-1.5 text-zinc-300">
               На площадке с {formatJoinedDate(seller.createdAt)}
             </span>
+            <span className="rounded-full border border-white/10 bg-white/5 px-3 py-1.5 text-zinc-300">
+              Достижений: <span className="ml-2 font-semibold text-white">{seller.achievements.length}</span>
+            </span>
           </>
         }
         actions={
@@ -290,6 +328,15 @@ export default async function PublicUserPage({ params }: PublicUserPageProps) {
             </div>
           </div>
         }
+      />
+
+      <ProfileAchievementGrid
+        eyebrow="Achievement Board"
+        title="Достижения продавца"
+        description="Коллекция достижений, заработанных за активность, отзывы и успешные продажи на SafeLoot."
+        achievements={seller.achievements}
+        emptyTitle="Пока достижений нет"
+        emptyDescription="Когда продавец совершит первые заметные шаги на площадке, здесь появятся его достижения."
       />
 
       <section className="space-y-6">

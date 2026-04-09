@@ -2,6 +2,10 @@ import { OrderStatus } from "@prisma/client";
 import Link from "next/link";
 
 import { ProfilePageClient } from "@/app/profile/profile-page-client";
+import {
+  ProfileAchievementGrid,
+  type ProfileAchievementItem,
+} from "@/components/profile/profile-achievement-grid";
 import { extractUserAppearance, USER_APPEARANCE_SELECT } from "@/lib/cosmetics";
 import { ProfileHero } from "@/components/profile/profile-hero";
 import { ProfileRoleBadge } from "@/components/profile/profile-role-badge";
@@ -134,6 +138,25 @@ export default async function ProfilePage() {
             bannerUrl: true,
             badges: true,
             availableBalance: true,
+            earnedAchievements: {
+              select: {
+                id: true,
+                earnedAt: true,
+                achievement: {
+                  select: {
+                    id: true,
+                    key: true,
+                    title: true,
+                    description: true,
+                    iconUrl: true,
+                    rarity: true,
+                  },
+                },
+              },
+              orderBy: {
+                earnedAt: "desc",
+              },
+            },
             products: {
               select: {
                 id: true,
@@ -248,6 +271,20 @@ export default async function ProfilePage() {
           }) satisfies ProfileTabsReview,
       )
     : [];
+  const profileAchievements = sellerProfile
+    ? sellerProfile.earnedAchievements.map(
+        (entry) =>
+          ({
+            id: entry.id,
+            key: entry.achievement.key,
+            title: entry.achievement.title,
+            description: entry.achievement.description,
+            iconUrl: entry.achievement.iconUrl,
+            rarity: entry.achievement.rarity,
+            earnedAt: entry.earnedAt.toISOString(),
+          }) satisfies ProfileAchievementItem,
+      )
+    : [];
   const currentProfileRole = sellerProfile?.role ?? session?.user?.role;
   const shouldShowProfileRoleBadge =
     currentProfileRole && currentProfileRole !== "USER"
@@ -282,6 +319,9 @@ export default async function ProfilePage() {
             <span className="rounded-full border border-white/10 bg-white/5 px-4 py-2 text-zinc-300">
               Отзывов: <span className="ml-2 font-semibold text-white">{profileReviews.length}</span>
             </span>
+            <span className="rounded-full border border-white/10 bg-white/5 px-4 py-2 text-zinc-300">
+              Ачивок: <span className="ml-2 font-semibold text-white">{profileAchievements.length}</span>
+            </span>
           </>
         }
         actions={
@@ -314,6 +354,15 @@ export default async function ProfilePage() {
         isAuthenticated={Boolean(sellerId)}
         availableBalance={formatCurrency(Number(sellerProfile?.availableBalance ?? 0))}
         withdrawals={withdrawals.map(mapWithdrawalListItem)}
+      />
+
+      <ProfileAchievementGrid
+        eyebrow="Achievement Board"
+        title="Мои достижения"
+        description="Здесь собираются все полученные ачивки за покупки, отзывы и успешные продажи на площадке."
+        achievements={profileAchievements}
+        emptyTitle="Пока достижений нет"
+        emptyDescription="Совершите первую покупку, оставьте отзыв или завершите продажу, чтобы открыть первые достижения."
       />
 
       {sellerProfile ? (

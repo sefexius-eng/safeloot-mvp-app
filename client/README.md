@@ -63,6 +63,16 @@ npm run seed:cosmetics
 
 The script is idempotent and updates existing cosmetics by the pair of `name + type` instead of creating duplicates.
 
+## Achievements Seed
+
+To populate the achievements catalog locally, run:
+
+```bash
+npm run seed:achievements
+```
+
+The script is idempotent and updates existing achievements by unique `key`, so it is safe to rerun after changing titles, descriptions, rarities, or icon URLs.
+
 This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
 
 ## Learn More

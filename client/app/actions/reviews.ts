@@ -9,6 +9,10 @@ import {
   type CurrentSessionUser,
 } from "@/lib/access-control";
 import { getAuthSession } from "@/lib/auth";
+import {
+  maybeGrantReviewAuthorAchievements,
+  runAchievementAutomation,
+} from "@/lib/domain/achievements";
 import { prisma } from "@/lib/prisma";
 import { getSiteUrl } from "@/lib/site-url";
 import { escapeTelegramHtml, sendTelegramNotification } from "@/lib/telegram";
@@ -308,6 +312,13 @@ export async function createReview(
       rating: result.review.rating,
       comment: result.review.comment,
     });
+
+    await runAchievementAutomation("create-review", [
+      {
+        label: "review-author-achievements",
+        run: () => maybeGrantReviewAuthorAchievements(currentUser.id),
+      },
+    ]);
 
     return {
       ok: true,
