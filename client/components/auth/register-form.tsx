@@ -70,9 +70,9 @@ export function RegisterForm() {
   }
 
   return (
-    <section className="w-full max-w-md rounded-[2rem] border border-white/10 bg-zinc-900/82 p-6 shadow-[0_24px_80px_rgba(0,0,0,0.28)] backdrop-blur md:p-8">
+    <section className="w-full max-w-md rounded-[2rem] border border-white/10 bg-[radial-gradient(circle_at_top_left,rgba(0,200,83,0.12),transparent_38%),linear-gradient(180deg,rgba(22,27,34,0.94),rgba(13,17,23,0.98))] p-6 shadow-[0_24px_80px_rgba(0,0,0,0.36)] backdrop-blur-xl md:p-8">
       <div>
-        <p className="text-sm font-semibold tracking-[0.24em] uppercase text-sky-300">
+        <p className="text-sm font-semibold tracking-[0.24em] uppercase text-[#8bffb3]">
           Account Setup
         </p>
         <h1 className="mt-3 text-3xl font-semibold tracking-tight text-white">
@@ -91,7 +91,7 @@ export function RegisterForm() {
             value={email}
             onChange={(event) => setEmail(event.target.value)}
             placeholder="you@example.com"
-            className="border-white/10 bg-white/5 text-zinc-100 placeholder:text-zinc-500 focus:border-orange-500/45 focus:bg-white/8"
+            className="border-white/10 bg-white/[0.04] text-zinc-100 placeholder:text-zinc-500 focus:border-[#00C853]/45 focus:bg-white/[0.07]"
             required
           />
         </label>
@@ -103,7 +103,7 @@ export function RegisterForm() {
             value={password}
             onChange={(event) => setPassword(event.target.value)}
             placeholder="Минимум 6 символов"
-            className="border-white/10 bg-white/5 text-zinc-100 placeholder:text-zinc-500 focus:border-orange-500/45 focus:bg-white/8"
+            className="border-white/10 bg-white/[0.04] text-zinc-100 placeholder:text-zinc-500 focus:border-[#00C853]/45 focus:bg-white/[0.07]"
             required
           />
         </label>
@@ -117,7 +117,7 @@ export function RegisterForm() {
         <Button
           type="submit"
           disabled={isSubmitting}
-          className="h-14 w-full rounded-[1.35rem] bg-sky-600 text-base font-semibold shadow-[0_18px_42px_rgba(2,132,199,0.35)] hover:bg-sky-500"
+          className="h-14 w-full rounded-[1.35rem] border border-[#00C853]/35 bg-[#00C853] text-base font-bold text-[#03130a] shadow-[0_18px_42px_rgba(0,200,83,0.24)] hover:bg-[#00A344]"
         >
           {isSubmitting ? "Создаем аккаунт..." : "Зарегистрироваться"}
         </Button>
@@ -125,7 +125,7 @@ export function RegisterForm() {
 
       <p className="mt-6 text-sm text-zinc-400">
         Уже есть аккаунт?{" "}
-        <Link href="/login" className="font-semibold text-sky-300 transition hover:text-sky-200">
+        <Link href="/login" className="font-semibold text-[#8bffb3] transition hover:text-[#ecfff3]">
           Войти
         </Link>
       </p>

@@ -389,7 +389,7 @@ export function SiteHeader() {
   }
 
   return (
-    <header className="sticky top-0 z-50 border-b border-white/10 bg-[rgba(9,9,11,0.78)] backdrop-blur-xl">
+    <header className="sticky top-0 z-50 border-b border-white/10 bg-[rgba(8,12,16,0.76)] shadow-[0_14px_44px_rgba(0,0,0,0.32)] backdrop-blur-xl">
       <div className="mx-auto w-full max-w-7xl px-4 py-3 sm:px-6 lg:px-8">
         <div className="flex flex-col gap-3 md:grid md:grid-cols-[auto_minmax(0,1fr)_auto] md:items-center md:gap-5">
           <div className="flex items-center justify-between gap-4 md:min-w-[220px]">
@@ -417,7 +417,7 @@ export function SiteHeader() {
                   <button
                     type="button"
                     aria-label="Меню профиля"
-                    className="inline-flex h-9 w-9 items-center justify-center rounded-md border border-white/10 bg-white/5 text-zinc-100 shadow-[0_12px_28px_rgba(0,0,0,0.22)] transition hover:bg-white/10"
+                    className="inline-flex h-9 w-9 items-center justify-center rounded-md border border-white/10 bg-white/[0.04] text-zinc-100 shadow-[0_12px_28px_rgba(0,0,0,0.28)] transition hover:border-[#00C853]/25 hover:bg-white/[0.07]"
                   >
                     <UserAvatar
                       src={user?.image ?? session?.user?.image ?? null}
@@ -434,7 +434,7 @@ export function SiteHeader() {
                 <Link
                   href="/chats"
                   aria-label="Открыть диалоги"
-                  className="relative inline-flex h-9 w-9 items-center justify-center rounded-md border border-white/10 bg-white/5 text-lg text-zinc-100 shadow-[0_12px_28px_rgba(0,0,0,0.22)] transition hover:bg-white/10"
+                  className="relative inline-flex h-9 w-9 items-center justify-center rounded-md border border-white/10 bg-white/[0.04] text-lg text-zinc-100 shadow-[0_12px_28px_rgba(0,0,0,0.28)] transition hover:border-[#00C853]/25 hover:bg-white/[0.07]"
                 >
                   <span aria-hidden="true">💬</span>
                 </Link>
@@ -442,7 +442,7 @@ export function SiteHeader() {
                 {!isBanned ? (
                   <Link
                     href="/sell"
-                    className="sell-link inline-flex h-9 w-9 items-center justify-center rounded-md bg-orange-600 text-white shadow-[0_16px_40px_rgba(249,115,22,0.28)] transition hover:-translate-y-0.5 hover:bg-orange-500 md:w-auto md:px-4"
+                    className="sell-link inline-flex h-9 w-9 items-center justify-center rounded-md border border-[#00C853]/35 bg-[#00C853] text-black shadow-[0_16px_40px_rgba(0,200,83,0.24)] transition hover:-translate-y-0.5 hover:bg-[#00A344] md:w-auto md:px-4"
                     aria-label="Продать"
                   >
                     <span aria-hidden="true">+</span>
@@ -453,13 +453,13 @@ export function SiteHeader() {
               <div className="flex items-center gap-2 md:hidden">
                 <Link
                   href="/login"
-                  className="inline-flex h-9 items-center justify-center rounded-md border border-white/10 bg-white/5 px-3 text-sm font-semibold text-zinc-100 shadow-[0_12px_28px_rgba(0,0,0,0.22)] transition hover:bg-white/10"
+                  className="inline-flex h-9 items-center justify-center rounded-md border border-white/10 bg-white/[0.04] px-3 text-sm font-semibold text-zinc-100 shadow-[0_12px_28px_rgba(0,0,0,0.28)] transition hover:border-[#00C853]/25 hover:bg-white/[0.07]"
                 >
                   Войти
                 </Link>
                 <Link
                   href="/register"
-                  className="inline-flex h-9 items-center justify-center rounded-md bg-sky-600 px-3 text-sm font-semibold text-white shadow-[0_16px_40px_rgba(2,132,199,0.28)] transition hover:-translate-y-0.5 hover:bg-sky-500"
+                  className="inline-flex h-9 items-center justify-center rounded-md border border-[#00C853]/35 bg-[#00C853] px-3 text-sm font-bold text-black shadow-[0_16px_40px_rgba(0,200,83,0.24)] transition hover:-translate-y-0.5 hover:bg-[#00A344]"
                 >
                   Регистрация
                 </Link>
@@ -498,15 +498,15 @@ export function SiteHeader() {
                     setIsSearchOpen(true);
                   }}
                   placeholder="Поиск по играм и категориям"
-                  className="h-12 w-full rounded-2xl border border-white/10 bg-white/5 pl-12 pr-4 text-sm text-zinc-100 shadow-[0_12px_30px_rgba(0,0,0,0.22)] outline-none transition placeholder:text-zinc-500 focus:border-orange-500/40 focus:bg-white/8 focus:ring-4 focus:ring-orange-500/10"
+                  className="h-12 w-full rounded-2xl border border-white/10 bg-[rgba(22,27,34,0.86)] pl-12 pr-4 text-sm text-zinc-100 shadow-[0_14px_34px_rgba(0,0,0,0.3)] outline-none transition placeholder:text-zinc-500 focus:border-[#00C853]/40 focus:bg-[rgba(26,29,36,0.96)] focus:ring-4 focus:ring-[#00C853]/10"
                 />
               </label>
 
               {isSearchOpen ? (
-                <div className="absolute top-[calc(100%+0.6rem)] z-[80] w-full overflow-hidden rounded-[1.5rem] border border-white/10 bg-[rgba(9,9,11,0.96)] shadow-[0_24px_80px_rgba(0,0,0,0.34)] backdrop-blur-xl">
+                <div className="absolute top-[calc(100%+0.6rem)] z-[80] w-full overflow-hidden rounded-[1.5rem] border border-white/10 bg-[rgba(11,14,20,0.96)] shadow-[0_24px_80px_rgba(0,0,0,0.42)] backdrop-blur-xl">
                   {!query.trim() ? (
                     <div>
-                      <div className="border-b border-white/10 px-4 py-3 text-xs font-semibold tracking-[0.22em] uppercase text-orange-200/80">
+                      <div className="border-b border-white/10 px-4 py-3 text-xs font-semibold tracking-[0.22em] uppercase text-[#c8ffd9]/80">
                         Популярные игры
                       </div>
                       <div className="divide-y divide-white/10">
@@ -608,7 +608,7 @@ export function SiteHeader() {
                   <button
                     type="button"
                     aria-label="Меню профиля"
-                    className="hidden min-w-0 max-w-full items-center gap-3 rounded-2xl border border-white/10 bg-white/5 px-3 py-2 text-left text-zinc-300 shadow-[0_12px_28px_rgba(0,0,0,0.22)] transition hover:bg-white/10 md:flex"
+                    className="hidden min-w-0 max-w-full items-center gap-3 rounded-2xl border border-white/10 bg-white/[0.04] px-3 py-2 text-left text-zinc-300 shadow-[0_12px_28px_rgba(0,0,0,0.28)] transition hover:border-[#00C853]/20 hover:bg-white/[0.07] md:flex"
                   >
                     <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border border-white/10 bg-white/5 text-zinc-200">
                       <svg
@@ -673,10 +673,10 @@ export function SiteHeader() {
                     aria-label="Выбор валюты"
                     value={currency}
                     onChange={(event) => setCurrency(event.target.value as typeof currency)}
-                    className="!h-10 !rounded-xl !border !border-gray-800 !bg-[#1A1D24] !px-3 !py-1.5 !pr-9 !text-sm !text-gray-300 !shadow-none outline-none focus:!border-orange-500 focus:!ring-1 focus:!ring-orange-500"
+                    className="!h-10 !rounded-xl !border !border-white/10 !bg-[#161B22] !px-3 !py-1.5 !pr-9 !text-sm !text-gray-300 !shadow-none outline-none focus:!border-[#00C853] focus:!ring-1 focus:!ring-[#00C853]"
                   >
                     {currencies.map((item) => (
-                      <option key={item.code} value={item.code} className="bg-[#1A1D24] text-gray-300">
+                      <option key={item.code} value={item.code} className="bg-[#161B22] text-gray-300">
                         {item.code}
                       </option>
                     ))}
@@ -686,7 +686,7 @@ export function SiteHeader() {
                 <Link
                   href="/chats"
                   aria-label="Открыть диалоги"
-                  className="relative inline-flex h-9 w-9 items-center justify-center rounded-md border border-white/10 bg-white/5 text-lg text-zinc-100 shadow-[0_12px_28px_rgba(0,0,0,0.22)] transition hover:bg-white/10 md:h-10 md:w-10 md:rounded-xl"
+                  className="relative inline-flex h-9 w-9 items-center justify-center rounded-md border border-white/10 bg-white/[0.04] text-lg text-zinc-100 shadow-[0_12px_28px_rgba(0,0,0,0.28)] transition hover:border-[#00C853]/25 hover:bg-white/[0.07] md:h-10 md:w-10 md:rounded-xl"
                 >
                   <span aria-hidden="true">💬</span>
                 </Link>
@@ -699,7 +699,7 @@ export function SiteHeader() {
                   <>
                     <Link
                       href="/sell"
-                      className="sell-link inline-flex h-9 w-9 items-center justify-center rounded-md bg-orange-600 text-white shadow-[0_16px_40px_rgba(249,115,22,0.28)] transition hover:-translate-y-0.5 hover:bg-orange-500 md:h-10 md:w-auto md:px-4 md:rounded-xl"
+                      className="sell-link inline-flex h-9 w-9 items-center justify-center rounded-md border border-[#00C853]/35 bg-[#00C853] text-black shadow-[0_16px_40px_rgba(0,200,83,0.24)] transition hover:-translate-y-0.5 hover:bg-[#00A344] md:h-10 md:w-auto md:px-4 md:rounded-xl"
                       aria-label="Продать"
                     >
                       <span className="md:hidden" aria-hidden="true">+</span>
@@ -709,7 +709,7 @@ export function SiteHeader() {
                     {isAdminRole(user?.role) ? (
                       <Link
                         href="/admin"
-                        className="inline-flex h-10 items-center justify-center rounded-xl border border-white/10 bg-white/5 px-4 text-sm font-semibold text-zinc-100 shadow-[0_12px_28px_rgba(0,0,0,0.22)] transition hover:bg-white/10"
+                        className="inline-flex h-10 items-center justify-center rounded-xl border border-white/10 bg-white/[0.04] px-4 text-sm font-semibold text-zinc-100 shadow-[0_12px_28px_rgba(0,0,0,0.28)] transition hover:border-[#00C853]/25 hover:bg-white/[0.07]"
                       >
                         Админ-панель
                       </Link>
@@ -732,14 +732,14 @@ export function SiteHeader() {
               <>
                 <Link
                   href="/login"
-                  className="inline-flex h-10 items-center justify-center rounded-xl border border-white/10 bg-white/5 px-4 text-sm font-semibold text-zinc-100 shadow-[0_12px_28px_rgba(0,0,0,0.22)] transition hover:bg-white/10"
+                  className="inline-flex h-10 items-center justify-center rounded-xl border border-white/10 bg-white/[0.04] px-4 text-sm font-semibold text-zinc-100 shadow-[0_12px_28px_rgba(0,0,0,0.28)] transition hover:border-[#00C853]/25 hover:bg-white/[0.07]"
                 >
                   Войти
                 </Link>
 
                 <Link
                   href="/register"
-                  className="inline-flex h-10 items-center justify-center rounded-xl bg-sky-600 px-4 text-sm font-semibold text-white shadow-[0_16px_40px_rgba(2,132,199,0.28)] transition hover:-translate-y-0.5 hover:bg-sky-500"
+                  className="inline-flex h-10 items-center justify-center rounded-xl border border-[#00C853]/35 bg-[#00C853] px-4 text-sm font-bold text-black shadow-[0_16px_40px_rgba(0,200,83,0.24)] transition hover:-translate-y-0.5 hover:bg-[#00A344]"
                 >
                   Регистрация
                 </Link>

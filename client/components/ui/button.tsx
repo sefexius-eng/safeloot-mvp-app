@@ -23,6 +23,14 @@ const sizeClasses: Record<ButtonSize, string> = {
   icon: "h-10 w-10 px-0",
 };
 
+function hasCustomBackground(className?: string) {
+  return Boolean(className && /(^|\s)!?bg-|(^|\s)!?bg-\[/.test(className));
+}
+
+function hasCustomTextColor(className?: string) {
+  return Boolean(className && /(^|\s)!?text-/.test(className));
+}
+
 const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
   (
     {
@@ -34,13 +42,20 @@ const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
     },
     ref,
   ) => {
+    const usesCustomBackground = hasCustomBackground(className);
+    const usesCustomTextColor = hasCustomTextColor(className);
+
     return (
       <button
         ref={ref}
         type={type}
         className={cn(
-          "inline-flex items-center justify-center rounded-2xl text-sm font-semibold transition disabled:translate-y-0 disabled:cursor-not-allowed disabled:opacity-60",
-          variantClasses[variant],
+          "inline-flex items-center justify-center rounded-2xl text-sm font-semibold transition focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[#00C853]/15 disabled:translate-y-0 disabled:cursor-not-allowed disabled:opacity-60",
+          variant === "default"
+            ? usesCustomBackground
+              ? cn(!usesCustomTextColor && "text-white")
+              : "border border-[#00C853]/35 bg-[#00C853] text-[#03130c] shadow-[0_18px_42px_rgba(0,200,83,0.24)] hover:-translate-y-0.5 hover:bg-[#00A344]"
+            : variantClasses[variant],
           sizeClasses[size],
           className,
         )}

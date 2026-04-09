@@ -1,12 +1,21 @@
 @import "tailwindcss";
 
 :root {
-  --background: #09090b;
-  --foreground: #f4f4f5;
-  --muted: rgba(39, 39, 42, 0.88);
-  --muted-foreground: rgba(212, 212, 216, 0.78);
-  --surface: rgba(24, 24, 27, 0.72);
+  --background: #0b0e14;
+  --background-strong: #0d1117;
+  --foreground: #f5fff8;
+  --muted: rgba(13, 17, 23, 0.92);
+  --muted-foreground: rgba(194, 204, 198, 0.72);
+  --surface: rgba(22, 27, 34, 0.82);
+  --surface-strong: rgba(26, 29, 36, 0.94);
   --surface-border: rgba(255, 255, 255, 0.08);
+  --surface-border-strong: rgba(255, 255, 255, 0.14);
+  --accent: #00c853;
+  --accent-strong: #00a344;
+  --accent-soft: rgba(0, 200, 83, 0.12);
+  --accent-soft-strong: rgba(0, 200, 83, 0.22);
+  --accent-text: #c8ffd9;
+  --accent-text-strong: #ecfff3;
 }
 
 @theme inline {
@@ -29,18 +38,94 @@ html {
 }
 
 body {
+  position: relative;
+  isolation: isolate;
   min-height: 100vh;
+  overflow-x: hidden;
   background: var(--background);
   background-image:
-    radial-gradient(circle at top left, rgba(249, 115, 22, 0.16), transparent 22%),
-    radial-gradient(circle at bottom right, rgba(59, 130, 246, 0.14), transparent 24%),
-    linear-gradient(180deg, #09090b 0%, #111827 52%, #0f172a 100%);
+    radial-gradient(circle at 14% 12%, rgba(0, 200, 83, 0.16), transparent 24%),
+    radial-gradient(circle at 100% 0%, rgba(0, 128, 64, 0.15), transparent 22%),
+    radial-gradient(circle at 22% 100%, rgba(0, 200, 83, 0.1), transparent 20%),
+    linear-gradient(180deg, #0b0e14 0%, #0d1117 52%, #070a0f 100%);
   color: var(--foreground);
   font-family: var(--font-geist-sans), sans-serif;
 }
 
+body::before,
+body::after {
+  content: "";
+  pointer-events: none;
+  position: fixed;
+  inset: 0;
+}
+
+body::before {
+  z-index: -2;
+  background:
+    radial-gradient(circle at 8% 10%, rgba(0, 200, 83, 0.18), transparent 26%),
+    radial-gradient(circle at 88% 8%, rgba(0, 143, 57, 0.16), transparent 23%),
+    radial-gradient(circle at 74% 78%, rgba(0, 200, 83, 0.12), transparent 24%),
+    radial-gradient(circle at 26% 72%, rgba(0, 74, 38, 0.22), transparent 28%);
+  filter: blur(46px);
+  opacity: 0.82;
+}
+
+body::after {
+  z-index: -1;
+  background-image:
+    repeating-linear-gradient(
+      0deg,
+      rgba(255, 255, 255, 0.024) 0,
+      rgba(255, 255, 255, 0.024) 1px,
+      transparent 1px,
+      transparent 4px
+    ),
+    repeating-linear-gradient(
+      90deg,
+      rgba(255, 255, 255, 0.016) 0,
+      rgba(255, 255, 255, 0.016) 1px,
+      transparent 1px,
+      transparent 5px
+    );
+  opacity: 0.06;
+  mix-blend-mode: soft-light;
+}
+
 a {
   text-decoration: none;
+}
+
+::selection {
+  background: rgba(0, 200, 83, 0.3);
+  color: #f5fff8;
+}
+
+* {
+  scrollbar-color: rgba(0, 200, 83, 0.4) rgba(255, 255, 255, 0.05);
+}
+
+*::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+
+*::-webkit-scrollbar-track {
+  background: rgba(255, 255, 255, 0.04);
+}
+
+*::-webkit-scrollbar-thumb {
+  background: rgba(0, 200, 83, 0.32);
+  border-radius: 999px;
+  border: 2px solid transparent;
+  background-clip: padding-box;
+}
+
+*::-webkit-scrollbar-thumb:hover {
+  background: rgba(0, 200, 83, 0.46);
+  border-radius: 999px;
+  border: 2px solid transparent;
+  background-clip: padding-box;
 }
 
 .sell-link,
@@ -48,9 +133,9 @@ a {
 .sell-link:visited,
 .sell-link:hover,
 .sell-link:active {
-  color: #ffffff !important;
+  color: #04110a !important;
   font-weight: 700;
-  text-shadow: 0 0 16px rgba(255, 255, 255, 0.18);
+  text-shadow: none;
 }
 
 .font-cosmetic-arcade-nova {
@@ -80,21 +165,138 @@ a {
 }
 
 .avatar-frame-neon-halo {
-  border: 1px solid rgba(56, 189, 248, 0.5);
+  border: 1px solid rgba(0, 200, 83, 0.45);
   background:
-    linear-gradient(135deg, rgba(56, 189, 248, 0.2), rgba(249, 115, 22, 0.18));
+    linear-gradient(135deg, rgba(0, 200, 83, 0.18), rgba(0, 66, 34, 0.3));
   box-shadow:
-    0 0 0 1px rgba(14, 165, 233, 0.28),
-    0 0 18px rgba(56, 189, 248, 0.42),
-    0 0 36px rgba(249, 115, 22, 0.18);
+    0 0 0 1px rgba(0, 200, 83, 0.24),
+    0 0 18px rgba(0, 200, 83, 0.34),
+    0 0 36px rgba(0, 94, 48, 0.22);
 }
 
 .avatar-frame-obsidian-crest {
-  border: 1px solid rgba(250, 204, 21, 0.34);
+  border: 1px solid rgba(0, 200, 83, 0.24);
   background:
-    linear-gradient(135deg, rgba(24, 24, 27, 0.22), rgba(250, 204, 21, 0.12));
+    linear-gradient(135deg, rgba(24, 24, 27, 0.22), rgba(0, 200, 83, 0.08));
   box-shadow:
     0 0 0 1px rgba(63, 63, 70, 0.24),
     0 0 0 4px rgba(39, 39, 42, 0.28),
     0 22px 44px rgba(0, 0, 0, 0.34);
+}
+
+:where(input, textarea, select):focus,
+:where(input, textarea, select):focus-visible {
+  border-color: rgba(0, 200, 83, 0.48) !important;
+  box-shadow:
+    0 0 0 1px rgba(0, 200, 83, 0.38),
+    0 0 0 4px rgba(0, 200, 83, 0.12) !important;
+}
+
+:where([class*="text-orange-"], [class*="text-sky-"]) {
+  color: var(--accent-text) !important;
+}
+
+:where([class*="hover:text-orange-"], [class*="hover:text-sky-"]):hover {
+  color: var(--accent-text-strong) !important;
+}
+
+.group:hover :where([class*="group-hover:text-orange-"], [class*="group-hover:text-sky-"]) {
+  color: var(--accent-text-strong) !important;
+}
+
+:where([class*="border-orange-"], [class*="border-sky-"]) {
+  border-color: rgba(0, 200, 83, 0.28) !important;
+}
+
+:where([class*="hover:border-orange-"], [class*="hover:border-sky-"]):hover {
+  border-color: rgba(0, 200, 83, 0.42) !important;
+}
+
+.group:hover :where([class*="group-hover:border-orange-"], [class*="group-hover:border-sky-"]) {
+  border-color: rgba(0, 200, 83, 0.42) !important;
+}
+
+:where(
+  [class*="bg-orange-500/"],
+  [class*="bg-orange-400/"],
+  [class*="bg-orange-600/"],
+  [class*="bg-sky-400/"],
+  [class*="bg-sky-500/"],
+  [class*="bg-sky-600/"],
+  [class*="bg-sky-700/"]
+) {
+  background-color: rgba(0, 200, 83, 0.1) !important;
+}
+
+:where(
+  [class*="bg-orange-400"],
+  [class*="bg-orange-500"],
+  [class*="bg-orange-600"],
+  [class*="bg-sky-400"],
+  [class*="bg-sky-500"],
+  [class*="bg-sky-600"],
+  [class*="bg-sky-700"]
+):not([class*="bg-orange-400/"]):not([class*="bg-orange-500/"]):not([class*="bg-orange-600/"]):not([class*="bg-sky-400/"]):not([class*="bg-sky-500/"]):not([class*="bg-sky-600/"]):not([class*="bg-sky-700/"]) {
+  background-color: var(--accent) !important;
+  border-color: rgba(0, 200, 83, 0.34) !important;
+  color: #03130a !important;
+  box-shadow: 0 18px 42px rgba(0, 200, 83, 0.24) !important;
+}
+
+:where(
+  [class*="hover:bg-orange-400/"],
+  [class*="hover:bg-orange-500/"],
+  [class*="hover:bg-orange-600/"],
+  [class*="hover:bg-sky-400/"],
+  [class*="hover:bg-sky-500/"],
+  [class*="hover:bg-sky-600/"],
+  [class*="hover:bg-sky-700/"]
+):hover {
+  background-color: rgba(0, 200, 83, 0.16) !important;
+  color: var(--accent-text-strong) !important;
+}
+
+:where(
+  [class*="hover:bg-orange-400"],
+  [class*="hover:bg-orange-500"],
+  [class*="hover:bg-orange-600"],
+  [class*="hover:bg-sky-400"],
+  [class*="hover:bg-sky-500"],
+  [class*="hover:bg-sky-600"],
+  [class*="hover:bg-sky-700"]
+):not([class*="hover:bg-orange-400/"]):not([class*="hover:bg-orange-500/"]):not([class*="hover:bg-orange-600/"]):not([class*="hover:bg-sky-400/"]):not([class*="hover:bg-sky-500/"]):not([class*="hover:bg-sky-600/"]):not([class*="hover:bg-sky-700/"]):hover {
+  background-color: var(--accent-strong) !important;
+  color: #03130a !important;
+}
+
+:where(
+  [class*="focus:border-orange-"],
+  [class*="focus:border-sky-"],
+  [class*="focus:!border-orange-"],
+  [class*="focus:!border-sky-"]
+):focus,
+:where(
+  [class*="focus:border-orange-"],
+  [class*="focus:border-sky-"],
+  [class*="focus:!border-orange-"],
+  [class*="focus:!border-sky-"]
+):focus-visible {
+  border-color: rgba(0, 200, 83, 0.48) !important;
+}
+
+:where(
+  [class*="focus:ring-orange-"],
+  [class*="focus:ring-sky-"],
+  [class*="focus:!ring-orange-"],
+  [class*="focus:!ring-sky-"]
+):focus,
+:where(
+  [class*="focus:ring-orange-"],
+  [class*="focus:ring-sky-"],
+  [class*="focus:!ring-orange-"],
+  [class*="focus:!ring-sky-"]
+):focus-visible {
+  box-shadow:
+    0 0 0 1px rgba(0, 200, 83, 0.38),
+    0 0 0 4px rgba(0, 200, 83, 0.12) !important;
 }

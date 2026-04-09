@@ -190,23 +190,23 @@ export function ChatSidebar({ conversations }: ChatSidebarProps) {
 
   return (
     <div className="flex min-h-0 flex-1 flex-col">
-      <div className="border-b border-gray-800 px-4 py-4">
-        <p className="text-xs font-semibold tracking-[0.22em] uppercase text-gray-500">
+      <div className="border-b border-white/10 px-4 py-4">
+        <p className="text-xs font-semibold tracking-[0.22em] uppercase text-[#c8ffd9]/65">
           SafeLoot Chats
         </p>
         <h1 className="mt-2 text-2xl font-semibold tracking-tight text-white">
           Диалоги
         </h1>
 
-        <div className="mt-4 inline-flex rounded-2xl border border-white/10 bg-white/5 p-1">
+        <div className="mt-4 inline-flex rounded-2xl border border-white/10 bg-white/[0.04] p-1">
           <button
             type="button"
             onClick={() => setActiveTab("active")}
             className={cn(
               "rounded-[1rem] px-3 py-2 text-sm font-medium transition",
               activeTab === "active"
-                ? "bg-white text-zinc-950 shadow-[0_10px_30px_rgba(255,255,255,0.18)]"
-                : "text-zinc-400 hover:bg-white/10 hover:text-white",
+                ? "border border-[#00C853]/30 bg-[#00C853] text-[#03130a] shadow-[0_10px_30px_rgba(0,200,83,0.2)]"
+                : "text-zinc-400 hover:bg-white/[0.08] hover:text-white",
             )}
           >
             Все чаты
@@ -218,8 +218,8 @@ export function ChatSidebar({ conversations }: ChatSidebarProps) {
             className={cn(
               "rounded-[1rem] px-3 py-2 text-sm font-medium transition",
               activeTab === "archived"
-                ? "bg-white text-zinc-950 shadow-[0_10px_30px_rgba(255,255,255,0.18)]"
-                : "text-zinc-400 hover:bg-white/10 hover:text-white",
+                ? "border border-[#00C853]/30 bg-[#00C853] text-[#03130a] shadow-[0_10px_30px_rgba(0,200,83,0.2)]"
+                : "text-zinc-400 hover:bg-white/[0.08] hover:text-white",
             )}
           >
             Архив
@@ -234,7 +234,7 @@ export function ChatSidebar({ conversations }: ChatSidebarProps) {
 
       <div className="min-h-0 flex-1 overflow-y-auto">
         {visibleConversations.length === 0 ? (
-          <div className="px-4 py-6 text-sm leading-7 text-gray-500">
+          <div className="px-4 py-6 text-sm leading-7 text-zinc-500">
             {activeTab === "archived"
               ? "В архиве пока нет диалогов."
               : "У вас пока нет активных диалогов."}
@@ -253,8 +253,8 @@ export function ChatSidebar({ conversations }: ChatSidebarProps) {
               <div
                 key={chat.id}
                 className={cn(
-                  "group flex items-center gap-3 border-b border-gray-800/50 p-3 transition hover:bg-gray-800",
-                  isActive ? "bg-gray-800" : "bg-transparent",
+                  "group flex items-center gap-3 border-b border-white/6 p-3 transition hover:bg-white/[0.04]",
+                  isActive ? "bg-[#111821]" : "bg-transparent",
                 )}
               >
                 <Link
@@ -265,7 +265,7 @@ export function ChatSidebar({ conversations }: ChatSidebarProps) {
                     src={chat.otherParty.image}
                     name={displayName}
                     decoration={chat.otherParty.activeDecoration}
-                    className="h-12 w-12 shrink-0 border-gray-700 bg-zinc-800/80"
+                    className="h-12 w-12 shrink-0 border-white/10 bg-[#161B22]"
                     imageClassName="rounded-full object-cover"
                   />
 
@@ -276,12 +276,12 @@ export function ChatSidebar({ conversations }: ChatSidebarProps) {
                         appearance={chat.otherParty}
                         className="block truncate text-sm font-semibold text-white"
                       />
-                      <span className="shrink-0 text-[11px] uppercase tracking-[0.16em] text-gray-500">
+                      <span className="shrink-0 text-[11px] uppercase tracking-[0.16em] text-zinc-500">
                         {formatConversationTime(chat.lastMessage?.createdAt ?? chat.updatedAt)}
                       </span>
                     </div>
                     <div className="mt-0.5 flex items-center gap-2">
-                      <p className="truncate text-xs text-gray-500">
+                      <p className="truncate text-xs text-zinc-500">
                         <CensoredText text={chat.product?.title ?? "Диалог без товара"} />
                       </p>
                       {chat.isArchived ? (
@@ -290,7 +290,7 @@ export function ChatSidebar({ conversations }: ChatSidebarProps) {
                         </span>
                       ) : null}
                     </div>
-                    <p className="mt-1 truncate text-sm text-gray-400">
+                    <p className="mt-1 truncate text-sm text-zinc-400">
                       <CensoredText text={messagePreview} />
                     </p>
                   </div>
@@ -350,7 +350,7 @@ export function ChatSidebar({ conversations }: ChatSidebarProps) {
         open={Boolean(deleteTarget)}
         onOpenChange={handleDeleteDialogOpenChange}
       >
-        <DialogContent className="border-white/10 bg-[#10151c] text-zinc-100 sm:max-w-md">
+        <DialogContent className="border-white/10 bg-[radial-gradient(circle_at_top_left,rgba(0,200,83,0.12),transparent_36%),linear-gradient(180deg,rgba(22,27,34,0.96),rgba(13,17,23,0.98))] text-zinc-100 sm:max-w-md">
           <DialogHeader className="space-y-3 pr-10">
             <DialogTitle>Удалить чат?</DialogTitle>
             <DialogDescription>

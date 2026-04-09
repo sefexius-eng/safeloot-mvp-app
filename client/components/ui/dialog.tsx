@@ -17,7 +17,7 @@ const DialogOverlay = React.forwardRef<
   <DialogPrimitive.Overlay
     ref={ref}
     className={cn(
-      "fixed inset-0 z-50 bg-black/70 backdrop-blur-sm data-[state=open]:animate-in data-[state=closed]:animate-out",
+      "fixed inset-0 z-50 bg-[rgba(2,8,6,0.72)] backdrop-blur-md data-[state=open]:animate-in data-[state=closed]:animate-out",
       className,
     )}
     {...props}
@@ -35,13 +35,13 @@ const DialogContent = React.forwardRef<
     <DialogPrimitive.Content
       ref={ref}
       className={cn(
-        "fixed left-[50%] top-[50%] z-50 grid w-[calc(100%-2rem)] max-w-lg translate-x-[-50%] translate-y-[-50%] gap-4 rounded-[1.75rem] border border-white/10 bg-zinc-950/95 p-6 text-zinc-50 shadow-[0_24px_80px_rgba(0,0,0,0.45)] duration-200 data-[state=open]:animate-in data-[state=closed]:animate-out sm:p-7",
+        "fixed left-[50%] top-[50%] z-50 grid w-[calc(100%-2rem)] max-w-lg translate-x-[-50%] translate-y-[-50%] gap-4 rounded-[1.75rem] border border-white/10 bg-[radial-gradient(circle_at_top_left,rgba(0,200,83,0.12),transparent_36%),linear-gradient(180deg,rgba(22,27,34,0.96),rgba(13,17,23,0.98))] p-6 text-zinc-50 shadow-[0_30px_90px_rgba(0,0,0,0.56)] duration-200 data-[state=open]:animate-in data-[state=closed]:animate-out sm:p-7",
         className,
       )}
       {...props}
     >
       {children}
-      <DialogPrimitive.Close className="absolute right-4 top-4 rounded-full border border-white/10 bg-white/5 p-2 text-zinc-400 transition hover:bg-white/10 hover:text-white">
+      <DialogPrimitive.Close className="absolute right-4 top-4 rounded-full border border-white/10 bg-white/5 p-2 text-zinc-400 transition hover:border-[#00C853]/30 hover:bg-[#00C853]/10 hover:text-white">
         <svg
           aria-hidden="true"
           viewBox="0 0 24 24"
@@ -90,7 +90,7 @@ const DialogDescription = React.forwardRef<
 >(({ className, ...props }, ref) => (
   <DialogPrimitive.Description
     ref={ref}
-    className={cn("text-sm leading-7 text-zinc-400", className)}
+    className={cn("text-sm leading-7 text-zinc-400/95", className)}
     {...props}
   />
 ));

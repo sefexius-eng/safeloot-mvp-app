@@ -75,7 +75,7 @@ export function MarketplaceProductCard({ product }: MarketplaceProductCardProps)
   const coverImage = getProductCover(product);
 
   return (
-    <article className="group flex h-full flex-col overflow-hidden rounded-[1.75rem] border border-white/10 bg-[linear-gradient(180deg,rgba(24,24,27,0.96),rgba(12,12,14,0.98))] shadow-[0_18px_48px_rgba(0,0,0,0.24)] transition hover:-translate-y-1.5 hover:border-orange-500/30 hover:shadow-[0_28px_64px_rgba(0,0,0,0.32)]">
+    <article className="group flex h-full flex-col overflow-hidden rounded-[1.75rem] border border-white/10 bg-[radial-gradient(circle_at_top_left,rgba(0,200,83,0.1),transparent_32%),linear-gradient(180deg,rgba(22,27,34,0.96),rgba(13,17,23,0.98))] shadow-[0_18px_48px_rgba(0,0,0,0.3)] transition hover:-translate-y-1.5 hover:border-[#00C853]/30 hover:shadow-[0_28px_64px_rgba(0,0,0,0.36)]">
       <Link href={`/product/${product.id}`} className="block">
         <div className="relative h-40 w-full overflow-hidden border-b border-white/10 bg-zinc-900">
           {coverImage ? (
@@ -88,7 +88,7 @@ export function MarketplaceProductCard({ product }: MarketplaceProductCardProps)
               className="h-full w-full object-cover transition duration-500 group-hover:scale-105"
             />
           ) : (
-            <div className="flex h-full w-full items-end bg-[radial-gradient(circle_at_top_left,rgba(251,191,36,0.34),transparent_38%),radial-gradient(circle_at_bottom_right,rgba(59,130,246,0.28),transparent_42%),linear-gradient(135deg,rgba(39,39,42,1),rgba(9,9,11,1))] p-4">
+            <div className="flex h-full w-full items-end bg-[radial-gradient(circle_at_top_left,rgba(0,200,83,0.28),transparent_38%),radial-gradient(circle_at_bottom_right,rgba(0,96,48,0.22),transparent_42%),linear-gradient(135deg,rgba(22,27,34,1),rgba(9,12,17,1))] p-4">
               <div className="rounded-full border border-white/10 bg-black/25 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.24em] text-zinc-300">
                 {product.game.name}
               </div>
@@ -100,7 +100,7 @@ export function MarketplaceProductCard({ product }: MarketplaceProductCardProps)
             <div className="min-w-0 rounded-full border border-white/10 bg-black/35 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.22em] text-zinc-200 backdrop-blur-sm">
               {product.game.name}
             </div>
-            <div className="shrink-0 rounded-full border border-orange-400/20 bg-orange-500/15 px-3 py-1 text-xs font-semibold text-orange-100 backdrop-blur-sm">
+            <div className="shrink-0 rounded-full border border-[#00C853]/20 bg-[#00C853]/12 px-3 py-1 text-xs font-semibold text-[#c8ffd9] backdrop-blur-sm">
               {product.category.name}
             </div>
           </div>
@@ -110,10 +110,10 @@ export function MarketplaceProductCard({ product }: MarketplaceProductCardProps)
           <p className="text-xs font-medium uppercase tracking-[0.18em] text-zinc-500">
             {product.game.name}
           </p>
-          <h3 className="mt-1 line-clamp-2 text-sm font-semibold leading-6 text-white transition group-hover:text-orange-100">
+          <h3 className="mt-1 line-clamp-2 text-sm font-semibold leading-6 text-white transition group-hover:text-[#ecfff3]">
             <CensoredText text={product.title} />
           </h3>
-          <div className="mt-3 text-lg font-bold tracking-tight text-orange-300">
+          <div className="mt-3 text-lg font-bold tracking-tight text-[#8bffb3]">
             {formatPrice(product.price)}
           </div>
         </div>
@@ -139,7 +139,7 @@ export function MarketplaceProductCard({ product }: MarketplaceProductCardProps)
                 className="block truncate text-sm font-medium text-zinc-200 transition group-hover:text-white"
               />
               {isTeamSeller(product.seller.role) ? (
-                <span className="shrink-0 rounded-full border border-sky-400/20 bg-sky-500/15 px-2 py-0.5 text-[10px] font-bold uppercase tracking-[0.12em] text-sky-100 align-middle">
+                <span className="shrink-0 rounded-full border border-[#00C853]/20 bg-[#00C853]/12 px-2 py-0.5 text-[10px] font-bold uppercase tracking-[0.12em] text-[#c8ffd9] align-middle">
                   TEAM
                 </span>
               ) : null}

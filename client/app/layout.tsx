@@ -21,8 +21,8 @@ const yandexSiteVerification =
 const EMAIL_VERIFICATION_ADMIN_EMAIL = "sefexius@gmail.com";
 const APP_NAME = "SafeLoot Market";
 const APP_SHORT_NAME = "SafeLoot";
-const PWA_BACKGROUND_COLOR = "#09090b";
-const PWA_THEME_COLOR = "#00B85C";
+const PWA_BACKGROUND_COLOR = "#0B0E14";
+const PWA_THEME_COLOR = "#00C853";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -124,7 +124,7 @@ export default async function RootLayout({
       lang="ru"
       className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
     >
-      <body className="min-h-screen flex flex-col">
+      <body className="min-h-screen flex flex-col bg-transparent text-gray-100">
         <AuthSessionProvider session={session}>
           <SiteHeader />
           {session?.user &&
@@ -134,7 +134,7 @@ export default async function RootLayout({
           ) : null}
           <BannedModal />
 
-          <main className="flex-1">{children}</main>
+          <main className="relative flex-1">{children}</main>
           <SiteFooter />
         </AuthSessionProvider>
         <ExternalAnalytics />

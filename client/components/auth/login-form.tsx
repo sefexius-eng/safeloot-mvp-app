@@ -113,9 +113,9 @@ export function LoginForm() {
   }
 
   return (
-    <section className="w-full max-w-md rounded-[2rem] border border-white/10 bg-zinc-900/82 p-6 shadow-[0_24px_80px_rgba(0,0,0,0.28)] backdrop-blur md:p-8">
+    <section className="w-full max-w-md rounded-[2rem] border border-white/10 bg-[radial-gradient(circle_at_top_left,rgba(0,200,83,0.12),transparent_38%),linear-gradient(180deg,rgba(22,27,34,0.94),rgba(13,17,23,0.98))] p-6 shadow-[0_24px_80px_rgba(0,0,0,0.36)] backdrop-blur-xl md:p-8">
       <div>
-        <p className="text-sm font-semibold tracking-[0.24em] uppercase text-orange-300">
+        <p className="text-sm font-semibold tracking-[0.24em] uppercase text-[#8bffb3]">
           Secure Login
         </p>
         <h1 className="mt-3 text-3xl font-semibold tracking-tight text-white">
@@ -155,7 +155,7 @@ export function LoginForm() {
             value={email}
             onChange={(event) => setEmail(event.target.value)}
             placeholder="you@example.com"
-            className="border-white/10 bg-white/5 text-zinc-100 placeholder:text-zinc-500 focus:border-orange-500/45 focus:bg-white/8"
+            className="border-white/10 bg-white/[0.04] text-zinc-100 placeholder:text-zinc-500 focus:border-[#00C853]/45 focus:bg-white/[0.07]"
             required
           />
         </label>
@@ -170,7 +170,7 @@ export function LoginForm() {
             value={password}
             onChange={(event) => setPassword(event.target.value)}
             placeholder="Минимум 6 символов"
-            className="border-white/10 bg-white/5 text-zinc-100 placeholder:text-zinc-500 focus:border-orange-500/45 focus:bg-white/8"
+            className="border-white/10 bg-white/[0.04] text-zinc-100 placeholder:text-zinc-500 focus:border-[#00C853]/45 focus:bg-white/[0.07]"
             required
           />
         </label>
@@ -184,7 +184,7 @@ export function LoginForm() {
         <Button
           type="submit"
           disabled={isBusy}
-          className="h-14 w-full rounded-[1.35rem] bg-orange-600 text-base font-semibold shadow-[0_18px_42px_rgba(234,88,12,0.35)] hover:bg-orange-500"
+          className="h-14 w-full rounded-[1.35rem] border border-[#00C853]/35 bg-[#00C853] text-base font-bold text-[#03130a] shadow-[0_18px_42px_rgba(0,200,83,0.24)] hover:bg-[#00A344]"
         >
           {isSubmitting ? "Входим..." : "Войти"}
         </Button>
@@ -192,7 +192,7 @@ export function LoginForm() {
 
       <p className="mt-6 text-sm text-zinc-400">
         Нет аккаунта?{" "}
-        <Link href="/register" className="font-semibold text-orange-300 transition hover:text-orange-200">
+        <Link href="/register" className="font-semibold text-[#8bffb3] transition hover:text-[#ecfff3]">
           Зарегистрироваться
         </Link>
       </p>

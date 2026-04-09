@@ -150,7 +150,7 @@ export default async function Home() {
 
   return (
     <main className="mx-auto flex w-full max-w-7xl flex-col gap-12 px-4 py-10 sm:px-6 lg:gap-16 lg:px-8 lg:py-14">
-      <section className="overflow-hidden rounded-[2.4rem] border border-white/10 bg-[radial-gradient(circle_at_top_left,rgba(249,115,22,0.22),transparent_30%),radial-gradient(circle_at_bottom_right,rgba(14,165,233,0.16),transparent_36%),linear-gradient(135deg,rgba(24,24,27,0.96),rgba(15,23,42,0.94))] shadow-[0_24px_80px_rgba(0,0,0,0.3)] backdrop-blur">
+      <section className="overflow-hidden rounded-[2.4rem] border border-white/10 bg-[radial-gradient(circle_at_top_left,rgba(0,200,83,0.2),transparent_30%),radial-gradient(circle_at_bottom_right,rgba(0,94,48,0.18),transparent_36%),linear-gradient(135deg,rgba(22,27,34,0.96),rgba(13,17,23,0.94))] shadow-[0_24px_80px_rgba(0,0,0,0.34)] backdrop-blur-xl">
         <div className="grid gap-10 px-6 py-8 md:grid-cols-2 md:items-center md:px-10 md:py-12 lg:px-14 lg:py-16">
           <div>
             <div>
@@ -162,7 +162,7 @@ export default async function Home() {
             <div className="mt-6 flex flex-wrap gap-3">
               <Link
                 href={featuredCatalogHref}
-                className="inline-flex rounded-2xl bg-orange-600 px-6 py-3 text-sm font-semibold text-white shadow-[0_18px_45px_rgba(249,115,22,0.24)] transition hover:-translate-y-0.5 hover:bg-orange-500"
+                className="inline-flex rounded-2xl border border-[#00C853]/35 bg-[#00C853] px-6 py-3 text-sm font-bold text-[#03130a] shadow-[0_18px_45px_rgba(0,200,83,0.22)] transition hover:-translate-y-0.5 hover:bg-[#00A344]"
               >
                 Смотреть каталог
               </Link>
@@ -197,8 +197,8 @@ export default async function Home() {
           </div>
 
           <div className="relative">
-            <div className="pointer-events-none absolute -right-6 top-6 h-36 w-36 rounded-full bg-orange-500/25 blur-3xl animate-pulse" />
-            <div className="pointer-events-none absolute -left-6 bottom-10 h-28 w-28 rounded-full bg-sky-400/20 blur-3xl animate-pulse" />
+            <div className="pointer-events-none absolute -right-6 top-6 h-36 w-36 rounded-full bg-[#00C853]/22 blur-3xl animate-pulse" />
+            <div className="pointer-events-none absolute -left-6 bottom-10 h-28 w-28 rounded-full bg-[#00A344]/18 blur-3xl animate-pulse" />
 
             <div className="group relative mx-auto min-h-[360px] overflow-hidden rounded-[2rem] border border-white/10 bg-black/25 shadow-[0_26px_90px_rgba(0,0,0,0.34)] transition-all duration-500 hover:-translate-y-2">
               <Image
