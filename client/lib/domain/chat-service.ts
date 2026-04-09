@@ -196,6 +196,87 @@ async function getOrCreateConversationRecord(input: {
   );
 }
 
+export async function getOrCreateDirectConversation(input: {
+  userId: string;
+  targetUserId: string;
+}) {
+  const userId = normalizeText(input.userId);
+  const targetUserId = normalizeText(input.targetUserId);
+
+  if (!userId) {
+    throw new Error("userId is required.");
+  }
+
+  if (!targetUserId) {
+    throw new Error("targetUserId is required.");
+  }
+
+  if (userId === targetUserId) {
+    throw new Error("Нельзя начать диалог с самим собой.");
+  }
+
+  const conversation = await prisma.$transaction(
+    async (transactionClient) => {
+      const targetUser = await transactionClient.user.findUnique({
+        where: {
+          id: targetUserId,
+        },
+        select: {
+          id: true,
+        },
+      });
+
+      if (!targetUser) {
+        throw new Error("Пользователь не найден.");
+      }
+
+      const existingConversation = await transactionClient.conversation.findFirst({
+        where: {
+          productId: null,
+          OR: [
+            {
+              buyerId: userId,
+              sellerId: targetUserId,
+            },
+            {
+              buyerId: targetUserId,
+              sellerId: userId,
+            },
+          ],
+        },
+        select: {
+          id: true,
+        },
+        orderBy: {
+          createdAt: "desc",
+        },
+      });
+
+      if (existingConversation) {
+        return existingConversation;
+      }
+
+      return transactionClient.conversation.create({
+        data: {
+          buyerId: userId,
+          sellerId: targetUserId,
+          productId: null,
+        },
+        select: {
+          id: true,
+        },
+      });
+    },
+    {
+      isolationLevel: Prisma.TransactionIsolationLevel.Serializable,
+    },
+  );
+
+  return {
+    conversationId: conversation.id,
+  };
+}
+
 async function getOrCreateConversationByOrder(orderId: string) {
   const normalizedOrderId = normalizeText(orderId);
 

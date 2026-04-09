@@ -8,10 +8,18 @@ import { moderateAntiLeakageMessageText } from "@/lib/domain/shared";
 import {
   createChatMessage,
   createConversationMessage,
+  getOrCreateDirectConversation as getOrCreateDirectConversationRecord,
   getOrCreateConversation as getOrCreateConversationRecord,
   markChatMessagesAsRead,
   markConversationMessagesAsRead as markConversationMessagesAsReadRecord,
 } from "@/lib/domain/chat-service";
+
+interface StartDirectConversationResult {
+  ok: boolean;
+  conversationId?: string;
+  message?: string;
+  requiresLogin?: boolean;
+}
 
 async function requireActiveChatUserId() {
   const session = await getAuthSession();
@@ -52,6 +60,32 @@ export async function getOrCreateConversation(productId: string, sellerId: strin
   });
 
   redirect(`/chats/${result.conversationId}`);
+}
+
+export async function startDirectConversation(
+  targetUserId: string,
+): Promise<StartDirectConversationResult> {
+  try {
+    const userId = await requireActiveChatUserId();
+    const result = await getOrCreateDirectConversationRecord({
+      userId,
+      targetUserId,
+    });
+
+    return {
+      ok: true,
+      conversationId: result.conversationId,
+    };
+  } catch (error) {
+    const message =
+      error instanceof Error ? error.message : "Не удалось открыть диалог.";
+
+    return {
+      ok: false,
+      message,
+      requiresLogin: message === "Unauthorized",
+    };
+  }
 }
 
 export async function sendMessage(

@@ -3,6 +3,7 @@ import { notFound } from "next/navigation";
 
 import CensoredText from "@/components/censored-text";
 import { ProfileHero } from "@/components/profile/profile-hero";
+import { PublicProfileMessageButton } from "@/components/profile/public-profile-message-button";
 import { ProfileRoleBadge } from "@/components/profile/profile-role-badge";
 import {
   MarketplaceProductCard,
@@ -212,6 +213,7 @@ export default async function PublicUserPage({ params }: PublicUserPageProps) {
   }
 
   const displayName = seller.name?.trim() || "Продавец";
+  const isOwnProfile = currentUser?.id === seller.id;
 
   return (
     <main className="mx-auto flex w-full max-w-7xl flex-col gap-8 px-4 py-10 sm:px-6 lg:px-8 lg:py-14">
@@ -254,6 +256,14 @@ export default async function PublicUserPage({ params }: PublicUserPageProps) {
               На площадке с {formatJoinedDate(seller.createdAt)}
             </span>
           </>
+        }
+        actions={
+          !isOwnProfile ? (
+            <PublicProfileMessageButton
+              targetUserId={seller.id}
+              isAuthenticated={Boolean(currentUser)}
+            />
+          ) : null
         }
         aside={
           <div className="rounded-[1.75rem] border border-white/10 bg-white/5 p-5 shadow-[0_18px_45px_rgba(0,0,0,0.2)]">
