@@ -5,6 +5,7 @@ import type { Role } from "@prisma/client";
 
 import { BANNED_USER_MESSAGE, getCurrentSessionUser } from "@/lib/access-control";
 import { getAuthSession } from "@/lib/auth";
+import { moderateAntiLeakageMessageText } from "@/lib/domain/shared";
 import { createTavernMessage, deleteTavernMessage } from "@/lib/domain/tavern";
 import type { RealtimeTavernMessagePayload } from "@/lib/pusher";
 
@@ -60,8 +61,9 @@ export async function sendGlobalMessage(
 ): Promise<SendTavernMessageResult> {
   try {
     const currentUser = await requireActiveTavernUser();
+    const sanitizedText = moderateAntiLeakageMessageText(text).text;
     const tavernMessage = await createTavernMessage({
-      text,
+      text: sanitizedText,
       userId: currentUser.id,
     });
 

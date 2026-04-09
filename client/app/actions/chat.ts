@@ -4,6 +4,7 @@ import { redirect } from "next/navigation";
 
 import { BANNED_USER_MESSAGE, getCurrentSessionUser } from "@/lib/access-control";
 import { getAuthSession } from "@/lib/auth";
+import { moderateAntiLeakageMessageText } from "@/lib/domain/shared";
 import {
   createChatMessage,
   createConversationMessage,
@@ -59,11 +60,12 @@ export async function sendMessage(
   imageBase64?: string | null,
 ) {
   const userId = await requireActiveChatUserId();
+  const sanitizedContent = moderateAntiLeakageMessageText(content).text;
 
   return createChatMessage({
     orderId,
     senderId: userId,
-    content,
+    content: sanitizedContent,
     imageBase64,
   });
 }
@@ -83,11 +85,12 @@ export async function sendConversationMessage(
   imageBase64?: string | null,
 ) {
   const userId = await requireActiveChatUserId();
+  const sanitizedText = moderateAntiLeakageMessageText(text).text;
 
   return createConversationMessage({
     conversationId,
     senderId: userId,
-    text,
+    text: sanitizedText,
     imageBase64,
   });
 }

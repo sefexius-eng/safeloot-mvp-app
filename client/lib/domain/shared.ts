@@ -22,7 +22,6 @@ const PRODUCT_IMAGE_BASE64_PATTERN =
   /^data:image\/webp;base64,[A-Za-z0-9+/=]+$/;
 export const ZERO_MONEY = new Prisma.Decimal(0);
 const ANTI_LEAKAGE_REDACTED_PLACEHOLDER = "[СКРЫТО]";
-const ANTI_LEAKAGE_LINK_PLACEHOLDER = "[ССЫЛКА УДАЛЕНА]";
 export const DEAL_ROOM_SECURITY_WARNING =
   "⚠️ Внимание! Переход в сторонние мессенджеры и передача личных контактов запрещены. Это лишает вас защиты SafeLoot и может привести к блокировке.";
 const TERMINAL_ORDER_STATUSES = [
@@ -31,12 +30,12 @@ const TERMINAL_ORDER_STATUSES = [
   OrderStatus.CANCELLED,
 ] as const;
 
-const MESSAGE_CONTACT_BLACKLIST_REGEX =
-  /(?<![\p{L}\p{N}_])(?:discord|дискорд|tg|тг|telegram|телеграм|skype|whatsapp|вк|vk|номер|кидай\s+на|на\s+карту)(?![\p{L}\p{N}_])/giu;
-const MESSAGE_COMPETITOR_BLACKLIST_REGEX =
-  /(?<![\p{L}\p{N}_])(?:funpay|фанпей|player\s*ok|playerok|плеерок|g2g|plati(?:\.ru)?|плати|ggsel|ггсел|eldorado|эльдорадо|zaka(?:-|\s)?zaka|lolz|лолз|zelenka|зеленка)(?![\p{L}\p{N}_])/giu;
 const MESSAGE_LINK_REGEX =
   /(?:https?:\/\/|www\.)\S+|(?<![\p{L}\p{N}_])(?:[a-z0-9-]+\.)+(?:com|ru|net|org|gg|me|io|app|dev|xyz|info|biz|link|shop|su|ua|tv|cc|to)(?:\/\S*)?/giu;
+const MESSAGE_PROTOCOL_LINK_REGEX =
+  /(?<![\p{L}\p{N}])(?:h[\s\W_]*t[\s\W_]*t[\s\W_]*p(?:[\s\W_]*s)?|w[\s\W_]*w[\s\W_]*w)(?:[\s\W_]*[:/.\\])+[^\s]{2,}/giu;
+const MESSAGE_OBFUSCATED_LINK_REGEX =
+  /(?<![\p{L}\p{N}])(?:[a-zа-яё0-9-]+[\s\W_]*(?:\.|dot|точка)[\s\W_]*)+(?:ru|com|net|org|gg|me|io|app|dev|xyz|info|biz|link|shop|su|ua|tv|cc|to)(?:[\s\W_/\\-]*[a-zа-яё0-9/?#=&%._-]+)?(?![\p{L}\p{N}])/giu;
 const MESSAGE_USERNAME_REGEX = /@[a-z0-9_]{2,}/giu;
 const MESSAGE_EMAIL_REGEX =
   /\b[a-z0-9._%+-]+@[a-z0-9.-]+\.[a-z]{2,}\b/giu;
@@ -46,6 +45,186 @@ const MESSAGE_PHONE_CANDIDATE_REGEX =
   /(?<![\p{L}\p{N}])(?:\+?\d[\d\s().-]{8,}\d)(?![\p{L}\p{N}])/gu;
 const MESSAGE_CRYPTO_WALLET_REGEX =
   /(?<![\p{L}\p{N}])(?:0x[a-f0-9]{40}|bc1[a-z0-9]{25,62}|[13][a-km-zA-HJ-NP-Z1-9]{25,34}|T[a-zA-HJ-NP-Z1-9]{33})(?![\p{L}\p{N}])/giu;
+const FUZZY_TOKEN_SEPARATOR_PATTERN = String.raw`[\s\W_]*`;
+const FUZZY_TOKEN_BOUNDARY_START_PATTERN = String.raw`(?<![\p{L}\p{N}])`;
+const FUZZY_TOKEN_BOUNDARY_END_PATTERN = String.raw`(?![\p{L}\p{N}])`;
+
+interface AntiLeakageRule {
+  pattern: RegExp;
+  replacement: string;
+  predicate?: (match: string) => boolean;
+}
+
+function createFuzzyTokenRegex(parts: string[]) {
+  return new RegExp(
+    `${FUZZY_TOKEN_BOUNDARY_START_PATTERN}${parts.join(FUZZY_TOKEN_SEPARATOR_PATTERN)}${FUZZY_TOKEN_BOUNDARY_END_PATTERN}`,
+    "giu",
+  );
+}
+
+const MESSAGE_FUZZY_BLACKLIST_PATTERNS = [
+  createFuzzyTokenRegex(["[tт]", "[gг]"]),
+  createFuzzyTokenRegex([
+    "[dд]",
+    "[iи1|l]",
+    "[sс$]",
+    "[cсkк]",
+    "[oо0]",
+    "[rр]",
+    "[dд]",
+  ]),
+  createFuzzyTokenRegex(["[vвw]", "[kкcс]"]),
+  createFuzzyTokenRegex([
+    "[sс$]",
+    "[kкcс]",
+    "[yуийi1]",
+    "[pп]",
+    "[eе3]",
+  ]),
+  createFuzzyTokenRegex([
+    "[tт]",
+    "[eе3]",
+    "[lл1|iи]",
+    "[eе3]",
+    "[gг6]",
+    "[rр]",
+    "[aа4]",
+    "[mм]",
+  ]),
+  createFuzzyTokenRegex([
+    "[wшщvv]",
+    "[hнxх]",
+    "[aа4]",
+    "[tт]",
+    "[sс$]",
+    "[aа4]",
+    "[pп]",
+    "[pп]",
+  ]),
+  createFuzzyTokenRegex([
+    "[fф]",
+    "[uуaа]",
+    "[nн]",
+    "[pп]",
+    "[aаeе]",
+    "[yуйiи]",
+  ]),
+  createFuzzyTokenRegex([
+    "[pп]",
+    "[lл]",
+    "[aаeе]",
+    "[yуй]",
+    "[eе]",
+    "[rр]",
+    "[oо0]",
+    "[kкcс]",
+  ]),
+  createFuzzyTokenRegex([
+    "[пpп]",
+    "[лlл]",
+    "[eе3]",
+    "[eе3]",
+    "[rр]",
+    "[oо0]",
+    "[kкcс]",
+  ]),
+  createFuzzyTokenRegex(["[gг6]", "[2zз]", "[gг6]"]),
+  createFuzzyTokenRegex([
+    "[pпrр]",
+    "[lл1|iи]",
+    "[aа4]",
+    "[tт]",
+    "[iи1|]",
+  ]),
+  createFuzzyTokenRegex([
+    "[gг6]",
+    "[gг6]",
+    "[sс$]",
+    "[eе3]",
+    "[lл1|iи]",
+  ]),
+  createFuzzyTokenRegex([
+    "[eе3]",
+    "[lл1|iи]",
+    "[dд]",
+    "[oо0]",
+    "[rр]",
+    "[aа4]",
+    "[dд]",
+    "[oо0]",
+  ]),
+  new RegExp(
+    `${FUZZY_TOKEN_BOUNDARY_START_PATTERN}[эeе3]${FUZZY_TOKEN_SEPARATOR_PATTERN}[лlл]${FUZZY_TOKEN_SEPARATOR_PATTERN}[ьъb6]?${FUZZY_TOKEN_SEPARATOR_PATTERN}[дdд]${FUZZY_TOKEN_SEPARATOR_PATTERN}[oо0]${FUZZY_TOKEN_SEPARATOR_PATTERN}[рpр]${FUZZY_TOKEN_SEPARATOR_PATTERN}[aа4]${FUZZY_TOKEN_SEPARATOR_PATTERN}[дdд]${FUZZY_TOKEN_SEPARATOR_PATTERN}[oо0]${FUZZY_TOKEN_BOUNDARY_END_PATTERN}`,
+    "giu",
+  ),
+  createFuzzyTokenRegex([
+    "[zз2]",
+    "[aа4]",
+    "[kкcс]",
+    "[aа4]",
+    "[zз2]",
+    "[aа4]",
+    "[kкcс]",
+    "[aа4]",
+  ]),
+  createFuzzyTokenRegex([
+    "[lл1|iи]",
+    "[oо0]",
+    "[lл1|iи]",
+    "[zз2]",
+  ]),
+  createFuzzyTokenRegex([
+    "[zз2]",
+    "[eе3]",
+    "[lл1|iи]",
+    "[eе3]",
+    "[nнh]",
+    "[kкcс]",
+    "[aа4]",
+  ]),
+  /(?<![\p{L}\p{N}])(?:номер|кидай[\s\W_]*на|на[\s\W_]*карту)(?![\p{L}\p{N}])/giu,
+] as const;
+
+const ANTI_LEAKAGE_RULES: AntiLeakageRule[] = [
+  {
+    pattern: MESSAGE_EMAIL_REGEX,
+    replacement: ANTI_LEAKAGE_REDACTED_PLACEHOLDER,
+  },
+  {
+    pattern: MESSAGE_LINK_REGEX,
+    replacement: ANTI_LEAKAGE_REDACTED_PLACEHOLDER,
+  },
+  {
+    pattern: MESSAGE_PROTOCOL_LINK_REGEX,
+    replacement: ANTI_LEAKAGE_REDACTED_PLACEHOLDER,
+  },
+  {
+    pattern: MESSAGE_OBFUSCATED_LINK_REGEX,
+    replacement: ANTI_LEAKAGE_REDACTED_PLACEHOLDER,
+  },
+  {
+    pattern: MESSAGE_USERNAME_REGEX,
+    replacement: ANTI_LEAKAGE_REDACTED_PLACEHOLDER,
+  },
+  ...MESSAGE_FUZZY_BLACKLIST_PATTERNS.map((pattern) => ({
+    pattern,
+    replacement: ANTI_LEAKAGE_REDACTED_PLACEHOLDER,
+  })),
+  {
+    pattern: MESSAGE_CARD_CANDIDATE_REGEX,
+    replacement: ANTI_LEAKAGE_REDACTED_PLACEHOLDER,
+    predicate: isLikelyCardNumber,
+  },
+  {
+    pattern: MESSAGE_PHONE_CANDIDATE_REGEX,
+    replacement: ANTI_LEAKAGE_REDACTED_PLACEHOLDER,
+    predicate: isLikelyPhoneNumber,
+  },
+  {
+    pattern: MESSAGE_CRYPTO_WALLET_REGEX,
+    replacement: ANTI_LEAKAGE_REDACTED_PLACEHOLDER,
+  },
+];
 
 const chatTypingState = new Map<string, Map<string, number>>();
 
@@ -369,56 +548,21 @@ export function moderateAntiLeakageMessageText(value?: string) {
     };
   }
 
-  let sanitizedValue = replaceSensitiveMessageMatches(
-    normalizedValue,
-    MESSAGE_EMAIL_REGEX,
-    ANTI_LEAKAGE_REDACTED_PLACEHOLDER,
-  );
+  let sanitizedValue = normalizedValue;
 
-  sanitizedValue = replaceSensitiveMessageMatches(
-    sanitizedValue,
-    MESSAGE_COMPETITOR_BLACKLIST_REGEX,
-    ANTI_LEAKAGE_REDACTED_PLACEHOLDER,
-  );
-  sanitizedValue = replaceSensitiveMessageMatches(
-    sanitizedValue,
-    MESSAGE_LINK_REGEX,
-    ANTI_LEAKAGE_LINK_PLACEHOLDER,
-  );
-  sanitizedValue = replaceSensitiveMessageMatches(
-    sanitizedValue,
-    MESSAGE_USERNAME_REGEX,
-    ANTI_LEAKAGE_REDACTED_PLACEHOLDER,
-  );
-  sanitizedValue = replaceSensitiveMessageMatches(
-    sanitizedValue,
-    MESSAGE_CONTACT_BLACKLIST_REGEX,
-    ANTI_LEAKAGE_REDACTED_PLACEHOLDER,
-  );
-  sanitizedValue = replaceSensitiveMessageMatches(
-    sanitizedValue,
-    MESSAGE_CARD_CANDIDATE_REGEX,
-    ANTI_LEAKAGE_REDACTED_PLACEHOLDER,
-    isLikelyCardNumber,
-  );
-  sanitizedValue = replaceSensitiveMessageMatches(
-    sanitizedValue,
-    MESSAGE_PHONE_CANDIDATE_REGEX,
-    ANTI_LEAKAGE_REDACTED_PLACEHOLDER,
-    isLikelyPhoneNumber,
-  );
-  sanitizedValue = replaceSensitiveMessageMatches(
-    sanitizedValue,
-    MESSAGE_CRYPTO_WALLET_REGEX,
-    ANTI_LEAKAGE_REDACTED_PLACEHOLDER,
-  )
+  for (const rule of ANTI_LEAKAGE_RULES) {
+    sanitizedValue = replaceSensitiveMessageMatches(
+      sanitizedValue,
+      rule.pattern,
+      rule.replacement,
+      rule.predicate,
+    );
+  }
+
+  sanitizedValue = sanitizedValue
     .replace(
       /(?:\[СКРЫТО\](?:\s*[,:;.-]?\s*)?){2,}/g,
       `${ANTI_LEAKAGE_REDACTED_PLACEHOLDER} `,
-    )
-    .replace(
-      /(?:\[ССЫЛКА УДАЛЕНА\](?:\s*[,:;.-]?\s*)?){2,}/g,
-      `${ANTI_LEAKAGE_LINK_PLACEHOLDER} `,
     )
     .replace(/\s{2,}/g, " ")
     .trim();
