@@ -49,16 +49,16 @@ type RarityRecommendation = {
 };
 
 const SHOP_ACTION_BUTTON_BASE_CLASS_NAME =
-  "inline-flex items-center justify-center rounded-2xl text-sm font-semibold transition disabled:translate-y-0 disabled:cursor-not-allowed disabled:opacity-60";
+  "flex h-10 w-full items-center justify-center rounded-2xl text-sm font-semibold transition disabled:translate-y-0 disabled:cursor-not-allowed disabled:opacity-60";
 
 const SHOP_BUY_BUTTON_CLASS_NAME =
-  "h-11 min-w-[144px] bg-orange-500 px-5 text-white shadow-[0_16px_40px_rgba(249,115,22,0.28)] hover:-translate-y-0.5 hover:bg-orange-600";
+  "border border-orange-400/30 bg-orange-500 px-5 text-white shadow-[0_16px_40px_rgba(249,115,22,0.28)] hover:-translate-y-0.5 hover:bg-orange-600";
 
 const SHOP_SECONDARY_BUTTON_CLASS_NAME =
-  "h-11 min-w-[144px] border border-white/20 bg-white/5 px-5 text-white hover:-translate-y-0.5 hover:bg-white/10";
+  "border border-white/20 bg-white/5 px-5 text-white hover:-translate-y-0.5 hover:bg-white/10";
 
 const SHOP_SECONDARY_WIDE_BUTTON_CLASS_NAME =
-  "h-10 w-full border border-white/20 bg-white/5 px-4 text-white hover:-translate-y-0.5 hover:bg-white/10";
+  "border border-white/20 bg-white/5 px-4 text-white hover:-translate-y-0.5 hover:bg-white/10";
 
 function getTypeAccent(type: CosmeticType) {
   switch (type) {
@@ -986,11 +986,11 @@ export function CosmeticsShop({ initialState }: { initialState: CosmeticsShopSta
                     </div>
                   </div>
 
-                  <div className="mt-5 flex-1">
+                  <div className="mt-5">
                     <CosmeticPreview cosmetic={cosmetic} viewer={viewer} />
                   </div>
 
-                  <div className="mt-5 flex items-center justify-between gap-3">
+                  <div className="mt-auto flex flex-col gap-3 pt-5">
                     <div className="flex flex-wrap gap-2 text-[11px] font-semibold uppercase tracking-[0.18em]">
                       {cosmetic.isOwned ? (
                         <span className="rounded-full border border-emerald-500/20 bg-emerald-500/10 px-2.5 py-1 text-emerald-100">
@@ -1051,7 +1051,10 @@ export function CosmeticsShop({ initialState }: { initialState: CosmeticsShopSta
                     ) : (
                       <Link
                         href="/login?callbackUrl=/shop"
-                        className="inline-flex min-w-[144px] items-center justify-center rounded-2xl border border-white/10 bg-white/5 px-5 py-3 text-sm font-semibold text-zinc-100 transition hover:bg-white/10"
+                        className={cn(
+                          SHOP_ACTION_BUTTON_BASE_CLASS_NAME,
+                          SHOP_SECONDARY_BUTTON_CLASS_NAME,
+                        )}
                       >
                         Войти
                       </Link>
