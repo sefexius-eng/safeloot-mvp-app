@@ -68,6 +68,8 @@ const SHOP_INLINE_EDITOR_INPUT_CLASS_NAME =
 const SHOP_INLINE_EDITOR_ACTION_CLASS_NAME =
   "inline-flex h-9 items-center justify-center rounded-xl border px-3 text-xs font-semibold transition disabled:cursor-not-allowed disabled:opacity-60";
 
+const SHOP_PRICE_EDITOR_BASE_CURRENCY_LABEL = "USDT";
+
 function getTypeAccent(type: CosmeticType) {
   switch (type) {
     case "COLOR":
@@ -1089,11 +1091,11 @@ export function CosmeticsShop({
 
                   <div className="mt-auto flex flex-col gap-3 pt-5">
                     {canManagePrices && editingCosmeticId === cosmetic.id ? (
-                      <div className="rounded-[1.15rem] border border-white/10 bg-white/5 p-3">
+                      <div className="rounded-[1.15rem] border border-white/10 bg-white/5 p-3.5">
                         <div className="grid gap-3 sm:grid-cols-2">
                           <label className="grid gap-1">
                             <span className="text-[11px] font-semibold uppercase tracking-[0.18em] text-zinc-500">
-                              Текущая цена
+                              Текущая цена ({SHOP_PRICE_EDITOR_BASE_CURRENCY_LABEL})
                             </span>
                             <input
                               type="number"
@@ -1107,7 +1109,7 @@ export function CosmeticsShop({
                           </label>
                           <label className="grid gap-1">
                             <span className="text-[11px] font-semibold uppercase tracking-[0.18em] text-zinc-500">
-                              Старая цена
+                              Старая цена ({SHOP_PRICE_EDITOR_BASE_CURRENCY_LABEL})
                             </span>
                             <input
                               type="number"
@@ -1121,6 +1123,9 @@ export function CosmeticsShop({
                             />
                           </label>
                         </div>
+                        <p className="mt-3 rounded-xl border border-white/10 bg-black/20 px-3 py-2 text-xs leading-5 text-zinc-400">
+                          Заполните &quot;Старую цену&quot;, чтобы на витрине появилась скидка. Оставьте поле пустым для обычного изменения цены.
+                        </p>
                         <div className="mt-3 flex gap-2">
                           <button
                             type="button"
