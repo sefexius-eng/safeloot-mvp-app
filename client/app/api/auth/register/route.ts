@@ -5,6 +5,11 @@ import {
   isEmailVerificationTestUser,
   sendVerificationEmailToUser,
 } from "@/lib/email-verification";
+import {
+  ACHIEVEMENT_CODES,
+  grantAchievementToUserIfExists,
+  runAchievementAutomation,
+} from "@/lib/domain/achievements";
 import { prisma } from "@/lib/prisma";
 
 interface RegisterRequestBody {
@@ -74,6 +79,18 @@ export async function POST(request: Request) {
         console.error("[REGISTER_VERIFICATION_EMAIL_ERROR]", error);
       }
     }
+
+    await runAchievementAutomation("register-user", [
+      {
+        label: "registration-achievement",
+        run: () =>
+          grantAchievementToUserIfExists({
+            userId: user.id,
+            achievementCode: ACHIEVEMENT_CODES.REGISTRATION,
+            notifyUser: true,
+          }),
+      },
+    ]);
 
     return NextResponse.json(user, { status: 201 });
   } catch (error) {

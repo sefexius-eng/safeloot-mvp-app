@@ -17,6 +17,11 @@ import {
   normalizeText,
   roundMoney,
 } from "@/lib/domain/shared";
+import {
+  ACHIEVEMENT_CODES,
+  grantAchievementToUserIfExists,
+  runAchievementAutomation,
+} from "@/lib/domain/achievements";
 import { prisma } from "@/lib/prisma";
 
 type CosmeticRecord = {
@@ -283,6 +288,18 @@ export async function buyCosmetic(input: {
       isolationLevel: Prisma.TransactionIsolationLevel.Serializable,
     },
   );
+
+  await runAchievementAutomation("buy-cosmetic", [
+    {
+      label: "shopaholic-achievement",
+      run: () =>
+        grantAchievementToUserIfExists({
+          userId,
+          achievementCode: ACHIEVEMENT_CODES.SHOPAHOLIC,
+          notifyUser: true,
+        }),
+    },
+  ]);
 
   return result;
 }

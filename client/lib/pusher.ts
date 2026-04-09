@@ -37,6 +37,17 @@ export interface RealtimeNotificationPayload {
   createdAt: string;
 }
 
+export interface RealtimeAchievementUnlockedPayload {
+  achievement: {
+    id: string;
+    code: string;
+    title: string;
+    description: string;
+    iconUrl: string;
+    rarity: "COMMON" | "RARE" | "EPIC" | "LEGENDARY";
+  };
+}
+
 export interface RealtimeConversationAlertPayload {
   conversationId: string;
   senderId: string;
@@ -167,6 +178,7 @@ export interface RealtimeTavernMessagePayload {
 
 export const PUSHER_MESSAGE_EVENT = "new-message";
 export const PUSHER_NOTIFICATION_EVENT = "new-notification";
+export const PUSHER_ACHIEVEMENT_UNLOCKED_EVENT = "achievement-unlocked";
 export const PUSHER_CONVERSATION_ALERT_EVENT = "conversation-message-alert";
 export const PUSHER_TYPING_EVENT = "typing-state";
 export const PUSHER_GAME_DRAW_EVENT = "client-draw-line";
@@ -414,6 +426,17 @@ export async function publishUserNotificationEvent(
     getUserNotificationChannelName(userId),
     PUSHER_NOTIFICATION_EVENT,
     notificationData,
+  );
+}
+
+export async function publishUserAchievementUnlockedEvent(
+  userId: string,
+  payload: RealtimeAchievementUnlockedPayload,
+) {
+  await triggerPusherEvent(
+    getUserNotificationChannelName(userId),
+    PUSHER_ACHIEVEMENT_UNLOCKED_EVENT,
+    payload,
   );
 }
 

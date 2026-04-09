@@ -40,9 +40,45 @@ import {
   type NotificationRealtimeDeliveryInput,
   triggerDealChatTelegramNotification,
 } from "@/lib/domain/notifications-service";
+import {
+  ACHIEVEMENT_CODES,
+  grantAchievementToUserIfExists,
+  runAchievementAutomation,
+} from "@/lib/domain/achievements";
 
 function uniqueUserIds(userIds: string[]) {
   return Array.from(new Set(userIds.filter(Boolean)));
+}
+
+async function runChessAchievementAutomation(
+  scope: string,
+  gameMetadata: ConversationGameMetadata,
+) {
+  if (gameMetadata.game !== "chess") {
+    return;
+  }
+
+  const participantIds = uniqueUserIds([
+    gameMetadata.whitePlayerId ?? "",
+    gameMetadata.blackPlayerId ?? "",
+  ]);
+
+  if (participantIds.length === 0) {
+    return;
+  }
+
+  await runAchievementAutomation(
+    scope,
+    participantIds.map((participantId) => ({
+      label: `chess-master-${participantId}`,
+      run: () =>
+        grantAchievementToUserIfExists({
+          userId: participantId,
+          achievementCode: ACHIEVEMENT_CODES.CHESS_MASTER,
+          notifyUser: true,
+        }),
+    })),
+  );
 }
 
 function isConversationGameType(value: unknown): value is ConversationGameType {
@@ -1360,6 +1396,14 @@ export async function updateConversationGameInviteStatus(input: {
 
   await publishConversationMessageEvent(conversation.id, serializedMessage);
 
+  if (
+    input.status === "completed" &&
+    currentGameMetadata.status === "active" &&
+    nextGameMetadata.game === "chess"
+  ) {
+    await runChessAchievementAutomation("complete-chess-game", nextGameMetadata);
+  }
+
   return {
     conversationId: conversation.id,
     message: serializedMessage,
@@ -1531,6 +1575,10 @@ export async function endConversationMiniGame(input: {
     publishConversationMessageEvent(conversation.id, serializedMessage),
     publishConversationMessageEvent(conversation.id, serializedSystemMessage),
   ]);
+
+  if (input.reason === "surrender" && nextGameMetadata.game === "chess") {
+    await runChessAchievementAutomation("surrender-chess-game", nextGameMetadata);
+  }
 
   return {
     conversationId: conversation.id,

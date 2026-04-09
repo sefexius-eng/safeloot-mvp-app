@@ -16,6 +16,8 @@ import { prisma } from "@/lib/prisma";
 import { normalizeCurrencyCode } from "@/lib/currency-config";
 
 import {
+  ACHIEVEMENT_CODES,
+  grantAchievementToUserIfExists,
   maybeGrantBuyerPurchaseAchievements,
   maybeGrantSellerSaleAchievements,
   runAchievementAutomation,
@@ -716,6 +718,7 @@ export async function completeOrder(input: { orderId: string; buyerId: string })
       return {
         orderId: order.id,
         transactionId: transaction.id,
+        buyerId: order.buyerId,
         sellerId: order.sellerId,
         status: OrderStatus.COMPLETED,
         platformFee: formatMoney(fee),
@@ -746,6 +749,24 @@ export async function completeOrder(input: { orderId: string; buyerId: string })
   ]);
 
   await runAchievementAutomation("complete-order", [
+    {
+      label: "buyer-first-trade-achievement",
+      run: () =>
+        grantAchievementToUserIfExists({
+          userId: result.buyerId,
+          achievementCode: ACHIEVEMENT_CODES.FIRST_TRADE,
+          notifyUser: true,
+        }),
+    },
+    {
+      label: "seller-first-trade-achievement",
+      run: () =>
+        grantAchievementToUserIfExists({
+          userId: result.sellerId,
+          achievementCode: ACHIEVEMENT_CODES.FIRST_TRADE,
+          notifyUser: true,
+        }),
+    },
     {
       label: "seller-sale-achievements",
       run: () => maybeGrantSellerSaleAchievements(result.sellerId),

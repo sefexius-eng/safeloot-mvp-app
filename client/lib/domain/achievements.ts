@@ -6,6 +6,7 @@ import {
   sendNotificationRealtimeEvents,
   type NotificationRealtimeDeliveryInput,
 } from "@/lib/domain/notifications-service";
+import { publishUserAchievementUnlockedEvent } from "@/lib/pusher";
 import { prisma } from "@/lib/prisma";
 
 export interface AchievementGrantResult {
@@ -27,6 +28,10 @@ export interface AchievementGrantResult {
 }
 
 export const ACHIEVEMENT_CODES = Object.freeze({
+  REGISTRATION: "REGISTRATION",
+  CHESS_MASTER: "CHESS_MASTER",
+  SHOPAHOLIC: "SHOPAHOLIC",
+  FIRST_TRADE: "FIRST_TRADE",
   FIRST_PURCHASE: "FIRST_PURCHASE",
   FIRST_REVIEW: "FIRST_REVIEW",
   FIRST_SALE: "FIRST_SALE",
@@ -62,6 +67,52 @@ type AchievementRecord = NonNullable<Awaited<ReturnType<typeof getAchievementByC
 interface AchievementAutomationTask {
   label: string;
   run: () => Promise<unknown>;
+}
+
+function isAchievementGrantResult(value: unknown): value is AchievementGrantResult {
+  if (!value || typeof value !== "object") {
+    return false;
+  }
+
+  const candidate = value as Partial<AchievementGrantResult>;
+
+  return Boolean(
+    typeof candidate.alreadyEarned === "boolean" &&
+      candidate.achievement &&
+      typeof candidate.achievement === "object" &&
+      typeof candidate.achievement.code === "string" &&
+      candidate.userAchievement &&
+      typeof candidate.userAchievement === "object" &&
+      typeof candidate.userAchievement.userId === "string",
+  );
+}
+
+function collectAchievementGrantResults(value: unknown): AchievementGrantResult[] {
+  if (isAchievementGrantResult(value)) {
+    return [value];
+  }
+
+  if (Array.isArray(value)) {
+    return value.flatMap((entry) => collectAchievementGrantResults(entry));
+  }
+
+  return [];
+}
+
+function logAchievementAutomationGrant(input: {
+  scope: string;
+  task: string;
+  result: AchievementGrantResult;
+}) {
+  console.info("[ACHIEVEMENT_AUTOMATION_GRANTED]", {
+    scope: input.scope,
+    task: input.task,
+    userId: input.result.userAchievement.userId,
+    achievementId: input.result.achievement.id,
+    achievementCode: input.result.achievement.code,
+    rarity: input.result.achievement.rarity,
+    earnedAt: input.result.userAchievement.earnedAt,
+  });
 }
 
 function normalizeAchievementCode(value?: string) {
@@ -245,6 +296,16 @@ async function notifyUserAboutAchievementGrant(input: {
     });
 
     await sendNotificationRealtimeEvents(realtimeDeliveryQueue);
+    await publishUserAchievementUnlockedEvent(input.userId, {
+      achievement: {
+        id: input.achievement.id,
+        code: input.achievement.code,
+        title: input.achievement.title,
+        description: input.achievement.description,
+        iconUrl: input.achievement.iconUrl,
+        rarity: input.achievement.rarity,
+      },
+    });
   } catch (error) {
     console.error("[ACHIEVEMENT_NOTIFICATION_ERROR]", {
       userId: input.userId,
@@ -367,6 +428,18 @@ export async function runAchievementAutomation(
 
   settledResults.forEach((result, index) => {
     if (result.status === "fulfilled") {
+      const grants = collectAchievementGrantResults(result.value).filter(
+        (grant) => !grant.alreadyEarned,
+      );
+
+      grants.forEach((grant) => {
+        logAchievementAutomationGrant({
+          scope,
+          task: tasks[index]?.label ?? "unknown",
+          result: grant,
+        });
+      });
+
       return;
     }
 
