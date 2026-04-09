@@ -862,7 +862,7 @@ export function CosmeticsShop({
         ) : null}
       </aside>
 
-      <div className="rounded-[2rem] border border-white/10 bg-zinc-900/80 p-6 shadow-[0_24px_80px_rgba(0,0,0,0.28)] backdrop-blur md:p-8">
+      <div className="overflow-visible rounded-[2rem] border border-white/10 bg-zinc-900/80 p-6 shadow-[0_24px_80px_rgba(0,0,0,0.28)] backdrop-blur md:p-8">
         <div className="border-b border-white/10 pb-5">
           <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
             <div>
@@ -1007,114 +1007,27 @@ export function CosmeticsShop({
           </section>
         ) : null}
 
-        <section className="mt-6">
-          <div className="flex flex-col gap-2 md:flex-row md:items-end md:justify-between">
-            <div>
-              <p className="text-xs font-semibold uppercase tracking-[0.24em] text-zinc-500">
-                Полный preview профиля
+        <div className="mt-6 flex flex-col gap-6 lg:flex-row lg:items-start">
+          <section className="order-2 min-w-0 flex-1 lg:order-1">
+            <div className="flex items-center justify-between gap-3 text-sm text-zinc-400">
+              <p>
+                Найдено предметов: <span className="font-semibold text-white">{visibleCosmetics.length}</span>
+                <span className="text-zinc-500"> / {previewCountBase}</span>
               </p>
-              <p className="mt-2 text-sm leading-6 text-zinc-400">
-                Большой блок ниже показывает, как текущая карточка будет выглядеть на полноценной витрине продавца.
-              </p>
+              {normalizedSearchQuery ? (
+                <button
+                  type="button"
+                  onClick={() => setSearchQuery("")}
+                  className="font-semibold text-sky-200 transition hover:text-sky-100"
+                >
+                  Сбросить поиск
+                </button>
+              ) : null}
             </div>
-            {previewCosmeticId ? (
-              <button
-                type="button"
-                onClick={() => setPreviewCosmeticId(null)}
-                className="text-sm font-semibold text-sky-200 transition hover:text-sky-100"
-              >
-                Вернуть текущий образ
-              </button>
-            ) : null}
-          </div>
 
-          <div className="mt-4">
-            <ProfileHero
-              eyebrow="Preview в магазине"
-              displayName={previewDisplayName}
-              avatarName={previewDisplayName}
-              avatarSrc={viewer?.image ?? null}
-              appearance={previewAppearance}
-              roleBadge={
-                <span className="inline-flex rounded-full border border-orange-500/20 bg-orange-500/10 px-3 py-1 text-xs font-semibold uppercase tracking-[0.16em] text-orange-100">
-                  SELLER VIEW
-                </span>
-              }
-              details={
-                <>
-                  <span className="inline-flex rounded-full border border-white/10 bg-white/5 px-3 py-1 text-zinc-200">
-                    {previewEmail}
-                  </span>
-                  <span className="inline-flex rounded-full border border-white/10 bg-white/5 px-3 py-1 text-zinc-200">
-                    Витрина и отзывы SafeLoot
-                  </span>
-                  <span className="inline-flex rounded-full border border-white/10 bg-white/5 px-3 py-1 text-zinc-200">
-                    Видно в каталоге, чатах и профиле
-                  </span>
-                </>
-              }
-              aside={
-                <div className="rounded-[1.4rem] border border-white/10 bg-black/20 p-4 text-sm text-zinc-300">
-                  <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-zinc-500">
-                    Сейчас в фокусе
-                  </p>
-                  <p className="mt-3 text-xl font-semibold text-white">
-                    {previewCosmetic?.name ?? "Текущий образ"}
-                  </p>
-                  {previewRarity && previewRarityAccent ? (
-                    <span
-                      className={cn(
-                        "mt-3 inline-flex rounded-full border px-2.5 py-1 text-[11px] font-semibold uppercase tracking-[0.18em]",
-                        previewRarityAccent.pill,
-                      )}
-                    >
-                      {COSMETIC_RARITY_LABELS[previewRarity]}
-                    </span>
-                  ) : null}
-                  <p className="mt-3 leading-6 text-zinc-300">
-                    {previewRarity
-                      ? COSMETIC_RARITY_DESCRIPTIONS[previewRarity]
-                      : "Сейчас показан ваш текущий косметический образ без усиления карточкой магазина."}
-                  </p>
-                  {previewCosmetic ? (
-                    <div className="mt-4 rounded-[1rem] border border-white/10 bg-white/5 p-3">
-                      <p className="text-[11px] uppercase tracking-[0.18em] text-zinc-500">Цена preview</p>
-                      <div className="mt-2">
-                        <CosmeticPriceBlock
-                          cosmetic={previewCosmetic}
-                          formatPrice={formatPrice}
-                        />
-                      </div>
-                      <p className="mt-2 text-xs leading-5 text-zinc-400">
-                        В preview подмешивается текущий образ пользователя и эффект выделенной карточки.
-                      </p>
-                    </div>
-                  ) : null}
-                </div>
-              }
-            />
-          </div>
-        </section>
-
-        <div className="mt-4 flex items-center justify-between gap-3 text-sm text-zinc-400">
-          <p>
-            Найдено предметов: <span className="font-semibold text-white">{visibleCosmetics.length}</span>
-            <span className="text-zinc-500"> / {previewCountBase}</span>
-          </p>
-          {normalizedSearchQuery ? (
-            <button
-              type="button"
-              onClick={() => setSearchQuery("")}
-              className="font-semibold text-sky-200 transition hover:text-sky-100"
-            >
-              Сбросить поиск
-            </button>
-          ) : null}
-        </div>
-
-        {visibleCosmetics.length > 0 ? (
-          <div className="mt-6 grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-            {visibleCosmetics.map((cosmetic) => {
+            {visibleCosmetics.length > 0 ? (
+              <div className="mt-6 grid gap-4 md:grid-cols-2 2xl:grid-cols-3">
+                {visibleCosmetics.map((cosmetic) => {
               const accent = getTypeAccent(cosmetic.type);
               const rarity = getCosmeticRarity(cosmetic.price);
               const rarityAccent = getRarityAccent(rarity);
@@ -1308,27 +1221,118 @@ export function CosmeticsShop({
                       </Link>
                     )}
                   </div>
-                </article>
-              );
-            })}
-          </div>
-        ) : (
-          <div className="mt-6 rounded-[1.7rem] border border-dashed border-white/10 bg-white/[0.04] px-6 py-10 text-center">
-            <p className="text-lg font-semibold text-white">Ничего не найдено</p>
-            <p className="mt-2 text-sm leading-6 text-zinc-400">
-              Попробуйте другой запрос или откройте соседний тип косметики, чтобы расширить выбор.
-            </p>
-            {normalizedSearchQuery ? (
-              <Button
-                type="button"
-                onClick={() => setSearchQuery("")}
-                className="mt-5 rounded-2xl bg-white/10 px-5 text-sm font-semibold text-white hover:bg-white/15"
-              >
-                Очистить поиск
-              </Button>
-            ) : null}
-          </div>
-        )}
+                  </article>
+                );
+              })}
+              </div>
+            ) : (
+              <div className="mt-6 rounded-[1.7rem] border border-dashed border-white/10 bg-white/[0.04] px-6 py-10 text-center">
+                <p className="text-lg font-semibold text-white">Ничего не найдено</p>
+                <p className="mt-2 text-sm leading-6 text-zinc-400">
+                  Попробуйте другой запрос или откройте соседний тип косметики, чтобы расширить выбор.
+                </p>
+                {normalizedSearchQuery ? (
+                  <Button
+                    type="button"
+                    onClick={() => setSearchQuery("")}
+                    className="mt-5 rounded-2xl bg-white/10 px-5 text-sm font-semibold text-white hover:bg-white/15"
+                  >
+                    Очистить поиск
+                  </Button>
+                ) : null}
+              </div>
+            )}
+          </section>
+
+          <section className="order-1 w-full overflow-visible lg:order-2 lg:w-[400px] lg:shrink-0 lg:self-start lg:sticky lg:top-24 lg:h-fit">
+            <div className="flex flex-col gap-2 md:flex-row md:items-end md:justify-between lg:flex-col lg:items-start">
+              <div>
+                <p className="text-xs font-semibold uppercase tracking-[0.24em] text-zinc-500">
+                  Полный preview профиля
+                </p>
+                <p className="mt-2 text-sm leading-6 text-zinc-400">
+                  Большой блок справа остаётся в кадре, чтобы изменения аватара и ника были видны даже на нижних карточках.
+                </p>
+              </div>
+              {previewCosmeticId ? (
+                <button
+                  type="button"
+                  onClick={() => setPreviewCosmeticId(null)}
+                  className="text-sm font-semibold text-sky-200 transition hover:text-sky-100"
+                >
+                  Вернуть текущий образ
+                </button>
+              ) : null}
+            </div>
+
+            <div className="mt-4">
+              <ProfileHero
+                eyebrow="Preview в магазине"
+                displayName={previewDisplayName}
+                avatarName={previewDisplayName}
+                avatarSrc={viewer?.image ?? null}
+                appearance={previewAppearance}
+                roleBadge={
+                  <span className="inline-flex rounded-full border border-orange-500/20 bg-orange-500/10 px-3 py-1 text-xs font-semibold uppercase tracking-[0.16em] text-orange-100">
+                    SELLER VIEW
+                  </span>
+                }
+                details={
+                  <>
+                    <span className="inline-flex rounded-full border border-white/10 bg-white/5 px-3 py-1 text-zinc-200">
+                      {previewEmail}
+                    </span>
+                    <span className="inline-flex rounded-full border border-white/10 bg-white/5 px-3 py-1 text-zinc-200">
+                      Витрина и отзывы SafeLoot
+                    </span>
+                    <span className="inline-flex rounded-full border border-white/10 bg-white/5 px-3 py-1 text-zinc-200">
+                      Видно в каталоге, чатах и профиле
+                    </span>
+                  </>
+                }
+                aside={
+                  <div className="rounded-[1.4rem] border border-white/10 bg-black/20 p-4 text-sm text-zinc-300">
+                    <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-zinc-500">
+                      Сейчас в фокусе
+                    </p>
+                    <p className="mt-3 text-xl font-semibold text-white">
+                      {previewCosmetic?.name ?? "Текущий образ"}
+                    </p>
+                    {previewRarity && previewRarityAccent ? (
+                      <span
+                        className={cn(
+                          "mt-3 inline-flex rounded-full border px-2.5 py-1 text-[11px] font-semibold uppercase tracking-[0.18em]",
+                          previewRarityAccent.pill,
+                        )}
+                      >
+                        {COSMETIC_RARITY_LABELS[previewRarity]}
+                      </span>
+                    ) : null}
+                    <p className="mt-3 leading-6 text-zinc-300">
+                      {previewRarity
+                        ? COSMETIC_RARITY_DESCRIPTIONS[previewRarity]
+                        : "Сейчас показан ваш текущий косметический образ без усиления карточкой магазина."}
+                    </p>
+                    {previewCosmetic ? (
+                      <div className="mt-4 rounded-[1rem] border border-white/10 bg-white/5 p-3">
+                        <p className="text-[11px] uppercase tracking-[0.18em] text-zinc-500">Цена preview</p>
+                        <div className="mt-2">
+                          <CosmeticPriceBlock
+                            cosmetic={previewCosmetic}
+                            formatPrice={formatPrice}
+                          />
+                        </div>
+                        <p className="mt-2 text-xs leading-5 text-zinc-400">
+                          В preview подмешивается текущий образ пользователя и эффект выделенной карточки.
+                        </p>
+                      </div>
+                    ) : null}
+                  </div>
+                }
+              />
+            </div>
+          </section>
+        </div>
       </div>
     </section>
   );
