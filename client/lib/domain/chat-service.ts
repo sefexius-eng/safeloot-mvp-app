@@ -6,6 +6,7 @@ import {
   type NotificationEmailDeliveryInput,
 } from "@/lib/notification-delivery";
 import {
+  publishConversationAlertEvent,
   publishConversationMessageEvent,
   publishConversationTypingStateEvent,
   publishOrderMessageEvent,
@@ -957,6 +958,11 @@ export async function createConversationMessage(input: {
   await Promise.all([
     sendNotificationEmails(emailDeliveryQueue),
     sendNotificationRealtimeEvents(realtimeNotificationQueue),
+    publishConversationAlertEvent(recipientId, {
+      conversationId: conversation.id,
+      senderId,
+      createdAt: serializedMessage.createdAt,
+    }),
     publishConversationMessageEvent(conversation.id, serializedMessage),
     publishConversationTypingStateEvent(conversation.id, typingUsers),
     ...(serializedSystemMessage

@@ -34,6 +34,12 @@ export interface RealtimeNotificationPayload {
   createdAt: string;
 }
 
+export interface RealtimeConversationAlertPayload {
+  conversationId: string;
+  senderId: string;
+  createdAt: string;
+}
+
 export interface RealtimeTypingUser {
   senderId: string;
   role: "BUYER" | "SELLER";
@@ -87,6 +93,7 @@ export interface RealtimeTavernMessagePayload {
 
 export const PUSHER_MESSAGE_EVENT = "new-message";
 export const PUSHER_NOTIFICATION_EVENT = "new-notification";
+export const PUSHER_CONVERSATION_ALERT_EVENT = "conversation-message-alert";
 export const PUSHER_TYPING_EVENT = "typing-state";
 export const PUSHER_ORDER_UPDATED_EVENT = "order-updated";
 export const PUSHER_GLOBAL_PRESENCE_CHANNEL = "presence-site-users";
@@ -95,6 +102,7 @@ export const PUSHER_TAVERN_MESSAGE_DELETED_EVENT = "message-deleted";
 
 const PUSHER_AUTH_ENDPOINT = "/api/pusher/auth";
 const USER_CHANNEL_PREFIX = "private-user-";
+const USER_CONVERSATION_ALERT_CHANNEL_PREFIX = "private-chat-alert-user-";
 const CONVERSATION_CHANNEL_PREFIX = "private-conversation-";
 const ORDER_CHANNEL_PREFIX = "private-order-";
 
@@ -155,6 +163,10 @@ export function getUserNotificationChannelName(userId: string) {
   return `${USER_CHANNEL_PREFIX}${userId}`;
 }
 
+export function getUserConversationAlertChannelName(userId: string) {
+  return `${USER_CONVERSATION_ALERT_CHANNEL_PREFIX}${userId}`;
+}
+
 export function getGlobalPresenceChannelName() {
   return PUSHER_GLOBAL_PRESENCE_CHANNEL;
 }
@@ -192,6 +204,11 @@ export function parseRealtimeChannelName(
   }
 
   return (
+    parsePrefixedChannelName(
+      channelName,
+      USER_CONVERSATION_ALERT_CHANNEL_PREFIX,
+      "user",
+    ) ??
     parsePrefixedChannelName(channelName, USER_CHANNEL_PREFIX, "user") ??
     parsePrefixedChannelName(
       channelName,
@@ -317,6 +334,17 @@ export async function publishUserNotificationEvent(
     getUserNotificationChannelName(userId),
     PUSHER_NOTIFICATION_EVENT,
     notificationData,
+  );
+}
+
+export async function publishConversationAlertEvent(
+  userId: string,
+  payload: RealtimeConversationAlertPayload,
+) {
+  await triggerPusherEvent(
+    getUserConversationAlertChannelName(userId),
+    PUSHER_CONVERSATION_ALERT_EVENT,
+    payload,
   );
 }
 
