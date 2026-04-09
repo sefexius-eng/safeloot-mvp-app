@@ -1,5 +1,6 @@
 "use server";
 
+import { MessageType } from "@prisma/client";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 
@@ -16,6 +17,7 @@ import {
   softDeleteConversationByUser,
   toggleArchiveConversationByUser,
 } from "@/lib/domain/chat-service";
+import type { ConversationGameType } from "@/lib/pusher";
 
 interface StartDirectConversationResult {
   ok: boolean;
@@ -197,6 +199,46 @@ export async function sendConversationMessage(
     senderId: userId,
     text: sanitizedText,
     imageBase64,
+  });
+
+  revalidateChatPaths(result.conversationId);
+
+  return result;
+}
+
+function isSupportedConversationGameType(
+  gameType: string,
+): gameType is ConversationGameType {
+  return gameType === "crocodile";
+}
+
+function getConversationGameInviteText(gameType: ConversationGameType) {
+  switch (gameType) {
+    case "crocodile":
+      return "Приглашение в мини-игру: Крокодил.";
+  }
+}
+
+export async function sendGameInvite(
+  conversationId: string,
+  gameType: "crocodile",
+) {
+  const userId = await requireActiveChatUserId();
+
+  if (!isSupportedConversationGameType(gameType)) {
+    throw new Error("Unsupported game type.");
+  }
+
+  const result = await createConversationMessage({
+    conversationId,
+    senderId: userId,
+    text: getConversationGameInviteText(gameType),
+    type: MessageType.GAME_INVITE,
+    gameMetadata: {
+      game: gameType,
+      status: "pending",
+      initiatorId: userId,
+    },
   });
 
   revalidateChatPaths(result.conversationId);

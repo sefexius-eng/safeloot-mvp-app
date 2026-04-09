@@ -1,12 +1,22 @@
 "use client";
 
 import Image from "next/image";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, useTransition } from "react";
 
-import { markConversationMessagesAsRead } from "@/app/actions/chat";
+import {
+  markConversationMessagesAsRead,
+  sendGameInvite,
+} from "@/app/actions/chat";
 import CensoredText from "@/components/censored-text";
 import { Button } from "@/components/ui/button";
 import { CosmeticName } from "@/components/ui/cosmetic-name";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { Input } from "@/components/ui/input";
 import {
   getConversationChannelName,
@@ -14,6 +24,10 @@ import {
   PUSHER_MESSAGE_EVENT,
   PUSHER_TYPING_EVENT,
   type BrowserPusherChannel,
+  type ConversationGameMetadata,
+  type ConversationGameStatus,
+  type ConversationGameType,
+  type ConversationMessageType,
   type RealtimeConversationMessagePayload,
   type RealtimeTypingStatePayload,
 } from "@/lib/pusher";
@@ -39,7 +53,9 @@ export interface ChatMessageSender {
 export interface ChatMessage {
   id: string;
   text: string;
+  type: ConversationMessageType;
   imageUrl: string | null;
+  gameMetadata: ConversationGameMetadata | null;
   isSystem: boolean;
   isRead: boolean;
   senderId: string;
@@ -91,6 +107,28 @@ function getTypingUserLabel(typingUser: TypingUser) {
     typingUser.name?.trim() ||
     (typingUser.role === "SELLER" ? "Продавец" : "Покупатель")
   );
+}
+
+function getConversationMessageType(imageBase64: string | null): ConversationMessageType {
+  return imageBase64 ? "IMAGE" : "TEXT";
+}
+
+function getGameTitle(game: ConversationGameType) {
+  switch (game) {
+    case "crocodile":
+      return "Крокодил";
+  }
+}
+
+function getGameInviteStatusLabel(status: ConversationGameStatus) {
+  switch (status) {
+    case "pending":
+      return "Ожидает ответа";
+    case "active":
+      return "Игра идет";
+    case "completed":
+      return "Игра завершена";
+  }
 }
 
 function readFileAsDataUrl(file: Blob) {
@@ -210,6 +248,7 @@ export function ChatMessages({
   const [isSending, setIsSending] = useState(false);
   const [isProcessingAttachment, setIsProcessingAttachment] = useState(false);
   const [errorMessage, setErrorMessage] = useState("");
+  const [isSendingInvite, startSendingInviteTransition] = useTransition();
   const previousMessageCountRef = useRef(initialMessages.length);
   const latestMessageCreatedAtRef = useRef<string | null>(
     initialMessages[initialMessages.length - 1]?.createdAt ?? null,
@@ -570,7 +609,9 @@ export function ChatMessages({
     const optimisticMessage: ChatMessage = {
       id: tempId,
       text,
+      type: getConversationMessageType(imageBase64),
       imageUrl: imageBase64,
+      gameMetadata: null,
       isSystem: false,
       isRead: true,
       senderId: currentUserId,
@@ -647,6 +688,37 @@ export function ChatMessages({
     }
   }
 
+  function handleSendGameInvite(gameType: ConversationGameType) {
+    setErrorMessage("");
+
+    startSendingInviteTransition(() => {
+      void (async () => {
+        try {
+          const result = await sendGameInvite(conversationId, gameType);
+
+          setMessages((currentMessages) =>
+            mergeMessages(
+              currentMessages,
+              result.systemMessage
+                ? [result.message, result.systemMessage]
+                : [result.message],
+            ),
+          );
+          latestMessageCreatedAtRef.current =
+            result.systemMessage?.createdAt ?? result.message.createdAt;
+        } catch (error) {
+          setErrorMessage(
+            error instanceof Error
+              ? error.message
+              : "Не удалось отправить приглашение в игру.",
+          );
+        }
+      })();
+    });
+  }
+
+  const isMutating = isSending || isProcessingAttachment || isSendingInvite;
+
   return (
     <section className="flex min-h-0 flex-1 flex-col bg-[#0f1318]">
       <div ref={chatScrollContainerRef} className="flex-1 overflow-y-auto p-4">
@@ -657,7 +729,7 @@ export function ChatMessages({
             </div>
           ) : (
             messages.map((message) => {
-              if (message.isSystem) {
+              if (message.isSystem || message.type === "SYSTEM") {
                 return (
                   <div key={message.id} className="flex justify-center">
                     <div className="max-w-[92%] rounded-[1.5rem] border border-amber-500/20 bg-amber-500/10 px-4 py-3 text-center text-sm leading-7 text-amber-100 shadow-[0_12px_30px_rgba(0,0,0,0.18)]">
@@ -679,6 +751,15 @@ export function ChatMessages({
               const authorLabel = isOwnMessage
                 ? "Вы"
                 : getConversationUserLabel(message.sender.name);
+              const inviteStatusLabel = message.gameMetadata
+                ? getGameInviteStatusLabel(message.gameMetadata.status)
+                : null;
+              const inviteGameTitle = message.gameMetadata
+                ? getGameTitle(message.gameMetadata.game)
+                : null;
+              const inviteDescription = isOwnMessage
+                ? "Вы отправили приглашение в мини-игру."
+                : "Собеседник приглашает вас сыграть прямо в этом чате.";
 
               return (
                 <div
@@ -705,7 +786,29 @@ export function ChatMessages({
                         />
                       )}
                     </p>
-                    {message.text ? (
+                    {message.type === "GAME_INVITE" && message.gameMetadata ? (
+                      <div className="mt-2 rounded-[1.25rem] border border-emerald-400/15 bg-emerald-500/10 p-4 text-left shadow-[0_12px_30px_rgba(0,0,0,0.16)]">
+                        <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-emerald-200/80">
+                          Мини-игра
+                        </p>
+                        <p className="mt-2 text-base font-semibold text-white">
+                          {inviteGameTitle}
+                        </p>
+                        <p className="mt-2 text-sm leading-6 text-zinc-100/90">
+                          {inviteDescription}
+                        </p>
+                        {message.text ? (
+                          <p className="mt-3 text-sm leading-6 text-zinc-300">
+                            <CensoredText text={message.text} />
+                          </p>
+                        ) : null}
+                        {inviteStatusLabel ? (
+                          <span className="mt-3 inline-flex rounded-full border border-emerald-300/20 bg-emerald-400/10 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.16em] text-emerald-100">
+                            {inviteStatusLabel}
+                          </span>
+                        ) : null}
+                      </div>
+                    ) : message.text ? (
                       <p className="mt-2 whitespace-pre-wrap text-sm leading-7">
                         <CensoredText text={message.text} />
                       </p>
@@ -781,11 +884,37 @@ export function ChatMessages({
             onChange={handleAttachmentChange}
             className="hidden"
           />
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <button
+                type="button"
+                title="Пригласить в мини-игру"
+                disabled={isMutating}
+                className="inline-flex h-14 w-14 shrink-0 items-center justify-center rounded-[1.35rem] border border-white/10 bg-white/5 text-xl text-zinc-200 shadow-[0_12px_30px_rgba(0,0,0,0.18)] transition hover:bg-white/10 disabled:cursor-not-allowed disabled:opacity-60"
+              >
+                🎮
+              </button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent side="top" align="start" className="min-w-[220px]">
+              <DropdownMenuLabel>Мини-игры</DropdownMenuLabel>
+              <DropdownMenuItem onSelect={() => handleSendGameInvite("crocodile")}>
+                <span className="text-base" aria-hidden="true">
+                  🎭
+                </span>
+                <div className="flex flex-col">
+                  <span>Крокодил</span>
+                  <span className="text-xs font-normal text-zinc-400">
+                    Отправить инвайт в чат
+                  </span>
+                </div>
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
           <button
             type="button"
             title="Прикрепить скриншот"
             onClick={() => fileInputRef.current?.click()}
-            disabled={isSending || isProcessingAttachment}
+            disabled={isMutating}
             className="inline-flex h-14 w-14 shrink-0 items-center justify-center rounded-[1.35rem] border border-white/10 bg-white/5 text-xl text-zinc-200 shadow-[0_12px_30px_rgba(0,0,0,0.18)] transition hover:bg-white/10 disabled:cursor-not-allowed disabled:opacity-60"
           >
             📎
@@ -795,11 +924,11 @@ export function ChatMessages({
             onChange={(event) => setDraftMessage(event.target.value)}
             placeholder="Напишите сообщение или приложите скриншот"
             className="h-14 flex-1 border-white/10 bg-white/5 text-zinc-100 placeholder:text-zinc-500 focus:border-orange-500/45 focus:bg-white/8"
-            disabled={isSending || isProcessingAttachment}
+            disabled={isMutating}
           />
           <Button
             type="submit"
-            disabled={isSending || isProcessingAttachment || (!draftMessage.trim() && !draftImageBase64)}
+            disabled={isMutating || (!draftMessage.trim() && !draftImageBase64)}
             className="h-14 rounded-[1.35rem] bg-orange-600 px-6 text-sm font-semibold text-white shadow-[0_18px_42px_rgba(234,88,12,0.35)] hover:bg-orange-500"
           >
             {isSending ? "Отправляем..." : "Отправить"}

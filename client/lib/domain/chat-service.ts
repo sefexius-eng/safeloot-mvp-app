@@ -1,4 +1,4 @@
-import { Prisma } from "@prisma/client";
+import { MessageType, Prisma } from "@prisma/client";
 
 import { USER_APPEARANCE_SELECT } from "@/lib/cosmetics";
 import {
@@ -11,6 +11,9 @@ import {
   publishConversationTypingStateEvent,
   publishOrderMessageEvent,
   publishOrderTypingStateEvent,
+  type ConversationGameMetadata,
+  type ConversationGameStatus,
+  type ConversationGameType,
   type RealtimeConversationMessagePayload,
   type RealtimeOrderMessagePayload,
   type RealtimeTypingUser,
@@ -38,6 +41,42 @@ import {
 
 function uniqueUserIds(userIds: string[]) {
   return Array.from(new Set(userIds.filter(Boolean)));
+}
+
+function isConversationGameType(value: unknown): value is ConversationGameType {
+  return value === "crocodile";
+}
+
+function isConversationGameStatus(value: unknown): value is ConversationGameStatus {
+  return value === "pending" || value === "active" || value === "completed";
+}
+
+function parseConversationGameMetadata(value: unknown): ConversationGameMetadata | null {
+  if (!value || typeof value !== "object" || Array.isArray(value)) {
+    return null;
+  }
+
+  const metadata = value as Record<string, unknown>;
+  const game = metadata.game;
+  const status = metadata.status;
+  const initiatorId = metadata.initiatorId;
+  const sessionId = metadata.sessionId;
+
+  if (
+    !isConversationGameType(game) ||
+    !isConversationGameStatus(status) ||
+    typeof initiatorId !== "string" ||
+    !initiatorId.trim()
+  ) {
+    return null;
+  }
+
+  return {
+    game,
+    status,
+    initiatorId,
+    sessionId: typeof sessionId === "string" ? sessionId : null,
+  };
 }
 
 async function getConversationContextById(conversationId: string) {
@@ -707,7 +746,9 @@ export async function getConversationMessages(
         select: {
           id: true,
           text: true,
+          type: true,
           imageUrl: true,
+          gameMetadata: true,
           isSystem: true,
           isRead: true,
           senderId: true,
@@ -744,6 +785,7 @@ export async function getConversationMessages(
     conversationId: conversation.id,
     messages: conversation.messages.map((message) => ({
       ...message,
+      gameMetadata: parseConversationGameMetadata(message.gameMetadata),
       createdAt: message.createdAt.toISOString(),
       updatedAt: message.updatedAt.toISOString(),
     })),
@@ -753,7 +795,9 @@ export async function getConversationMessages(
 function serializeConversationMessage(message: {
   id: string;
   text: string;
+  type: MessageType;
   imageUrl: string | null;
+  gameMetadata: unknown;
   isSystem: boolean;
   isRead: boolean;
   senderId: string;
@@ -770,6 +814,7 @@ function serializeConversationMessage(message: {
 }): RealtimeConversationMessagePayload {
   return {
     ...message,
+    gameMetadata: parseConversationGameMetadata(message.gameMetadata),
     createdAt: message.createdAt.toISOString(),
     updatedAt: message.updatedAt.toISOString(),
   };
@@ -796,12 +841,32 @@ export async function createConversationMessage(input: {
   senderId: string;
   text?: string;
   imageBase64?: string | null;
+  type?: MessageType;
+  gameMetadata?: Prisma.InputJsonValue | null;
 }) {
   const conversationId = normalizeText(input.conversationId);
   const senderId = normalizeText(input.senderId);
   const moderationResult = moderateAntiLeakageMessageText(input.text);
   const text = moderationResult.text;
   const imageBase64 = normalizeOptionalText(input.imageBase64);
+  const messageType = input.type ?? (imageBase64 ? MessageType.IMAGE : MessageType.TEXT);
+  const gameMetadataInput = input.gameMetadata ?? null;
+  const gameMetadata =
+    messageType === MessageType.GAME_INVITE
+      ? parseConversationGameMetadata(gameMetadataInput)
+      : null;
+  const gameMetadataData: Prisma.InputJsonObject | null = gameMetadata
+    ? {
+        game: gameMetadata.game,
+        status: gameMetadata.status,
+        initiatorId: gameMetadata.initiatorId,
+        ...(gameMetadata.sessionId
+          ? {
+              sessionId: gameMetadata.sessionId,
+            }
+          : {}),
+      }
+    : null;
 
   if (!conversationId) {
     throw new Error("conversationId is required.");
@@ -821,6 +886,14 @@ export async function createConversationMessage(input: {
 
   if (imageBase64 && imageBase64.length > MAX_MESSAGE_IMAGE_BASE64_LENGTH) {
     throw new Error("imageBase64 is too large.");
+  }
+
+  if (messageType === MessageType.GAME_INVITE && !gameMetadata) {
+    throw new Error("gameMetadata is required for game invite messages.");
+  }
+
+  if (messageType !== MessageType.GAME_INVITE && gameMetadataInput !== null) {
+    throw new Error("gameMetadata is only supported for game invite messages.");
   }
 
   const conversation = await prisma.conversation.findUnique({
@@ -865,13 +938,21 @@ export async function createConversationMessage(input: {
           conversationId: conversation.id,
           senderId,
           text,
+          type: messageType,
           imageUrl: imageBase64,
-          isSystem: false,
+          ...(gameMetadataData
+            ? {
+                gameMetadata: gameMetadataData,
+              }
+            : {}),
+          isSystem: messageType === MessageType.SYSTEM,
         },
         select: {
           id: true,
           text: true,
+          type: true,
           imageUrl: true,
+          gameMetadata: true,
           isSystem: true,
           isRead: true,
           senderId: true,
@@ -894,12 +975,15 @@ export async function createConversationMessage(input: {
               conversationId: conversation.id,
               senderId,
               text: DEAL_ROOM_SECURITY_WARNING,
+              type: MessageType.SYSTEM,
               isSystem: true,
             },
             select: {
               id: true,
               text: true,
+              type: true,
               imageUrl: true,
+              gameMetadata: true,
               isSystem: true,
               isRead: true,
               senderId: true,

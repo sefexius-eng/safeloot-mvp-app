@@ -40,6 +40,23 @@ export interface RealtimeConversationAlertPayload {
   createdAt: string;
 }
 
+export type ConversationMessageType =
+  | "TEXT"
+  | "IMAGE"
+  | "SYSTEM"
+  | "GAME_INVITE";
+
+export type ConversationGameType = "crocodile";
+
+export type ConversationGameStatus = "pending" | "active" | "completed";
+
+export interface ConversationGameMetadata {
+  game: ConversationGameType;
+  status: ConversationGameStatus;
+  initiatorId: string;
+  sessionId?: string | null;
+}
+
 export interface RealtimeTypingUser {
   senderId: string;
   role: "BUYER" | "SELLER";
@@ -53,7 +70,9 @@ export interface RealtimeTypingStatePayload {
 export interface RealtimeConversationMessagePayload {
   id: string;
   text: string;
+  type: ConversationMessageType;
   imageUrl: string | null;
+  gameMetadata: ConversationGameMetadata | null;
   isSystem: boolean;
   isRead: boolean;
   senderId: string;
