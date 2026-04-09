@@ -48,6 +48,7 @@ async function getConversationContextById(conversationId: string) {
         select: {
           name: true,
           image: true,
+          lastSeen: true,
           role: true,
         },
       },
@@ -55,6 +56,7 @@ async function getConversationContextById(conversationId: string) {
         select: {
           name: true,
           image: true,
+          lastSeen: true,
           role: true,
         },
       },
@@ -394,15 +396,19 @@ export async function getConversationRoom(conversationId: string, userId: string
     otherParty:
       normalizedUserId === conversation.buyerId
         ? {
+            id: conversation.sellerId,
             role: "SELLER" as const,
             name: conversation.seller.name,
             image: conversation.seller.image,
+            lastSeen: conversation.seller.lastSeen.toISOString(),
             accountRole: conversation.seller.role,
           }
         : {
+            id: conversation.buyerId,
             role: "BUYER" as const,
             name: conversation.buyer.name,
             image: conversation.buyer.image,
+            lastSeen: conversation.buyer.lastSeen.toISOString(),
             accountRole: conversation.buyer.role,
           },
     latestOrder: conversation.latestOrder

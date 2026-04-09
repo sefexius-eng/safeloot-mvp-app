@@ -1,4 +1,3 @@
-import Link from "next/link";
 import { OrderStatus } from "@prisma/client";
 import { notFound } from "next/navigation";
 
@@ -18,6 +17,10 @@ import {
   formatSellerAverageRating,
   formatSellerReviewCount,
 } from "@/components/reviews/seller-star-scale";
+import {
+  UserPresenceDot,
+  UserPresencePill,
+} from "@/components/ui/user-presence-status";
 import { getCurrentSessionUser } from "@/lib/access-control";
 import { getAuthSession } from "@/lib/auth";
 import { mergeProfileBadgeIds } from "@/lib/profile-badges";
@@ -27,7 +30,6 @@ import { getSellerAutomaticBadgeDataBySellerId } from "@/lib/seller-achievements
 export const dynamic = 'force-dynamic';
 
 type SellerRank = "BRONZE" | "SILVER" | "GOLD";
-const SELLER_ONLINE_WINDOW_MS = 5 * 60 * 1000;
 
 interface PublicUserPageProps {
   params: Promise<{
@@ -67,20 +69,6 @@ function formatJoinedDate(value: Date) {
     month: "long",
     year: "numeric",
   }).format(value);
-}
-
-function isSellerOnline(lastSeen?: Date | string | null) {
-  if (!lastSeen) {
-    return false;
-  }
-
-  const lastSeenTime = new Date(lastSeen).getTime();
-
-  if (!Number.isFinite(lastSeenTime)) {
-    return false;
-  }
-
-  return lastSeenTime > Date.now() - SELLER_ONLINE_WINDOW_MS;
 }
 
 async function getPublicSellerProfile(id: string) {
@@ -218,7 +206,6 @@ export default async function PublicUserPage({ params }: PublicUserPageProps) {
   }
 
   const displayName = seller.name?.trim() || "Продавец";
-  const sellerIsOnline = isSellerOnline(seller.lastSeen);
 
   return (
     <main className="mx-auto flex w-full max-w-7xl flex-col gap-8 px-4 py-10 sm:px-6 lg:px-8 lg:py-14">
@@ -235,18 +222,12 @@ export default async function PublicUserPage({ params }: PublicUserPageProps) {
         roleBadge={<ProfileRoleBadge role={seller.role} />}
         badges={seller.badges}
         avatarStatus={
-          <span
-            aria-label={sellerIsOnline ? "Продавец онлайн" : "Продавец не в сети"}
-            title={sellerIsOnline ? "Продавец онлайн" : "Продавец не в сети"}
-            className={[
-              "inline-flex h-5 w-5 items-center justify-center rounded-full border border-zinc-950 text-[10px] shadow-[0_8px_20px_rgba(0,0,0,0.28)] md:h-6 md:w-6",
-              sellerIsOnline
-                ? "bg-emerald-500 text-emerald-950 shadow-[0_8px_20px_rgba(16,185,129,0.4)]"
-                : "bg-zinc-600 text-zinc-200",
-            ].join(" ")}
-          >
-            ●
-          </span>
+          <UserPresenceDot
+            userId={seller.id}
+            lastSeen={seller.lastSeen}
+            subjectLabel="Продавец"
+            className="md:h-6 md:w-6"
+          />
         }
         details={
           <>
@@ -255,16 +236,13 @@ export default async function PublicUserPage({ params }: PublicUserPageProps) {
             >
               Ранг: {getRankLabel(seller.rank)}
             </span>
-            <span
-              className={[
-                "inline-flex rounded-full border px-3 py-1.5 font-medium",
-                sellerIsOnline
-                  ? "border-emerald-500/20 bg-emerald-500/10 text-emerald-200"
-                  : "border-white/10 bg-white/5 text-zinc-300",
-              ].join(" ")}
-            >
-              {sellerIsOnline ? "Онлайн сейчас" : "Сейчас не в сети"}
-            </span>
+            <UserPresencePill
+              userId={seller.id}
+              lastSeen={seller.lastSeen}
+              subjectLabel="Продавец"
+              label="long"
+              className="px-3 py-1.5 font-medium text-sm"
+            />
             <span className="rounded-full border border-white/10 bg-white/5 px-3 py-1.5 text-zinc-300">
               На площадке с {formatJoinedDate(seller.createdAt)}
             </span>

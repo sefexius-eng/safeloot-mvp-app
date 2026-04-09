@@ -1,6 +1,7 @@
 "use client";
 
 import type { Role } from "@prisma/client";
+import Image from "next/image";
 import Link from "next/link";
 
 import CensoredText from "@/components/censored-text";
@@ -10,6 +11,7 @@ import {
   formatSellerAverageRating,
   formatSellerReviewCount,
 } from "@/components/reviews/seller-star-scale";
+import { UserPresenceInlineStatus } from "@/components/ui/user-presence-status";
 import { UserAvatar } from "@/components/ui/user-avatar";
 import type { SellerReviewSummary } from "@/lib/review-summary";
 
@@ -73,9 +75,12 @@ export function MarketplaceProductCard({ product }: MarketplaceProductCardProps)
       <Link href={`/product/${product.id}`} className="block">
         <div className="relative h-40 w-full overflow-hidden border-b border-white/10 bg-zinc-900">
           {coverImage ? (
-            <img
+            <Image
               src={coverImage}
               alt={product.title}
+              fill
+              unoptimized
+              sizes="(min-width: 1280px) 320px, (min-width: 640px) 50vw, 100vw"
               className="h-full w-full object-cover transition duration-500 group-hover:scale-105"
             />
           ) : (
@@ -132,6 +137,12 @@ export function MarketplaceProductCard({ product }: MarketplaceProductCardProps)
                 </span>
               ) : null}
             </div>
+            <UserPresenceInlineStatus
+              userId={product.seller.id}
+              lastSeen={product.seller.lastSeen}
+              subjectLabel="Продавец"
+              className="mt-1 flex flex-wrap items-center gap-1.5 text-xs"
+            />
             <div className="mt-1">
               {hasReviews ? (
                 <div className="flex flex-wrap items-center gap-1.5">

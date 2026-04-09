@@ -106,6 +106,12 @@ export async function authorizePusherChannelSubscription(input: {
     return pusher.authorizeChannel(socketId, channelName);
   }
 
+  if (channelDescriptor.kind === "presence") {
+    return pusher.authorizeChannel(socketId, channelName, {
+      user_id: userId,
+    });
+  }
+
   if (channelDescriptor.kind === "conversation") {
     await assertConversationChannelAccess(channelDescriptor.id, userId, input.role);
     return pusher.authorizeChannel(socketId, channelName);

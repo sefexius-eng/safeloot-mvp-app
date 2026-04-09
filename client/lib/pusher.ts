@@ -1,11 +1,14 @@
 type PusherServerConstructor = typeof import("pusher");
 
 export type BrowserPusherChannel = import("pusher-js").Channel;
+export type BrowserPusherPresenceChannel = import("pusher-js").PresenceChannel;
+export type BrowserPusherMembers = import("pusher-js").Members;
 
 export type RealtimeChannelDescriptor =
   | { kind: "user"; id: string }
   | { kind: "conversation"; id: string }
-  | { kind: "order"; id: string };
+  | { kind: "order"; id: string }
+  | { kind: "presence" };
 
 export interface RealtimeUserIdentity {
   id: string;
@@ -68,6 +71,7 @@ export const PUSHER_MESSAGE_EVENT = "new-message";
 export const PUSHER_NOTIFICATION_EVENT = "new-notification";
 export const PUSHER_TYPING_EVENT = "typing-state";
 export const PUSHER_ORDER_UPDATED_EVENT = "order-updated";
+export const PUSHER_GLOBAL_PRESENCE_CHANNEL = "presence-site-users";
 
 const PUSHER_AUTH_ENDPOINT = "/api/pusher/auth";
 const USER_CHANNEL_PREFIX = "private-user-";
@@ -131,6 +135,10 @@ export function getUserNotificationChannelName(userId: string) {
   return `${USER_CHANNEL_PREFIX}${userId}`;
 }
 
+export function getGlobalPresenceChannelName() {
+  return PUSHER_GLOBAL_PRESENCE_CHANNEL;
+}
+
 function parsePrefixedChannelName(
   channelName: string,
   prefix: string,
@@ -155,6 +163,10 @@ function parsePrefixedChannelName(
 export function parseRealtimeChannelName(
   channelName: string,
 ): RealtimeChannelDescriptor | null {
+  if (channelName === PUSHER_GLOBAL_PRESENCE_CHANNEL) {
+    return { kind: "presence" };
+  }
+
   return (
     parsePrefixedChannelName(channelName, USER_CHANNEL_PREFIX, "user") ??
     parsePrefixedChannelName(

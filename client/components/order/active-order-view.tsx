@@ -31,6 +31,11 @@ import { TeamBadge } from "@/components/ui/team-badge";
 import { Textarea } from "@/components/ui/textarea";
 import { UserAvatar } from "@/components/ui/user-avatar";
 import {
+  UserPresenceDot,
+  UserPresenceInlineStatus,
+  UserPresencePill,
+} from "@/components/ui/user-presence-status";
+import {
   formatStoredOrderAmount,
   normalizeCurrencyCode,
 } from "@/lib/currency-config";
@@ -48,7 +53,6 @@ import {
 import { isAdminRole } from "@/lib/roles";
 
 const TYPING_IDLE_TIMEOUT_MS = 1800;
-const INTERLOCUTOR_ONLINE_WINDOW_MS = 5 * 60 * 1000;
 const BALANCE_REFRESH_EVENT = "safeloot:balances-refresh";
 const MAX_CHAT_IMAGE_WIDTH = 800;
 const CHAT_IMAGE_QUALITY = 0.7;
@@ -203,19 +207,6 @@ function getUserDisplayName(
   fallbackLabel = "Пользователь",
 ) {
   return user.name?.trim() || fallbackLabel;
-}
-
-function isUserOnline(lastSeen?: string | null) {
-  if (!lastSeen) {
-    return false;
-  }
-
-  const lastSeenTime = new Date(lastSeen).getTime();
-
-  return (
-    Number.isFinite(lastSeenTime) &&
-    lastSeenTime > Date.now() - INTERLOCUTOR_ONLINE_WINDOW_MS
-  );
 }
 
 function getOrderParticipantById(order: OrderDetail, userId: string) {
@@ -1190,9 +1181,6 @@ export function ActiveOrderView({ orderId }: ActiveOrderViewProps) {
   const interlocutorDisplayName = interlocutor
     ? getUserDisplayName(interlocutor, interlocutorRole ?? "Собеседник")
     : "";
-  const interlocutorIsOnline = interlocutor
-    ? isUserOnline(interlocutor.lastSeen)
-    : false;
   const emptyStateTargetLabel = interlocutorRole?.toLowerCase() ?? "участнику сделки";
   const currentUserDisplayName = currentParticipant
     ? getUserDisplayName(currentParticipant, currentUserDealRole)
@@ -1254,45 +1242,45 @@ export function ActiveOrderView({ orderId }: ActiveOrderViewProps) {
                   className="h-10 w-10 shrink-0 border-white/10 bg-zinc-800/80"
                   imageClassName="rounded-full object-cover"
                 />
-                <span
-                  aria-label={interlocutorIsOnline ? "Собеседник онлайн" : "Собеседник не в сети"}
-                  title={interlocutorIsOnline ? "Собеседник онлайн" : "Собеседник не в сети"}
-                  className={[
-                    "absolute -bottom-0.5 -right-0.5 inline-flex h-3.5 w-3.5 items-center justify-center rounded-full border border-zinc-950 text-[8px]",
-                    interlocutorIsOnline
-                      ? "bg-emerald-500 text-emerald-950"
-                      : "bg-zinc-600 text-zinc-200",
-                  ].join(" ")}
-                >
-                  ●
-                </span>
+                <UserPresenceDot
+                  userId={interlocutor.id}
+                  lastSeen={interlocutor.lastSeen}
+                  subjectLabel="Собеседник"
+                  className="absolute -bottom-0.5 -right-0.5 h-3.5 w-3.5 text-[8px]"
+                />
               </div>
 
               <div className="min-w-0">
                 <p className="text-sm font-semibold tracking-[0.24em] uppercase text-zinc-500">
                   Чат сделки
                 </p>
-                <Link
-                  href={`/user/${interlocutor.id}`}
-                  className="mt-1 inline-flex max-w-full items-center gap-2 truncate text-xl font-semibold tracking-tight text-white transition hover:text-orange-300 hover:underline"
-                >
-                  <span className="truncate">
-                    <CensoredText text={interlocutorDisplayName} />
-                  </span>
-                  <TeamBadge role={interlocutor.role} />
-                </Link>
+                <div className="mt-1 flex max-w-full flex-wrap items-center gap-2">
+                  <Link
+                    href={`/user/${interlocutor.id}`}
+                    className="inline-flex min-w-0 max-w-full items-center gap-2 truncate text-xl font-semibold tracking-tight text-white transition hover:text-orange-300 hover:underline"
+                  >
+                    <span className="truncate">
+                      <CensoredText text={interlocutorDisplayName} />
+                    </span>
+                    <TeamBadge role={interlocutor.role} />
+                  </Link>
+                  <UserPresencePill
+                    userId={interlocutor.id}
+                    lastSeen={interlocutor.lastSeen}
+                    subjectLabel="Собеседник"
+                  />
+                </div>
                 <div className="mt-1 flex flex-wrap items-center gap-2 text-sm text-zinc-400">
                   <span>{interlocutorRole}</span>
                   <span className="h-1 w-1 rounded-full bg-zinc-600" />
-                  <span className="inline-flex items-center gap-1.5">
-                    <span
-                      className={[
-                        "h-2 w-2 rounded-full",
-                        interlocutorIsOnline ? "bg-emerald-400" : "bg-zinc-500",
-                      ].join(" ")}
-                    />
-                    {interlocutorIsOnline ? "Онлайн" : "Не в сети"}
-                  </span>
+                  <UserPresenceInlineStatus
+                    userId={interlocutor.id}
+                    lastSeen={interlocutor.lastSeen}
+                    subjectLabel="Собеседник"
+                    label="long"
+                    showDot={false}
+                    textClassName="text-zinc-400"
+                  />
                 </div>
               </div>
             </div>

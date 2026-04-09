@@ -6,6 +6,10 @@ import { ChatMessages } from "@/components/chat-messages";
 import { UserAvatar } from "@/components/ui/user-avatar";
 import { BuyProductDialog } from "@/components/product/buy-product-dialog";
 import { TeamBadge } from "@/components/ui/team-badge";
+import {
+  UserPresenceInlineStatus,
+  UserPresencePill,
+} from "@/components/ui/user-presence-status";
 import { getCurrentSessionUser } from "@/lib/access-control";
 import { getAuthSession } from "@/lib/auth";
 import {
@@ -116,15 +120,33 @@ export default async function ChatRoomPage({ params }: ChatPageProps) {
               imageClassName="rounded-full object-cover"
             />
             <div className="min-w-0">
-              <div className="flex min-w-0 items-center gap-2 text-lg font-semibold text-white">
-                <p className="truncate">
-                  <CensoredText text={otherPartyName} />
-                </p>
-                <TeamBadge role={conversation.otherParty.accountRole} />
+              <div className="flex min-w-0 flex-wrap items-center gap-2 text-lg font-semibold text-white">
+                <div className="flex min-w-0 items-center gap-2">
+                  <p className="truncate">
+                    <CensoredText text={otherPartyName} />
+                  </p>
+                  <TeamBadge role={conversation.otherParty.accountRole} />
+                </div>
+                <UserPresencePill
+                  userId={conversation.otherParty.id}
+                  lastSeen={conversation.otherParty.lastSeen}
+                  subjectLabel="Собеседник"
+                />
               </div>
-              <p className="truncate text-sm text-gray-400">
-                <CensoredText text={conversation.product?.title ?? "Личный диалог"} />
-              </p>
+              <div className="mt-1 flex flex-wrap items-center gap-2 text-sm text-gray-400">
+                <p className="truncate">
+                  <CensoredText text={conversation.product?.title ?? "Личный диалог"} />
+                </p>
+                <span className="h-1 w-1 rounded-full bg-gray-600" />
+                <UserPresenceInlineStatus
+                  userId={conversation.otherParty.id}
+                  lastSeen={conversation.otherParty.lastSeen}
+                  subjectLabel="Собеседник"
+                  label="long"
+                  showDot={false}
+                  textClassName="text-gray-400"
+                />
+              </div>
             </div>
           </div>
 
