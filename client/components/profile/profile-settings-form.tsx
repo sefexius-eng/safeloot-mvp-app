@@ -73,6 +73,13 @@ interface SellerAutomationKeywordRuleDraft {
 
 type ProfileSettingsTab = "profile" | "automation";
 
+const AUTOMATION_FIELD_CLASS_NAME =
+  "w-full rounded-md border border-white/10 bg-[#13171F] p-3 text-white placeholder:text-gray-500 focus:border-[#00C853] focus:ring-1 focus:ring-[#00C853]";
+
+const AUTOMATION_INPUT_CLASS_NAME = `${AUTOMATION_FIELD_CLASS_NAME} h-auto`;
+
+const AUTOMATION_TEXTAREA_CLASS_NAME = `${AUTOMATION_FIELD_CLASS_NAME} min-h-32`;
+
 function createKeywordRuleDraft(
   rule?: Partial<SellerAutomationKeywordRuleDraft>,
 ): SellerAutomationKeywordRuleDraft {
@@ -948,7 +955,7 @@ export function ProfileSettingsForm({
                   }}
                   maxLength={1200}
                   placeholder="Например: Привет! Я онлайн и обычно отвечаю в течение пары минут. Если нужен конкретный формат товара, напишите сразу детали."
-                  className="min-h-36 border-white/10 bg-black/20 text-zinc-100 placeholder:text-zinc-500 focus:border-orange-400/40 focus:bg-black/30"
+                  className={`${AUTOMATION_TEXTAREA_CLASS_NAME} min-h-36`}
                 />
                 <p className="text-sm text-zinc-500">
                   До 1200 символов. Оставьте поле пустым, если автоприветствие не нужно.
@@ -1001,6 +1008,7 @@ export function ProfileSettingsForm({
                                   )
                                 }
                                 placeholder="Например: наличие"
+                                className={AUTOMATION_INPUT_CLASS_NAME}
                               />
                             </div>
 
@@ -1019,7 +1027,7 @@ export function ProfileSettingsForm({
                                   )
                                 }
                                 placeholder="Например: Да, товар в наличии. Могу выдать сразу после оплаты."
-                                className="min-h-28 border-white/10 bg-zinc-950/60 text-zinc-100 placeholder:text-zinc-500 focus:border-orange-400/40 focus:bg-zinc-950/80"
+                                className={`${AUTOMATION_TEXTAREA_CLASS_NAME} min-h-28`}
                               />
                             </div>
                           </div>
@@ -1085,7 +1093,7 @@ export function ProfileSettingsForm({
                     }}
                     maxLength={1000}
                     placeholder="Спасибо за покупку! Обращайтесь еще"
-                    className="min-h-32 border-white/10 bg-black/20 text-zinc-100 placeholder:text-zinc-500 focus:border-orange-400/40 focus:bg-black/30"
+                    className={AUTOMATION_TEXTAREA_CLASS_NAME}
                   />
                 </div>
 
@@ -1102,7 +1110,7 @@ export function ProfileSettingsForm({
                     }}
                     maxLength={1000}
                     placeholder="Сожалеем, что возникли проблемы. Напишите нам в чат, и мы все решим"
-                    className="min-h-32 border-white/10 bg-black/20 text-zinc-100 placeholder:text-zinc-500 focus:border-orange-400/40 focus:bg-black/30"
+                    className={AUTOMATION_TEXTAREA_CLASS_NAME}
                   />
                 </div>
               </section>
