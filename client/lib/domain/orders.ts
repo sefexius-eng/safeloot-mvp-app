@@ -485,6 +485,34 @@ export async function getOrderById(
 
   ensureOrderAccess(normalizedUserId, order, role);
 
+  const buyerSellerReview =
+    order.review ??
+    (await prisma.review.findFirst({
+      where: {
+        authorId: order.buyerId,
+        sellerId: order.sellerId,
+      },
+      orderBy: {
+        createdAt: "desc",
+      },
+      select: {
+        id: true,
+        rating: true,
+        comment: true,
+        sellerReply: true,
+        replyCreatedAt: true,
+        createdAt: true,
+        author: {
+          select: {
+            id: true,
+            name: true,
+            image: true,
+            ...USER_APPEARANCE_SELECT,
+          },
+        },
+      },
+    }));
+
   return {
     id: order.id,
     buyerId: order.buyerId,
@@ -500,6 +528,14 @@ export async function getOrderById(
           ...order.review,
           createdAt: order.review.createdAt.toISOString(),
           replyCreatedAt: order.review.replyCreatedAt?.toISOString() ?? null,
+        }
+      : null,
+    buyerSellerReview: buyerSellerReview
+      ? {
+          ...buyerSellerReview,
+          createdAt: buyerSellerReview.createdAt.toISOString(),
+          replyCreatedAt:
+            buyerSellerReview.replyCreatedAt?.toISOString() ?? null,
         }
       : null,
     buyer: {

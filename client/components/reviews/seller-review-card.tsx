@@ -2,7 +2,7 @@
 
 import type { Role } from "@prisma/client";
 import { useRouter } from "next/navigation";
-import { useEffect, useState, useTransition, type FormEvent } from "react";
+import { useState, useTransition, type FormEvent } from "react";
 
 import { deleteReview, updateReview } from "@/app/actions/reviews";
 import CensoredText from "@/components/censored-text";
@@ -101,8 +101,6 @@ export function SellerReviewCard({
   onDeleted,
 }: SellerReviewCardProps) {
   const router = useRouter();
-  const [review, setReview] = useState(initialReview);
-  const [isDeleted, setIsDeleted] = useState(false);
   const [isEditOpen, setIsEditOpen] = useState(false);
   const [draftRating, setDraftRating] = useState(initialReview.rating);
   const [draftComment, setDraftComment] = useState(initialReview.comment ?? "");
@@ -110,19 +108,7 @@ export function SellerReviewCard({
   const [deleteError, setDeleteError] = useState<string | null>(null);
   const [isUpdatePending, startUpdateTransition] = useTransition();
   const [isDeletePending, startDeleteTransition] = useTransition();
-
-  useEffect(() => {
-    setReview(initialReview);
-    setDraftRating(initialReview.rating);
-    setDraftComment(initialReview.comment ?? "");
-    setEditError(null);
-    setDeleteError(null);
-    setIsDeleted(false);
-  }, [initialReview]);
-
-  if (isDeleted) {
-    return null;
-  }
+  const review = initialReview;
 
   const authorName =
     review.author.name?.trim() || review.author.email?.trim() || "Покупатель";
@@ -134,6 +120,7 @@ export function SellerReviewCard({
     hasManageAccess &&
     currentUserId !== review.author.id &&
     hasAdminReviewAccess(currentUserRole);
+  const canDelete = hasAdminReviewAccess(currentUserRole);
   const canReply = isSellerOwner && !review.sellerReply?.trim();
   const normalizedCurrentComment = review.comment?.trim() ?? "";
   const normalizedDraftComment = draftComment.trim();
@@ -172,7 +159,6 @@ export function SellerReviewCard({
             replyCreatedAt: result.review.replyCreatedAt,
           };
 
-          setReview(updatedReview);
           onUpdated?.(updatedReview);
           setIsEditOpen(false);
           router.refresh();
@@ -203,7 +189,6 @@ export function SellerReviewCard({
           }
 
           onDeleted?.(review.id);
-          setIsDeleted(true);
           router.refresh();
         })
         .catch(() => {
@@ -323,16 +308,18 @@ export function SellerReviewCard({
                 </DialogContent>
               </Dialog>
 
-              <button
-                type="button"
-                onClick={handleDelete}
-                disabled={isUpdatePending || isDeletePending}
-                title="Удалить отзыв"
-                aria-label="Удалить отзыв"
-                className="inline-flex h-9 w-9 items-center justify-center rounded-full border border-rose-500/20 bg-rose-500/10 text-rose-100 transition hover:bg-rose-500/20 disabled:cursor-not-allowed disabled:opacity-60"
-              >
-                <TrashIcon />
-              </button>
+              {canDelete ? (
+                <button
+                  type="button"
+                  onClick={handleDelete}
+                  disabled={isUpdatePending || isDeletePending}
+                  title="Удалить отзыв"
+                  aria-label="Удалить отзыв"
+                  className="inline-flex h-9 w-9 items-center justify-center rounded-full border border-rose-500/20 bg-rose-500/10 text-rose-100 transition hover:bg-rose-500/20 disabled:cursor-not-allowed disabled:opacity-60"
+                >
+                  <TrashIcon />
+                </button>
+              ) : null}
             </div>
           ) : null}
 

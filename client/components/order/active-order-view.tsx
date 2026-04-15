@@ -18,10 +18,18 @@ import {
 import {
   type CurrencyCode,
 } from "@/components/providers/currency-provider";
-import { createReview } from "@/app/actions/reviews";
+import { createReview, updateReview } from "@/app/actions/reviews";
 import { useTabNotification } from "@/components/chat/use-tab-notification";
 import CensoredText from "@/components/censored-text";
 import { RatingStars } from "@/components/reviews/rating-stars";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import {
   SellerReviewCard,
   type SellerReviewCardData,
@@ -59,6 +67,7 @@ const TYPING_IDLE_TIMEOUT_MS = 1800;
 const BALANCE_REFRESH_EVENT = "safeloot:balances-refresh";
 const MAX_CHAT_IMAGE_WIDTH = 800;
 const CHAT_IMAGE_QUALITY = 0.7;
+const MAX_REVIEW_COMMENT_LENGTH = 1000;
 const ACCEPTED_CHAT_IMAGE_TYPES = new Set([
   "image/jpeg",
   "image/png",
@@ -102,22 +111,8 @@ interface OrderDetail {
     id: string;
     title: string;
   };
-  review: {
-    id: string;
-    rating: number;
-    comment: string | null;
-    sellerReply: string | null;
-    replyCreatedAt: string | null;
-    createdAt: string;
-    author: {
-      id: string;
-      name: string | null;
-      image: string | null;
-      activeColor: string | null;
-      activeFont: string | null;
-      activeDecoration: string | null;
-    };
-  } | null;
+  review: SellerReviewCardData | null;
+  buyerSellerReview: SellerReviewCardData | null;
   buyer: OrderParticipant;
   seller: OrderParticipant;
 }
@@ -217,6 +212,26 @@ function getUserDisplayName(
   fallbackLabel = "Пользователь",
 ) {
   return user.name?.trim() || fallbackLabel;
+}
+
+function buildOrderReviewData(
+  review: Pick<
+    SellerReviewCardData,
+    "id" | "rating" | "comment" | "sellerReply" | "replyCreatedAt" | "createdAt"
+  >,
+  author: OrderParticipant,
+): SellerReviewCardData {
+  return {
+    ...review,
+    author: {
+      id: author.id,
+      name: author.name,
+      image: author.image,
+      activeColor: author.activeColor,
+      activeFont: author.activeFont,
+      activeDecoration: author.activeDecoration,
+    },
+  };
 }
 
 function getOrderParticipantById(order: OrderDetail, userId: string) {
@@ -327,6 +342,8 @@ export function ActiveOrderView({ orderId }: ActiveOrderViewProps) {
   const { data: session, status: sessionStatus } = useSession();
   const router = useRouter();
   const [isReviewPending, startReviewTransition] = useTransition();
+  const [isExistingReviewEditPending, startExistingReviewEditTransition] =
+    useTransition();
   const [order, setOrder] = useState<OrderDetail | null>(null);
   const [chatRoomId, setChatRoomId] = useState("");
   const [messages, setMessages] = useState<ChatMessage[]>([]);
@@ -335,6 +352,11 @@ export function ActiveOrderView({ orderId }: ActiveOrderViewProps) {
   const [draftImageBase64, setDraftImageBase64] = useState<string | null>(null);
   const [reviewRating, setReviewRating] = useState(0);
   const [reviewComment, setReviewComment] = useState("");
+  const [isExistingReviewEditOpen, setIsExistingReviewEditOpen] =
+    useState(false);
+  const [existingReviewRating, setExistingReviewRating] = useState(0);
+  const [existingReviewComment, setExistingReviewComment] = useState("");
+  const [existingReviewEditError, setExistingReviewEditError] = useState("");
   const [isOrderLoading, setIsOrderLoading] = useState(true);
   const [isChatLoading, setIsChatLoading] = useState(true);
   const [isSending, setIsSending] = useState(false);
@@ -359,6 +381,43 @@ export function ActiveOrderView({ orderId }: ActiveOrderViewProps) {
   const currentUserAccountRole = session?.user?.role ?? "USER";
   const isCurrentUserSeller = order?.sellerId === currentUserId;
   const { triggerNotification } = useTabNotification();
+
+  function syncReviewInOrderState(
+    review: Pick<
+      SellerReviewCardData,
+      "id" | "rating" | "comment" | "sellerReply" | "replyCreatedAt" | "createdAt"
+    >,
+  ) {
+    setOrder((currentOrder) => {
+      if (!currentOrder) {
+        return currentOrder;
+      }
+
+      const nextReview = buildOrderReviewData(review, currentOrder.buyer);
+
+      return {
+        ...currentOrder,
+        review:
+          currentOrder.review?.id === review.id ? nextReview : currentOrder.review,
+        buyerSellerReview:
+          currentOrder.buyerSellerReview?.id === review.id
+            ? nextReview
+            : currentOrder.buyerSellerReview,
+      };
+    });
+  }
+
+  function handleExistingReviewEditOpen(nextOpen: boolean) {
+    setIsExistingReviewEditOpen(nextOpen);
+    setExistingReviewEditError("");
+
+    if (!nextOpen || !order?.buyerSellerReview) {
+      return;
+    }
+
+    setExistingReviewRating(order.buyerSellerReview.rating);
+    setExistingReviewComment(order.buyerSellerReview.comment ?? "");
+  }
 
   useEffect(() => {
     previousMessageCountRef.current = 0;
@@ -1114,22 +1173,11 @@ export function ActiveOrderView({ orderId }: ActiveOrderViewProps) {
             currentOrder
               ? {
                   ...currentOrder,
-                  review: {
-                    id: result.review.id,
-                    rating: result.review.rating,
-                    comment: result.review.comment,
-                    sellerReply: result.review.sellerReply,
-                    replyCreatedAt: result.review.replyCreatedAt,
-                    createdAt: result.review.createdAt,
-                    author: {
-                      id: currentOrder.buyer.id,
-                      name: currentOrder.buyer.name,
-                      image: currentOrder.buyer.image,
-                      activeColor: currentOrder.buyer.activeColor,
-                      activeFont: currentOrder.buyer.activeFont,
-                      activeDecoration: currentOrder.buyer.activeDecoration,
-                    },
-                  },
+                  review: buildOrderReviewData(result.review, currentOrder.buyer),
+                  buyerSellerReview: buildOrderReviewData(
+                    result.review,
+                    currentOrder.buyer,
+                  ),
                 }
               : currentOrder,
           );
@@ -1143,6 +1191,63 @@ export function ActiveOrderView({ orderId }: ActiveOrderViewProps) {
             error instanceof Error
               ? error.message
               : "Не удалось сохранить отзыв.",
+          );
+        });
+    });
+  }
+
+  function handleSubmitExistingReviewEdit(
+    event: React.FormEvent<HTMLFormElement>,
+  ) {
+    event.preventDefault();
+
+    if (!order?.buyerSellerReview) {
+      setExistingReviewEditError(
+        "Не удалось найти существующий отзыв для редактирования.",
+      );
+      return;
+    }
+
+    if (currentUserId !== order.buyerId) {
+      setExistingReviewEditError(
+        "Редактировать отзыв может только покупатель, который его оставил.",
+      );
+      return;
+    }
+
+    if (existingReviewRating < 1 || existingReviewRating > 5) {
+      setExistingReviewEditError("Поставьте оценку от 1 до 5.");
+      return;
+    }
+
+    setExistingReviewEditError("");
+    setReviewError("");
+    setReviewSuccess("");
+
+    startExistingReviewEditTransition(() => {
+      void updateReview(
+        order.buyerSellerReview!.id,
+        existingReviewRating,
+        existingReviewComment,
+      )
+        .then((result) => {
+          if (!result.ok || !result.review) {
+            setExistingReviewEditError(
+              result.message ?? "Не удалось обновить отзыв.",
+            );
+            return;
+          }
+
+          syncReviewInOrderState(result.review);
+          setReviewSuccess("Отзыв обновлен.");
+          handleExistingReviewEditOpen(false);
+          router.refresh();
+        })
+        .catch((error) => {
+          setExistingReviewEditError(
+            error instanceof Error
+              ? error.message
+              : "Не удалось обновить отзыв.",
           );
         });
     });
@@ -1231,10 +1336,17 @@ export function ActiveOrderView({ orderId }: ActiveOrderViewProps) {
     (order.status === "PAID" || order.status === "DISPUTED");
   const showArbiterPanel = isSpectator && order.status === "DISPUTED";
   const isChatReadOnly = isSpectator;
+  const existingBuyerSellerReview = order.buyerSellerReview;
   const canLeaveReview =
     order.status === "COMPLETED" &&
     currentUserId === order.buyerId &&
-    !order.review;
+    !order.review &&
+    !existingBuyerSellerReview;
+  const canEditExistingSellerReview =
+    order.status === "COMPLETED" &&
+    currentUserId === order.buyerId &&
+    !order.review &&
+    Boolean(existingBuyerSellerReview);
   const reviewTitle = currentUserId === order.buyerId ? "Ваш отзыв" : "Отзыв покупателя";
   const orderCurrency = normalizeCurrencyCode(order.currency);
   const formattedOrderPrice = formatAmountWithoutFractions(order.price, {
@@ -1809,41 +1921,20 @@ export function ActiveOrderView({ orderId }: ActiveOrderViewProps) {
               sellerId={order.sellerId}
               currentUserId={currentUserId}
               currentUserRole={currentUserAccountRole as Role}
-              onUpdated={(updatedReview) =>
+              onUpdated={syncReviewInOrderState}
+              onDeleted={(reviewId) => {
                 setOrder((currentOrder) =>
                   currentOrder
                     ? {
                         ...currentOrder,
-                        review: {
-                          ...updatedReview,
-                          author: {
-                            id: updatedReview.author.id,
-                            name: updatedReview.author.name,
-                            image: updatedReview.author.image,
-                            activeColor:
-                              updatedReview.author.activeColor ??
-                              currentOrder.review?.author.activeColor ??
-                              null,
-                            activeFont:
-                              updatedReview.author.activeFont ??
-                              currentOrder.review?.author.activeFont ??
-                              null,
-                            activeDecoration:
-                              updatedReview.author.activeDecoration ??
-                              currentOrder.review?.author.activeDecoration ??
-                              null,
-                          },
-                        },
-                      }
-                    : currentOrder,
-                )
-              }
-              onDeleted={(reviewId) => {
-                setOrder((currentOrder) =>
-                  currentOrder && currentOrder.review?.id === reviewId
-                    ? {
-                        ...currentOrder,
-                        review: null,
+                        review:
+                          currentOrder.review?.id === reviewId
+                            ? null
+                            : currentOrder.review,
+                        buyerSellerReview:
+                          currentOrder.buyerSellerReview?.id === reviewId
+                            ? null
+                            : currentOrder.buyerSellerReview,
                       }
                     : currentOrder,
                 );
@@ -1851,6 +1942,136 @@ export function ActiveOrderView({ orderId }: ActiveOrderViewProps) {
                 setReviewError("");
               }}
             />
+          </div>
+        ) : canEditExistingSellerReview && existingBuyerSellerReview ? (
+          <div className="mt-6 rounded-[1.5rem] border border-sky-500/20 bg-sky-500/10 p-5">
+            <div className="flex flex-wrap items-start justify-between gap-4">
+              <div>
+                <p className="text-xs font-semibold tracking-[0.24em] uppercase text-sky-200/80">
+                  Ваш отзыв
+                </p>
+                <h3 className="mt-2 text-lg font-semibold text-white">
+                  Вы уже оставляли отзыв этому продавцу.
+                </h3>
+                <p className="mt-2 text-sm leading-7 text-sky-100/80">
+                  Для новой сделки нельзя публиковать второй отзыв этому же продавцу. Вы можете только обновить уже существующий отзыв.
+                </p>
+              </div>
+
+              <Button
+                type="button"
+                onClick={() => handleExistingReviewEditOpen(true)}
+                disabled={isExistingReviewEditPending}
+                className="h-11 rounded-[1.15rem] bg-sky-500 px-5 text-sm font-semibold text-slate-950 shadow-[0_18px_42px_rgba(14,165,233,0.24)] hover:bg-sky-400"
+              >
+                {isExistingReviewEditPending
+                  ? "Открываем редактор..."
+                  : "Редактировать отзыв"}
+              </Button>
+            </div>
+
+            <div className="mt-4 rounded-[1.25rem] border border-white/10 bg-black/20 p-4">
+              <div className="flex items-center justify-between gap-3">
+                <RatingStars value={existingBuyerSellerReview.rating} size="sm" />
+                <span className="text-xs uppercase tracking-[0.16em] text-zinc-500">
+                  Текущая версия
+                </span>
+              </div>
+              <div className="mt-3 text-sm leading-7 text-zinc-200">
+                <CensoredText
+                  text={
+                    existingBuyerSellerReview.comment?.trim() ||
+                    "Вы поставили оценку без текстового комментария."
+                  }
+                />
+              </div>
+            </div>
+
+            <Dialog
+              open={isExistingReviewEditOpen}
+              onOpenChange={handleExistingReviewEditOpen}
+            >
+              <DialogContent className="border-white/10 bg-[#10151c] text-zinc-100 sm:max-w-xl">
+                <DialogHeader className="space-y-3 pr-10">
+                  <DialogTitle className="text-2xl font-semibold tracking-tight text-white">
+                    Редактирование отзыва
+                  </DialogTitle>
+                  <DialogDescription className="text-sm leading-7 text-zinc-400">
+                    Обновите вашу оценку и комментарий продавцу. Новый отзыв создан не будет, изменится уже существующий.
+                  </DialogDescription>
+                </DialogHeader>
+
+                <form
+                  onSubmit={handleSubmitExistingReviewEdit}
+                  className="space-y-5"
+                >
+                  <div>
+                    <p className="text-xs font-semibold uppercase tracking-[0.18em] text-zinc-500">
+                      Оценка
+                    </p>
+                    <RatingStars
+                      value={existingReviewRating}
+                      size="lg"
+                      onChange={setExistingReviewRating}
+                      disabled={isExistingReviewEditPending}
+                      className="mt-3"
+                    />
+                  </div>
+
+                  <div>
+                    <p className="text-xs font-semibold uppercase tracking-[0.18em] text-zinc-500">
+                      Комментарий
+                    </p>
+                    <Textarea
+                      value={existingReviewComment}
+                      onChange={(event) =>
+                        setExistingReviewComment(event.target.value)
+                      }
+                      maxLength={MAX_REVIEW_COMMENT_LENGTH}
+                      rows={4}
+                      placeholder="Опишите впечатления от сделки..."
+                      disabled={isExistingReviewEditPending}
+                      className="mt-3 border-white/10 bg-zinc-950/70 text-zinc-100 placeholder:text-zinc-500 focus:border-orange-500/45 focus:bg-zinc-950 focus:ring-orange-500/10"
+                    />
+                    <div className="mt-2 flex items-center justify-between gap-4 text-xs text-zinc-500">
+                      <span>Комментарий необязателен, но помогает другим покупателям.</span>
+                      <span>
+                        {existingReviewComment.length}/{MAX_REVIEW_COMMENT_LENGTH}
+                      </span>
+                    </div>
+                  </div>
+
+                  {existingReviewEditError ? (
+                    <p className="text-sm text-rose-300">
+                      {existingReviewEditError}
+                    </p>
+                  ) : null}
+
+                  <DialogFooter className="gap-3 sm:justify-end">
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      onClick={() => handleExistingReviewEditOpen(false)}
+                      disabled={isExistingReviewEditPending}
+                      className="border border-white/10 bg-white/5 hover:bg-white/10"
+                    >
+                      Отмена
+                    </Button>
+                    <Button
+                      type="submit"
+                      disabled={
+                        isExistingReviewEditPending || existingReviewRating < 1
+                      }
+                      className="bg-orange-600 hover:bg-orange-500"
+                    >
+                      {isExistingReviewEditPending
+                        ? "Сохраняем..."
+                        : "Сохранить изменения"}
+                    </Button>
+                  </DialogFooter>
+                </form>
+              </DialogContent>
+            </Dialog>
           </div>
         ) : canLeaveReview ? (
           <form

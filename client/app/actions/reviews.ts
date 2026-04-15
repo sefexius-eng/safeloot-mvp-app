@@ -109,6 +109,10 @@ function canManageReview(user: CurrentSessionUser, authorId: string) {
   return user.id === authorId || hasReviewAdminAccess(user);
 }
 
+function canDeleteReview(user: CurrentSessionUser) {
+  return hasReviewAdminAccess(user);
+}
+
 function normalizeReviewRating(rating: number) {
   const normalizedRating = Number(rating);
 
@@ -174,6 +178,25 @@ async function getReviewMutationContext(
           },
         },
       },
+    },
+  });
+}
+
+async function findExistingSellerReview(input: {
+  authorId: string;
+  sellerId: string;
+  transactionClient: Prisma.TransactionClient;
+}) {
+  return input.transactionClient.review.findFirst({
+    where: {
+      authorId: input.authorId,
+      sellerId: input.sellerId,
+    },
+    select: {
+      id: true,
+    },
+    orderBy: {
+      createdAt: "desc",
     },
   });
 }
@@ -303,6 +326,16 @@ export async function createReview(
 
         if (order.status !== OrderStatus.COMPLETED) {
           throw new Error("Оставить отзыв можно только после завершения сделки.");
+        }
+
+        const existingSellerReview = await findExistingSellerReview({
+          authorId: currentUser.id,
+          sellerId: order.sellerId,
+          transactionClient,
+        });
+
+        if (existingSellerReview) {
+          throw new Error("Вы уже оставляли отзыв этому продавцу.");
         }
 
         if (order.review) {
@@ -542,6 +575,12 @@ export async function deleteReview(reviewId: string) {
         if (!canManageReview(currentUser, review.authorId)) {
           throw new Error(
             "Удалять отзывы может только автор или администратор.",
+          );
+        }
+
+        if (!canDeleteReview(currentUser)) {
+          throw new Error(
+            "После публикации отзыв можно только редактировать. Удаление доступно только администраторам.",
           );
         }
 
