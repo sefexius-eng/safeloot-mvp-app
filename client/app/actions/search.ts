@@ -3,6 +3,14 @@
 import type { Role } from "@prisma/client";
 
 import { prisma } from "@/lib/prisma";
+import catalogSeedData from "@/lib/catalog-seed-data.json";
+
+const POPULAR_GAME_SEED = catalogSeedData.popularGames.map((game) => ({
+  id: game.slug,
+  name: game.name,
+  slug: game.slug,
+  imageUrl: game.imageUrl ?? null,
+})) satisfies SearchGameResult[];
 
 export interface SearchGameResult {
   id: string;
@@ -31,6 +39,37 @@ export interface SearchUserResult {
   email: string;
   image: string | null;
   role: Role;
+}
+
+export async function getPopularSearchGames(): Promise<SearchGameResult[]> {
+  const games = await prisma.game.findMany({
+    where: {
+      slug: {
+        in: POPULAR_GAME_SEED.map((game) => game.slug),
+      },
+    },
+    select: {
+      id: true,
+      name: true,
+      slug: true,
+      imageUrl: true,
+    },
+  });
+
+  const gamesBySlug = new Map(games.map((game) => [game.slug, game]));
+
+  return POPULAR_GAME_SEED.map((seedGame) => {
+    const game = gamesBySlug.get(seedGame.slug);
+
+    return game
+      ? {
+          id: game.id,
+          name: game.name,
+          slug: game.slug,
+          imageUrl: game.imageUrl ?? seedGame.imageUrl,
+        }
+      : seedGame;
+  });
 }
 
 export async function searchCatalog(query: string): Promise<SearchCatalogResult> {

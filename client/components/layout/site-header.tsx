@@ -8,6 +8,7 @@ import { signOut, useSession } from "next-auth/react";
 import type { Role } from "@prisma/client";
 
 import {
+  getPopularSearchGames,
   searchCatalog,
   type SearchCategoryResult,
   type SearchCatalogResult,
@@ -34,7 +35,14 @@ import { isAdminRole } from "@/lib/roles";
 const BALANCE_REFRESH_EVENT = "safeloot:balances-refresh";
 const PROFILE_REFRESH_INTERVAL_MS = 5000;
 const SEARCH_DEBOUNCE_MS = 250;
-const POPULAR_GAMES = catalogSeedData.popularGames;
+const POPULAR_GAMES_FALLBACK: SearchGameResult[] = catalogSeedData.popularGames.map(
+  (game) => ({
+    id: game.slug,
+    name: game.name,
+    slug: game.slug,
+    imageUrl: game.imageUrl ?? null,
+  }),
+);
 
 const EMPTY_SEARCH_RESULTS: SearchCatalogResult = {
   games: [],
@@ -49,19 +57,27 @@ function SearchGameIcon({
   imageUrl: string | null;
 }) {
   const fallbackLetter = name.slice(0, 1).toUpperCase() || "G";
+  const normalizedImageUrl = imageUrl?.trim() ?? "";
+  const [failedImageUrl, setFailedImageUrl] = useState<string | null>(null);
 
-  if (imageUrl?.trim()) {
+  if (normalizedImageUrl && failedImageUrl !== normalizedImageUrl) {
     return (
-      <img
-        src={imageUrl}
-        alt={name}
-        className="h-9 w-9 rounded-xl border border-white/10 object-cover"
-      />
+      <span className="relative flex h-9 w-9 shrink-0 overflow-hidden rounded-xl border border-white/10 bg-white/5">
+        <Image
+          src={normalizedImageUrl}
+          alt={name}
+          fill
+          unoptimized
+          sizes="36px"
+          className="object-cover"
+          onError={() => setFailedImageUrl(normalizedImageUrl)}
+        />
+      </span>
     );
   }
 
   return (
-    <span className="flex h-9 w-9 items-center justify-center rounded-xl border border-white/10 bg-white/5 text-sm font-semibold text-zinc-200">
+    <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border border-white/10 bg-white/5 text-sm font-semibold text-zinc-200">
       {fallbackLetter}
     </span>
   );
@@ -115,6 +131,9 @@ export function SiteHeader() {
   const [user, setUser] = useState<CurrentUser | null>(null);
   const [refreshToken, setRefreshToken] = useState(0);
   const [query, setQuery] = useState("");
+  const [popularGames, setPopularGames] = useState<SearchGameResult[]>(
+    POPULAR_GAMES_FALLBACK,
+  );
   const [results, setResults] = useState<SearchCatalogResult>(EMPTY_SEARCH_RESULTS);
   const [isSearchOpen, setIsSearchOpen] = useState(false);
   const [isSearching, setIsSearching] = useState(false);
@@ -131,6 +150,26 @@ export function SiteHeader() {
 
     return () => {
       window.removeEventListener(BALANCE_REFRESH_EVENT, handleBalanceRefresh);
+    };
+  }, []);
+
+  useEffect(() => {
+    let isMounted = true;
+
+    void getPopularSearchGames()
+      .then((games) => {
+        if (isMounted && games.length > 0) {
+          setPopularGames(games);
+        }
+      })
+      .catch(() => {
+        if (isMounted) {
+          setPopularGames(POPULAR_GAMES_FALLBACK);
+        }
+      });
+
+    return () => {
+      isMounted = false;
     };
   }, []);
 
@@ -474,20 +513,14 @@ export function SiteHeader() {
                         Популярные игры
                       </div>
                       <div className="divide-y divide-white/10">
-                        {POPULAR_GAMES.map((game) => (
+                        {popularGames.map((game) => (
                           <button
-                            key={game.slug}
+                            key={game.id}
                             type="button"
-                            onClick={() =>
-                              handleSelectGame({
-                                ...game,
-                                id: game.slug,
-                                imageUrl: game.imageUrl ?? null,
-                              })
-                            }
+                            onClick={() => handleSelectGame(game)}
                             className="flex w-full items-center gap-3 px-4 py-3 text-left transition hover:bg-white/5"
                           >
-                            <SearchGameIcon name={game.name} imageUrl={game.imageUrl ?? null} />
+                            <SearchGameIcon name={game.name} imageUrl={game.imageUrl} />
                             <span className="min-w-0 flex-1">
                               <span className="block truncate text-sm font-semibold text-white">
                                 {game.name}
