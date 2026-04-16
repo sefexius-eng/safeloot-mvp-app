@@ -39,13 +39,20 @@ function buildSellerOrderCompletedTelegramMessage(input: {
   currency?: string | null;
   holdEndsAt?: Date | null;
 }) {
+  const payoutLine = input.holdEndsAt
+    ? `🔒 <b>В hold:</b> ${formatTelegramNotificationAmount(input.sellerNetAmount, input.currency)}`
+    : `💰 <b>Зачислено:</b> ${formatTelegramNotificationAmount(input.sellerNetAmount, input.currency)}`;
+  const statusLine = input.holdEndsAt
+    ? "Средства временно удерживаются в hold SafeLoot и будут доступны после его разморозки."
+    : "Средства уже доступны на вашем балансе SafeLoot.";
+
   return [
     "✅ <b>Сделка завершена</b>",
     "",
     `📦 <b>Товар:</b> ${escapeTelegramHtml(input.productTitle)}`,
-    `💰 <b>Зачислено:</b> ${formatTelegramNotificationAmount(input.sellerNetAmount, input.currency)}`,
+    payoutLine,
     "",
-    "Средства уже доступны на вашем балансе SafeLoot.",
+    statusLine,
   ].join("\n");
 }
 

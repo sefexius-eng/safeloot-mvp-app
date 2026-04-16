@@ -1,6 +1,7 @@
 import {
   OrderStatus,
   Prisma,
+  SellerRank,
   TransactionStatus,
   TransactionType,
 } from "@prisma/client";
@@ -48,8 +49,6 @@ import {
 } from "@/lib/domain/notifications-service";
 
 const ZERO_PLATFORM_FEE = formatMoney(ZERO_MONEY);
-const TRUSTED_SELLER_MIN_COMPLETED_SALES = 10;
-const TRUSTED_SELLER_MIN_AVERAGE_RATING = 4.5;
 const SELLER_PAYOUT_HOLD_DURATION_MS = 48 * 60 * 60 * 1000;
 const ORDER_PAID_SYSTEM_MESSAGE =
   "Оплата получена. SafeLoot зарезервировал средства по сделке. Продавец может передать товар в этом чате.";
@@ -89,45 +88,6 @@ function getOrderCompletedSystemMessage(input: { holdEndsAt?: Date | null }) {
   }
 
   return `Сделка успешно завершена. Средства продавца помещены в hold до ${formatHoldReleaseAt(input.holdEndsAt)}.`;
-}
-
-async function getSellerTrustStatus(
-  transactionClient: Prisma.TransactionClient,
-  input: {
-    sellerId: string;
-    upcomingCompletedSales?: number;
-  },
-) {
-  const [completedSalesCount, reviewAggregate] = await Promise.all([
-    transactionClient.order.count({
-      where: {
-        sellerId: input.sellerId,
-        status: OrderStatus.COMPLETED,
-      },
-    }),
-    transactionClient.review.aggregate({
-      where: {
-        sellerId: input.sellerId,
-      },
-      _avg: {
-        rating: true,
-      },
-    }),
-  ]);
-
-  const successfulSalesCount =
-    completedSalesCount + (input.upcomingCompletedSales ?? 0);
-  const averageRating = reviewAggregate._avg.rating;
-  const isTrusted =
-    successfulSalesCount >= TRUSTED_SELLER_MIN_COMPLETED_SALES &&
-    averageRating !== null &&
-    averageRating >= TRUSTED_SELLER_MIN_AVERAGE_RATING;
-
-  return {
-    successfulSalesCount,
-    averageRating,
-    isTrusted,
-  };
 }
 
 function logSettledSideEffectResults(
@@ -774,6 +734,7 @@ export async function completeOrder(input: { orderId: string; buyerId: string })
           status: true,
           seller: {
             select: {
+              rank: true,
               telegramId: true,
             },
           },
@@ -808,11 +769,8 @@ export async function completeOrder(input: { orderId: string; buyerId: string })
       const { fee, sellerPayout, feeAsNumber } = calculateCommissionBreakdown(
         orderAmount,
       );
-      const sellerTrustStatus = await getSellerTrustStatus(transactionClient, {
-        sellerId: order.sellerId,
-        upcomingCompletedSales: 1,
-      });
-      const sellerHoldEndsAt = sellerTrustStatus.isTrusted
+      const isTrusted = order.seller.rank === SellerRank.GOLD;
+      const sellerHoldEndsAt = isTrusted
         ? null
         : createSellerPayoutHoldEndsAt();
       const platformAdmin = await getPlatformAdminAccount(transactionClient);
