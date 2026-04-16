@@ -74,6 +74,50 @@ const ACCEPTED_CHAT_IMAGE_TYPES = new Set([
   "image/webp",
 ]);
 
+function formatHoldEndsAtLabel(value?: string | null) {
+  if (!value) {
+    return null;
+  }
+
+  const holdEndsAt = new Date(value);
+
+  if (Number.isNaN(holdEndsAt.getTime())) {
+    return null;
+  }
+
+  return new Intl.DateTimeFormat("ru-RU", {
+    dateStyle: "medium",
+    timeStyle: "short",
+  }).format(holdEndsAt);
+}
+
+function getCompleteOrderSuccessMessage(input: {
+  sellerNetAmount?: string;
+  currency?: string;
+  sellerFundsOnHold?: boolean;
+  holdEndsAt?: string | null;
+}) {
+  const formattedAmount = input.sellerNetAmount
+    ? formatAmountWithoutFractions(input.sellerNetAmount, {
+        currency: input.currency ?? "UAH",
+      })
+    : null;
+
+  if (input.sellerFundsOnHold && formattedAmount) {
+    const holdEndsAtLabel = formatHoldEndsAtLabel(input.holdEndsAt);
+
+    return holdEndsAtLabel
+      ? `Сделка завершена. ${formattedAmount} отправлено продавцу в hold до ${holdEndsAtLabel}.`
+      : `Сделка завершена. ${formattedAmount} отправлено продавцу в hold.`;
+  }
+
+  if (formattedAmount) {
+    return `Сделка завершена. Продавцу зачислено ${formattedAmount}.`;
+  }
+
+  return "Сделка завершена. Средства зачислены продавцу на доступный баланс.";
+}
+
 interface ChatUserIdentity {
   id: string;
   name: string | null;
@@ -978,6 +1022,14 @@ export function ActiveOrderView({ orderId }: ActiveOrderViewProps) {
         result.sellerNetAmount
           ? `Сделка завершена. Продавцу зачислено ${formatAmountWithoutFractions(result.sellerNetAmount, { currency: order?.currency ?? "UAH" })}.`
           : "Сделка завершена. Средства зачислены продавцу на доступный баланс.",
+      );
+      setCompleteMessage(
+        getCompleteOrderSuccessMessage({
+          sellerNetAmount: result.sellerNetAmount,
+          currency: order?.currency ?? "UAH",
+          sellerFundsOnHold: result.sellerFundsOnHold,
+          holdEndsAt: result.holdEndsAt,
+        }),
       );
       window.dispatchEvent(new Event(BALANCE_REFRESH_EVENT));
       router.refresh();

@@ -48,6 +48,9 @@ import {
 } from "@/lib/domain/notifications-service";
 
 const ZERO_PLATFORM_FEE = formatMoney(ZERO_MONEY);
+const TRUSTED_SELLER_MIN_COMPLETED_SALES = 10;
+const TRUSTED_SELLER_MIN_AVERAGE_RATING = 4.5;
+const SELLER_PAYOUT_HOLD_DURATION_MS = 48 * 60 * 60 * 1000;
 const ORDER_PAID_SYSTEM_MESSAGE =
   "Оплата получена. SafeLoot зарезервировал средства по сделке. Продавец может передать товар в этом чате.";
 const ORDER_COMPLETED_SYSTEM_MESSAGE =
@@ -67,6 +70,64 @@ function getOrderDisputeOpenedSystemMessage(openedBy: "buyer" | "seller") {
 
 function getAutoDeliverySystemMessage(autoDeliveryContent: string) {
   return `Система SafeLoot: ${autoDeliveryContent}`;
+}
+
+function createSellerPayoutHoldEndsAt(baseDate = new Date()) {
+  return new Date(baseDate.getTime() + SELLER_PAYOUT_HOLD_DURATION_MS);
+}
+
+function formatHoldReleaseAt(value: Date) {
+  return new Intl.DateTimeFormat("ru-RU", {
+    dateStyle: "medium",
+    timeStyle: "short",
+  }).format(value);
+}
+
+function getOrderCompletedSystemMessage(input: { holdEndsAt?: Date | null }) {
+  if (!input.holdEndsAt) {
+    return ORDER_COMPLETED_SYSTEM_MESSAGE;
+  }
+
+  return `Сделка успешно завершена. Средства продавца помещены в hold до ${formatHoldReleaseAt(input.holdEndsAt)}.`;
+}
+
+async function getSellerTrustStatus(
+  transactionClient: Prisma.TransactionClient,
+  input: {
+    sellerId: string;
+    upcomingCompletedSales?: number;
+  },
+) {
+  const [completedSalesCount, reviewAggregate] = await Promise.all([
+    transactionClient.order.count({
+      where: {
+        sellerId: input.sellerId,
+        status: OrderStatus.COMPLETED,
+      },
+    }),
+    transactionClient.review.aggregate({
+      where: {
+        sellerId: input.sellerId,
+      },
+      _avg: {
+        rating: true,
+      },
+    }),
+  ]);
+
+  const successfulSalesCount =
+    completedSalesCount + (input.upcomingCompletedSales ?? 0);
+  const averageRating = reviewAggregate._avg.rating;
+  const isTrusted =
+    successfulSalesCount >= TRUSTED_SELLER_MIN_COMPLETED_SALES &&
+    averageRating !== null &&
+    averageRating >= TRUSTED_SELLER_MIN_AVERAGE_RATING;
+
+  return {
+    successfulSalesCount,
+    averageRating,
+    isTrusted,
+  };
 }
 
 function logSettledSideEffectResults(
@@ -747,6 +808,13 @@ export async function completeOrder(input: { orderId: string; buyerId: string })
       const { fee, sellerPayout, feeAsNumber } = calculateCommissionBreakdown(
         orderAmount,
       );
+      const sellerTrustStatus = await getSellerTrustStatus(transactionClient, {
+        sellerId: order.sellerId,
+        upcomingCompletedSales: 1,
+      });
+      const sellerHoldEndsAt = sellerTrustStatus.isTrusted
+        ? null
+        : createSellerPayoutHoldEndsAt();
       const platformAdmin = await getPlatformAdminAccount(transactionClient);
       const escrowHoldTransaction = await findCompletedEscrowHoldTransaction(
         transactionClient,
@@ -813,9 +881,17 @@ export async function completeOrder(input: { orderId: string; buyerId: string })
           id: order.sellerId,
         },
         data: {
-          availableBalance: {
-            increment: sellerPayout,
-          },
+          ...(sellerHoldEndsAt
+            ? {
+                holdBalance: {
+                  increment: sellerPayout,
+                },
+              }
+            : {
+                availableBalance: {
+                  increment: sellerPayout,
+                },
+              }),
         },
       });
 
@@ -825,7 +901,10 @@ export async function completeOrder(input: { orderId: string; buyerId: string })
           orderId: order.id,
           amount: sellerPayout,
           type: TransactionType.ESCROW_RELEASE,
-          status: TransactionStatus.COMPLETED,
+          status: sellerHoldEndsAt
+            ? TransactionStatus.PENDING
+            : TransactionStatus.COMPLETED,
+          holdEndsAt: sellerHoldEndsAt,
         },
         select: {
           id: true,
@@ -840,6 +919,8 @@ export async function completeOrder(input: { orderId: string; buyerId: string })
         status: OrderStatus.COMPLETED,
         platformFee: formatMoney(fee),
         sellerNetAmount: formatMoney(sellerPayout),
+        sellerFundsOnHold: sellerHoldEndsAt !== null,
+        holdEndsAt: sellerHoldEndsAt,
         sellerTelegramId: order.seller.telegramId,
         productTitle: order.product.title,
         orderCurrency: order.currency,
@@ -856,6 +937,7 @@ export async function completeOrder(input: { orderId: string; buyerId: string })
       productTitle: result.productTitle,
       sellerNetAmount: result.sellerNetAmount,
       currency: result.orderCurrency,
+      holdEndsAt: result.holdEndsAt,
     }),
     publishOrderUpdatedEvent({
       orderId: result.orderId,
@@ -866,7 +948,7 @@ export async function completeOrder(input: { orderId: string; buyerId: string })
     createOrderSystemMessages({
       orderId: result.orderId,
       senderId: buyerId,
-      texts: [ORDER_COMPLETED_SYSTEM_MESSAGE],
+      texts: [getOrderCompletedSystemMessage({ holdEndsAt: result.holdEndsAt })],
     }),
   ]);
 
@@ -901,6 +983,8 @@ export async function completeOrder(input: { orderId: string; buyerId: string })
     status: result.status,
     platformFee: result.platformFee,
     sellerNetAmount: result.sellerNetAmount,
+    sellerFundsOnHold: result.sellerFundsOnHold,
+    holdEndsAt: result.holdEndsAt?.toISOString() ?? null,
   };
 }
 

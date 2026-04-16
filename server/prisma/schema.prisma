@@ -119,6 +119,7 @@ model Transaction {
   externalId  String?           @unique
   type        TransactionType
   status      TransactionStatus @default(PENDING)
+  holdEndsAt  DateTime?
   user        User              @relation(fields: [userId], references: [id], onDelete: Restrict, onUpdate: Cascade)
   order       Order?            @relation(fields: [orderId], references: [id], onDelete: SetNull, onUpdate: Cascade)
   createdAt   DateTime          @default(now())
@@ -128,6 +129,7 @@ model Transaction {
   @@index([orderId])
   @@index([type])
   @@index([status])
+  @@index([type, status, holdEndsAt])
   @@map("transactions")
 }
 

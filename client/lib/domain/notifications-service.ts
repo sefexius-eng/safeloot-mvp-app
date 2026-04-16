@@ -37,6 +37,7 @@ function buildSellerOrderCompletedTelegramMessage(input: {
   productTitle: string;
   sellerNetAmount: string;
   currency?: string | null;
+  holdEndsAt?: Date | null;
 }) {
   return [
     "✅ <b>Сделка завершена</b>",
@@ -104,6 +105,7 @@ export async function sendSellerOrderCompletedTelegramNotification(input: {
   productTitle: string;
   sellerNetAmount: string;
   currency?: string | null;
+  holdEndsAt?: Date | null;
 }) {
   if (!input.telegramId) {
     return;
@@ -115,6 +117,7 @@ export async function sendSellerOrderCompletedTelegramNotification(input: {
       productTitle: input.productTitle,
       sellerNetAmount: input.sellerNetAmount,
       currency: input.currency,
+      holdEndsAt: input.holdEndsAt,
     }),
   );
 }

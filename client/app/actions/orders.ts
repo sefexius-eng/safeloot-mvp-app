@@ -26,6 +26,8 @@ interface OrderActionResult {
   platformFee?: string;
   refundAmount?: string;
   sellerNetAmount?: string;
+  sellerFundsOnHold?: boolean;
+  holdEndsAt?: string | null;
 }
 
 interface CreatePendingOrderResult {
@@ -170,6 +172,8 @@ export async function confirmOrder(orderId: string): Promise<OrderActionResult> 
       status: result.status,
       platformFee: result.platformFee,
       sellerNetAmount: result.sellerNetAmount,
+      sellerFundsOnHold: result.sellerFundsOnHold,
+      holdEndsAt: result.holdEndsAt,
     };
   } catch (error) {
     return {
