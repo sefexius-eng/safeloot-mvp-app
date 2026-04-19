@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { AzureOpenAI } from "openai";
 
 export async function POST(req: Request) {
   try {
@@ -9,43 +10,36 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: "Title is required" }, { status: 400 });
     }
 
-    // Берем полную ссылку (которую мы настроили в прошлом шаге)
-    const fullUrl = (process.env.AZURE_OPENAI_ENDPOINT || "").trim();
-    const apiKey = (process.env.AZURE_OPENAI_API_KEY || "").trim();
-
-    const response = await fetch(fullUrl, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "api-key": apiKey,
-      },
-      body: JSON.stringify({
-        messages: [
-          {
-            role: "user",
-            content: `Ты маркетолог игрового маркетплейса. Напиши сочное, продающее SEO-описание для товара: "${title}". Используй списки. Возвращай только текст описания.`
-          }
-        ],
-        // КРИТИЧЕСКИ ВАЖНО: жестко ограничиваем ответ, чтобы влезть в лимит 1K TPM
-        max_tokens: 250,
-        temperature: 0.7
-      })
+    const client = new AzureOpenAI({
+      endpoint: process.env.AZURE_OPENAI_ENDPOINT,
+      apiKey: process.env.AZURE_OPENAI_API_KEY,
+      apiVersion: "2024-02-15-preview", // Стабильная версия для gpt-4o
+      deployment: process.env.AZURE_OPENAI_DEPLOYMENT_NAME, // Теперь тут будет "gpt-4o"
     });
 
-    const rawText = await response.text();
+    const response = await client.chat.completions.create({
+      model: process.env.AZURE_OPENAI_DEPLOYMENT_NAME!,
+      messages: [
+        {
+          role: "system",
+          content: "Ты крутой маркетолог игрового маркетплейса. Напиши сочное, продающее описание для товара. Используй списки. Возвращай только текст описания без лишних вступлений."
+        },
+        {
+          role: "user",
+          content: title
+        }
+      ],
+      temperature: 0.7,
+      top_p: 0.95, // Параметр прямо из твоего файла ChatSetup.json
+      max_tokens: 800
+    });
 
-    if (!response.ok) {
-      console.error("🔥 Azure Error:", rawText);
-      return NextResponse.json({ error: "Ошибка API Azure" }, { status: response.status });
-    }
-
-    const data = JSON.parse(rawText);
-    const description = data.choices?.[0]?.message?.content || "";
+    const description = response.choices[0]?.message?.content || "";
 
     return NextResponse.json({ description });
 
   } catch (error: any) {
-    console.error("Server Error:", error.message);
-    return NextResponse.json({ error: "Internal Server Error" }, { status: 500 });
+    console.error("🔥 Ошибка API Azure:", error);
+    return NextResponse.json({ error: error.message || "Ошибка API" }, { status: 500 });
   }
 }
