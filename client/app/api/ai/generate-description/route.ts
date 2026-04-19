@@ -12,7 +12,7 @@ export async function POST(req: Request) {
     const baseUrl = (process.env.AZURE_OPENAI_ENDPOINT || "").replace(/\/$/, "").trim();
     const deployment = (process.env.AZURE_OPENAI_DEPLOYMENT_NAME || "").trim();
     const apiKey = (process.env.AZURE_OPENAI_API_KEY || "").trim();
-    const apiVersion = "2024-02-01"; // Самая стабильная релизная версия (GA)
+    const apiVersion = "2025-01-01-preview"; // Актуальная версия для модели 2025-04-14
 
     const url = `${baseUrl}/openai/deployments/${deployment}/chat/completions?api-version=${apiVersion}`;
 
