@@ -2,25 +2,17 @@ import { NextResponse } from "next/server";
 
 export async function POST(req: Request) {
   try {
-    // 1. Безопасно читаем запрос от твоего сайта
-    let body;
-    try {
-      body = await req.json();
-    } catch (e) {
-      return NextResponse.json({ error: "Empty request from frontend" }, { status: 400 });
+    const body = await req.json();
+    const title = body?.title;
+
+    if (!title) {
+      return NextResponse.json({ error: "Title is required" }, { status: 400 });
     }
 
-    const title = body?.title || "Секретный товар";
-
-    // 2. Берем ПОЛНУЮ ссылку из Vercel
+    // Берем полную ссылку (которую мы настроили в прошлом шаге)
     const fullUrl = (process.env.AZURE_OPENAI_ENDPOINT || "").trim();
     const apiKey = (process.env.AZURE_OPENAI_API_KEY || "").trim();
 
-    if (!fullUrl) {
-      return NextResponse.json({ error: "Azure Endpoint is missing in Vercel" }, { status: 500 });
-    }
-
-    // 3. Отправляем прямой запрос
     const response = await fetch(fullUrl, {
       method: "POST",
       headers: {
@@ -31,22 +23,22 @@ export async function POST(req: Request) {
         messages: [
           {
             role: "user",
-            content: `Напиши сочное, продающее описание для товара: ${title}. Возвращай только текст.`
+            content: `Ты маркетолог игрового маркетплейса. Напиши сочное, продающее SEO-описание для товара: "${title}". Используй списки. Возвращай только текст описания.`
           }
-        ]
+        ],
+        // КРИТИЧЕСКИ ВАЖНО: жестко ограничиваем ответ, чтобы влезть в лимит 1K TPM
+        max_tokens: 250,
+        temperature: 0.7
       })
     });
 
-    // 4. ЧИТАЕМ КАК ТЕКСТ (защита от SyntaxError)
     const rawText = await response.text();
 
     if (!response.ok) {
-      // Теперь, даже если Azure выплюнет HTML, мы увидим его в логах Vercel!
-      console.error("🔥 Azure Raw Response:", rawText);
-      return NextResponse.json({ error: `Azure Error: ${rawText}` }, { status: response.status });
+      console.error("🔥 Azure Error:", rawText);
+      return NextResponse.json({ error: "Ошибка API Azure" }, { status: response.status });
     }
 
-    // 5. Если всё ОК, парсим текст в JSON
     const data = JSON.parse(rawText);
     const description = data.choices?.[0]?.message?.content || "";
 
