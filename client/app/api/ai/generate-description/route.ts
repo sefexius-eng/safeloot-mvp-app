@@ -16,7 +16,7 @@ export async function POST(req: Request) {
     const client = new AzureOpenAI({
       endpoint: process.env.AZURE_OPENAI_ENDPOINT,
       apiKey: process.env.AZURE_OPENAI_API_KEY,
-      apiVersion: "2024-02-01",
+      apiVersion: "2025-01-01-preview",
       deployment: process.env.AZURE_OPENAI_DEPLOYMENT_NAME,
     });
 
