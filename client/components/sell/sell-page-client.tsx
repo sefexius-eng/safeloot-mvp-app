@@ -47,7 +47,9 @@ export function SellPageClient({ games }: SellPageClientProps) {
   const { currentRate, currencySymbol } = useCurrency();
   const [formState, setFormState] = useState(() => createInitialFormState(games));
   const [errorMessage, setErrorMessage] = useState("");
+  const [descriptionGeneratorError, setDescriptionGeneratorError] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isGeneratingDescription, setIsGeneratingDescription] = useState(false);
 
   const selectedGame =
     games.find((game) => game.id === formState.gameId) ?? games[0] ?? null;
@@ -58,6 +60,58 @@ export function SellPageClient({ games }: SellPageClientProps) {
       ? Math.round(((localPriceValue / currentRate) + Number.EPSILON) * 100000000) /
         100000000
       : 0;
+
+  async function handleGenerateAI() {
+    const title = formState.title.trim();
+
+    if (!title) {
+      alert("Сначала введите название товара");
+      return;
+    }
+
+    setDescriptionGeneratorError("");
+    setIsGeneratingDescription(true);
+
+    try {
+      const response = await fetch("/api/ai/generate-description", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ title }),
+      });
+
+      const payload = (await response.json().catch(() => null)) as
+        | {
+            description?: string;
+            message?: string;
+          }
+        | null;
+
+      if (!response.ok) {
+        throw new Error(payload?.message ?? "Не удалось сгенерировать описание.");
+      }
+
+      const generatedDescription = payload?.description?.trim();
+
+      if (!generatedDescription) {
+        throw new Error("ИИ вернул пустой текст. Попробуйте снова.");
+      }
+
+      setFormState((current) => ({
+        ...current,
+        description: generatedDescription.slice(0, 1000),
+      }));
+    } catch (error) {
+      setDescriptionGeneratorError(
+        error instanceof Error
+          ? error.message
+          : "Не удалось сгенерировать описание.",
+      );
+    } finally {
+      setIsGeneratingDescription(false);
+    }
+  }
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -140,7 +194,19 @@ export function SellPageClient({ games }: SellPageClientProps) {
               />
             </FormField>
 
-            <FormField label="Описание">
+            <div className="space-y-2.5">
+              <div className="flex flex-wrap items-center justify-between gap-3">
+                <span className="text-sm font-semibold text-neutral-800">Описание</span>
+                <Button
+                  type="button"
+                  onClick={handleGenerateAI}
+                  disabled={isGeneratingDescription || isSubmitting}
+                  className="h-9 rounded-xl bg-gradient-to-r from-purple-500 to-indigo-500 px-3.5 text-xs font-semibold text-white shadow-[0_12px_26px_rgba(99,102,241,0.34)] hover:brightness-110 focus-visible:ring-purple-500/35"
+                >
+                  {isGeneratingDescription ? "Генерация... ⏳" : "✨ Сгенерировать ИИ"}
+                </Button>
+              </div>
+
               <Textarea
                 value={formState.description}
                 onChange={(event) =>
@@ -153,7 +219,18 @@ export function SellPageClient({ games }: SellPageClientProps) {
                 maxLength={1000}
                 required
               />
-            </FormField>
+
+              <p className="text-xs leading-6 text-neutral-500">
+                ИИ использует название товара и формирует продающее SEO-описание с
+                акцентом на безопасность сделки.
+              </p>
+
+              {descriptionGeneratorError ? (
+                <p className="rounded-xl border border-red-500/15 bg-red-500/8 px-3 py-2 text-xs leading-6 text-red-800">
+                  {descriptionGeneratorError}
+                </p>
+              ) : null}
+            </div>
 
             <FormField label="Автовыдача (необязательно)">
               <Textarea
