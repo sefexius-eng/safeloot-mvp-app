@@ -9,10 +9,6 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: "Title is required" }, { status: 400 });
     }
 
-    // Для отладки в логах Vercel (чтобы убедиться, что переменные не undefined)
-    console.log("Endpoint:", process.env.AZURE_OPENAI_ENDPOINT ? "Set" : "Missing");
-    console.log("Deployment:", process.env.AZURE_OPENAI_DEPLOYMENT_NAME);
-
     const client = new AzureOpenAI({
       endpoint: process.env.AZURE_OPENAI_ENDPOINT,
       apiKey: process.env.AZURE_OPENAI_API_KEY,
@@ -21,30 +17,23 @@ export async function POST(req: Request) {
     });
 
     const response = await client.chat.completions.create({
-      model: process.env.AZURE_OPENAI_DEPLOYMENT_NAME!, // Обязательное поле для Azure
+      model: process.env.AZURE_OPENAI_DEPLOYMENT_NAME!, // Обязательно для Azure
       messages: [
         {
-          role: "system",
-          content:
-            "Ты крутой маркетолог игрового маркетплейса. Преврати краткое название товара в сочное, продающее описание для геймеров. Используй списки (буллиты), делай акцент на безопасности сделки. Не пиши вступительных фраз, возвращай ТОЛЬКО готовый текст описания.",
-        },
-        {
           role: "user",
-          content: title,
-        },
-      ],
-      temperature: 0.7,
-      max_tokens: 500,
+          content: `Ты крутой маркетолог игрового маркетплейса. Преврати краткое название товара в сочное, продающее описание для геймеров. Используй списки (буллиты), делай акцент на безопасности сделки и быстрой выдаче. Не пиши вступительных фраз, возвращай ТОЛЬКО готовый текст описания.\n\nНазвание товара: ${title}`
+        }
+      ]
+      // Мы полностью удалили temperature, max_tokens и роль system
+      // Новые Pro-модели выдают из-за них ошибку 400
     });
 
     const description = response.choices[0]?.message?.content || "";
 
     return NextResponse.json({ description });
+
   } catch (error: any) {
     console.error("Azure OpenAI Error:", error);
-    return NextResponse.json(
-      { error: error.message || "Internal Server Error" },
-      { status: 500 },
-    );
+    return NextResponse.json({ error: error.message || "Internal Server Error" }, { status: 500 });
   }
 }
