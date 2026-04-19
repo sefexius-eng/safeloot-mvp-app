@@ -8,10 +8,11 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: "Title is required" }, { status: 400 });
     }
 
-    const baseUrl = (process.env.AZURE_OPENAI_ENDPOINT || "").replace(/\/$/, "");
-    const deployment = process.env.AZURE_OPENAI_DEPLOYMENT_NAME;
-    const apiKey = process.env.AZURE_OPENAI_API_KEY || "";
-    const apiVersion = "2024-02-15-preview";
+    // ЖЕЛЕЗОБЕТОННАЯ ОЧИСТКА: удаляем случайные пробелы и слэши из настроек Vercel
+    const baseUrl = (process.env.AZURE_OPENAI_ENDPOINT || "").replace(/\/$/, "").trim();
+    const deployment = (process.env.AZURE_OPENAI_DEPLOYMENT_NAME || "").trim();
+    const apiKey = (process.env.AZURE_OPENAI_API_KEY || "").trim();
+    const apiVersion = "2024-02-01"; // Самая стабильная релизная версия (GA)
 
     const url = `${baseUrl}/openai/deployments/${deployment}/chat/completions?api-version=${apiVersion}`;
 
@@ -24,24 +25,19 @@ export async function POST(req: Request) {
       body: JSON.stringify({
         messages: [
           {
-            role: "system",
-            content:
-              "Ты крутой маркетолог игрового маркетплейса. Преврати краткое название товара в сочное, продающее описание для геймеров. Используй списки (буллиты), делай акцент на безопасности сделки и скорости выдачи. Не пиши вступительных фраз, возвращай ТОЛЬКО готовый текст описания.",
-          },
-          {
             role: "user",
-            content: title,
+            // Мы спрятали системный промпт прямо в запрос пользователя,
+            // так как некоторые новые модели Azure вообще не поддерживают роль "system"
+            content: `Ты маркетолог игрового маркетплейса. Напиши сочное, продающее описание для товара. Используй списки. Возвращай только текст описания без лишних слов.\n\nНазвание товара: ${title}`
           },
-        ],
-        temperature: 0.7,
-        max_tokens: 800,
+        ]
       }),
     });
 
     const data = await response.json();
 
     if (!response.ok) {
-      console.error("Direct Fetch Error from Azure:", data);
+      console.error("🔥 Azure Fetch Error:", data);
       return NextResponse.json(
         { error: data.error?.message || "Ошибка API Azure" },
         { status: response.status }
