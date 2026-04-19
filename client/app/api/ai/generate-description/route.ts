@@ -12,20 +12,25 @@ export async function POST(req: Request) {
     const client = new AzureOpenAI({
       endpoint: process.env.AZURE_OPENAI_ENDPOINT,
       apiKey: process.env.AZURE_OPENAI_API_KEY,
-      apiVersion: "2025-01-01-preview",
+      apiVersion: "2024-12-01-preview",
       deployment: process.env.AZURE_OPENAI_DEPLOYMENT_NAME,
     });
 
     const response = await client.chat.completions.create({
-      model: process.env.AZURE_OPENAI_DEPLOYMENT_NAME!, // Обязательно для Azure
+      model: process.env.AZURE_OPENAI_DEPLOYMENT_NAME!,
       messages: [
         {
+          role: "system",
+          content:
+            "Ты крутой маркетолог игрового маркетплейса. Преврати краткое название товара в сочное, продающее описание для геймеров. Используй списки (буллиты), делай акцент на безопасности сделки и скорости выдачи. Не пиши вступительных фраз, возвращай ТОЛЬКО готовый текст описания.",
+        },
+        {
           role: "user",
-          content: `Ты крутой маркетолог игрового маркетплейса. Преврати краткое название товара в сочное, продающее описание для геймеров. Используй списки (буллиты), делай акцент на безопасности сделки и быстрой выдаче. Не пиши вступительных фраз, возвращай ТОЛЬКО готовый текст описания.\n\nНазвание товара: ${title}`
+          content: title,
         }
-      ]
-      // Мы полностью удалили temperature, max_tokens и роль system
-      // Новые Pro-модели выдают из-за них ошибку 400
+      ],
+      temperature: 0.7,
+      max_tokens: 800,
     });
 
     const description = response.choices[0]?.message?.content || "";
