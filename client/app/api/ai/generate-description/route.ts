@@ -1,62 +1,32 @@
-import { AzureOpenAI } from "openai";
 import { NextResponse } from "next/server";
+import { AzureOpenAI } from "openai";
 
-interface GenerateDescriptionRequestBody {
-  title?: string;
-}
-
-const SYSTEM_PROMPT =
-  "Ты крутой маркетолог игрового маркетплейса. Преврати краткое название товара в сочное, продающее описание для геймеров. Используй списки (буллиты), делай акцент на безопасности сделки и скорости выдачи. Не пиши вступительных фраз вроде 'Вот ваше описание', возвращай ТОЛЬКО готовый текст описания.";
-const MAX_PRODUCT_DESCRIPTION_LENGTH = 1000;
-
-export const runtime = "nodejs";
-
-export async function POST(request: Request) {
-  let body: GenerateDescriptionRequestBody;
-
+export async function POST(req: Request) {
   try {
-    body = (await request.json()) as GenerateDescriptionRequestBody;
-  } catch {
-    return NextResponse.json(
-      { message: "Некорректное тело запроса." },
-      { status: 400 },
-    );
-  }
+    const { title } = await req.json();
 
-  const title = body.title?.trim() ?? "";
+    if (!title) {
+      return NextResponse.json({ error: "Title is required" }, { status: 400 });
+    }
 
-  if (!title) {
-    return NextResponse.json(
-      { message: "Поле title обязательно." },
-      { status: 400 },
-    );
-  }
+    // Для отладки в логах Vercel (чтобы убедиться, что переменные не undefined)
+    console.log("Endpoint:", process.env.AZURE_OPENAI_ENDPOINT ? "Set" : "Missing");
+    console.log("Deployment:", process.env.AZURE_OPENAI_DEPLOYMENT_NAME);
 
-  const endpoint = process.env.AZURE_OPENAI_ENDPOINT?.trim();
-  const apiKey = process.env.AZURE_OPENAI_API_KEY?.trim();
-  const deploymentName = process.env.AZURE_OPENAI_DEPLOYMENT_NAME?.trim();
+    const client = new AzureOpenAI({
+      endpoint: process.env.AZURE_OPENAI_ENDPOINT,
+      apiKey: process.env.AZURE_OPENAI_API_KEY,
+      apiVersion: "2024-02-01",
+      deployment: process.env.AZURE_OPENAI_DEPLOYMENT_NAME,
+    });
 
-  if (!endpoint || !apiKey || !deploymentName) {
-    return NextResponse.json(
-      { message: "Azure OpenAI не настроен на сервере." },
-      { status: 500 },
-    );
-  }
-
-  const client = new AzureOpenAI({
-    endpoint,
-    apiKey,
-    apiVersion: "2024-02-15-preview",
-    deployment: deploymentName,
-  });
-
-  try {
     const response = await client.chat.completions.create({
-      model: deploymentName,
+      model: process.env.AZURE_OPENAI_DEPLOYMENT_NAME!, // Обязательное поле для Azure
       messages: [
         {
           role: "system",
-          content: SYSTEM_PROMPT,
+          content:
+            "Ты крутой маркетолог игрового маркетплейса. Преврати краткое название товара в сочное, продающее описание для геймеров. Используй списки (буллиты), делай акцент на безопасности сделки. Не пиши вступительных фраз, возвращай ТОЛЬКО готовый текст описания.",
         },
         {
           role: "user",
@@ -64,30 +34,16 @@ export async function POST(request: Request) {
         },
       ],
       temperature: 0.7,
-      max_tokens: 700,
+      max_tokens: 500,
     });
 
-    const generatedText = response.choices[0]?.message?.content?.trim() ?? "";
+    const description = response.choices[0]?.message?.content || "";
 
-    if (!generatedText) {
-      throw new Error("ИИ вернул пустое описание. Попробуйте снова.");
-    }
-
-    return NextResponse.json({
-      description: generatedText.slice(0, MAX_PRODUCT_DESCRIPTION_LENGTH),
-    });
-  } catch (error) {
-    console.error("[AI_GENERATE_DESCRIPTION_ERROR]", error);
-
-    if (error instanceof Error) {
-      return NextResponse.json(
-        { message: error.message },
-        { status: 502 },
-      );
-    }
-
+    return NextResponse.json({ description });
+  } catch (error: any) {
+    console.error("Azure OpenAI Error:", error);
     return NextResponse.json(
-      { message: "Не удалось сгенерировать описание." },
+      { error: error.message || "Internal Server Error" },
       { status: 500 },
     );
   }
