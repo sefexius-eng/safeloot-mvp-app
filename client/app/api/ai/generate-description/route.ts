@@ -12,7 +12,7 @@ export async function POST(req: Request) {
     const client = new AzureOpenAI({
       endpoint: process.env.AZURE_OPENAI_ENDPOINT,
       apiKey: process.env.AZURE_OPENAI_API_KEY,
-      apiVersion: "2024-12-01-preview",
+      apiVersion: "2024-02-15-preview",
       deployment: process.env.AZURE_OPENAI_DEPLOYMENT_NAME,
     });
 
@@ -29,8 +29,6 @@ export async function POST(req: Request) {
           content: title,
         }
       ],
-      temperature: 0.7,
-      max_tokens: 800,
     });
 
     const description = response.choices[0]?.message?.content || "";
@@ -38,7 +36,7 @@ export async function POST(req: Request) {
     return NextResponse.json({ description });
 
   } catch (error: any) {
-    console.error("Azure OpenAI Error:", error);
+    console.error("Azure Raw Error:", JSON.stringify(error, null, 2));
     return NextResponse.json({ error: error.message || "Internal Server Error" }, { status: 500 });
   }
 }
