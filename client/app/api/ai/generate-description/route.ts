@@ -1,33 +1,59 @@
 import { NextResponse } from "next/server";
-import { AzureOpenAI } from "openai";
 
 export async function POST(req: Request) {
   try {
-    // 1. Инициализируем клиент с железобетонными настройками из скриншота
-    const client = new AzureOpenAI({
-      endpoint: "https://nesef-mo520qbb-eastus2.cognitiveservices.azure.com/",
-      apiKey: process.env.AZURE_OPENAI_API_KEY,
-      apiVersion: "2024-12-01-preview",
-      deployment: "safeloot-text-model",
+    // 1. Безопасно читаем запрос от твоего сайта
+    let body;
+    try {
+      body = await req.json();
+    } catch (e) {
+      return NextResponse.json({ error: "Empty request from frontend" }, { status: 400 });
+    }
+
+    const title = body?.title || "Секретный товар";
+
+    // 2. Берем ПОЛНУЮ ссылку из Vercel
+    const fullUrl = (process.env.AZURE_OPENAI_ENDPOINT || "").trim();
+    const apiKey = (process.env.AZURE_OPENAI_API_KEY || "").trim();
+
+    if (!fullUrl) {
+      return NextResponse.json({ error: "Azure Endpoint is missing in Vercel" }, { status: 500 });
+    }
+
+    // 3. Отправляем прямой запрос
+    const response = await fetch(fullUrl, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "api-key": apiKey,
+      },
+      body: JSON.stringify({
+        messages: [
+          {
+            role: "user",
+            content: `Напиши сочное, продающее описание для товара: ${title}. Возвращай только текст.`
+          }
+        ]
+      })
     });
 
-    // 2. Делаем МАКСИМАЛЬНО безобидный запрос, чтобы обойти фильтр на оружие
-    const response = await client.chat.completions.create({
-      model: "safeloot-text-model",
-      messages: [
-        {
-          role: "user",
-          content: "Напиши одно слово: Привет"
-        }
-      ]
-    });
+    // 4. ЧИТАЕМ КАК ТЕКСТ (защита от SyntaxError)
+    const rawText = await response.text();
 
-    const description = response.choices[0]?.message?.content || "";
+    if (!response.ok) {
+      // Теперь, даже если Azure выплюнет HTML, мы увидим его в логах Vercel!
+      console.error("🔥 Azure Raw Response:", rawText);
+      return NextResponse.json({ error: `Azure Error: ${rawText}` }, { status: response.status });
+    }
+
+    // 5. Если всё ОК, парсим текст в JSON
+    const data = JSON.parse(rawText);
+    const description = data.choices?.[0]?.message?.content || "";
 
     return NextResponse.json({ description });
 
   } catch (error: any) {
-    console.error("🔥 Ошибка:", error);
-    return NextResponse.json({ error: error.message || "Ошибка API" }, { status: 500 });
+    console.error("Server Error:", error.message);
+    return NextResponse.json({ error: "Internal Server Error" }, { status: 500 });
   }
 }
