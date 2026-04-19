@@ -8,15 +8,16 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: "Title is required" }, { status: 400 });
     }
 
-    // ЖЕЛЕЗОБЕТОННАЯ ОЧИСТКА: удаляем случайные пробелы и слэши из настроек Vercel
-    const baseUrl = (process.env.AZURE_OPENAI_ENDPOINT || "").replace(/\/$/, "").trim();
-    const deployment = (process.env.AZURE_OPENAI_DEPLOYMENT_NAME || "").trim();
+    // БЕРЕМ ГОТОВУЮ ПОЛНУЮ ССЫЛКУ ИЗ VERCEL (без всяких добавлений)
+    const fullUrl = (process.env.AZURE_OPENAI_ENDPOINT || "").trim();
     const apiKey = (process.env.AZURE_OPENAI_API_KEY || "").trim();
-    const apiVersion = "2025-01-01-preview"; // Актуальная версия для модели 2025-04-14
 
-    const url = `${baseUrl}/openai/deployments/${deployment}/chat/completions?api-version=${apiVersion}`;
+    if (!fullUrl) {
+      console.error("Endpoint is missing");
+      return NextResponse.json({ error: "Server configuration error" }, { status: 500 });
+    }
 
-    const response = await fetch(url, {
+    const response = await fetch(fullUrl, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
@@ -26,9 +27,7 @@ export async function POST(req: Request) {
         messages: [
           {
             role: "user",
-            // Мы спрятали системный промпт прямо в запрос пользователя,
-            // так как некоторые новые модели Azure вообще не поддерживают роль "system"
-            content: `Ты маркетолог игрового маркетплейса. Напиши сочное, продающее описание для товара. Используй списки. Возвращай только текст описания без лишних слов.\n\nНазвание товара: ${title}`
+            content: `Ты крутой маркетолог игрового маркетплейса. Преврати краткое название товара в сочное, продающее описание для геймеров. Используй списки (буллиты), делай акцент на безопасности сделки и скорости выдачи. Не пиши вступительных фраз, возвращай ТОЛЬКО готовый текст описания.\n\nНазвание товара: ${title}`
           },
         ]
       }),
